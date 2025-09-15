@@ -1,0 +1,90 @@
+services:    
+  ollama:
+    image: ollama/ollama:latest
+    container_name: ollama
+    restart: unless-stopped
+    ports:
+      - "11434:11434"
+    volumes:
+      - ollama_data:/root/.ollama
+    environment:
+      - OLLAMA_HOST=0.0.0.0
+    healthcheck:
+      test: ["CMD", "/bin/sh", "-c", "ollama list | grep -q 'qwen3:0.6b'"]
+      interval: 5s
+      timeout: 10s
+      retries: 60 # Accomodate for qwen3:0.6b model download time (523MB)
+      start_period: 5s
+    entrypoint: ["/bin/sh", "-c"]
+    command: 
+      - |
+        ollama serve &
+        sleep 5
+        ollama pull qwen3:0.6b || true
+        wait
+
+  hotel-api:
+    build:
+      context: ./hotel-booking-api
+      dockerfile: Dockerfile
+    container_name: hotel-booking-api
+    restart: unless-stopped
+    ports:
+      - "8000:8000"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/bookings"]
+      interval: 5s
+      timeout: 5s
+      retries: 3
+      start_period: 3s
+
+  # mcp-client:
+  #   build:
+  #     context: ./mcp-client
+  #     dockerfile: Dockerfile
+  #   container_name: mcp-client
+  #   environment:
+  #     - MCP_HTTP_URL=http://host.docker.internal:8082/bookings/mcp
+  #   stdin_open: true
+  #   tty: true
+  #   command: ["mcp-client"]
+
+  # llm-client:
+  #   build:
+  #     context: ./llm-client
+  #     dockerfile: Dockerfile
+  #   container_name: llm-client
+  #   depends_on:
+  #     ollama:
+  #       condition: service_healthy
+  #   environment:
+  #     - OLLAMA_URL=http://ollama:11434
+  #     - OLLAMA_MODEL=qwen3:0.6b
+  #     - OLLAMA_TEMPERATURE=0.3
+  #   stdin_open: true
+  #   tty: true
+  #   command: ["llm-client"]
+
+  a2a-agent:
+    build:
+      context: .
+      dockerfile: ./a2a-agent/Dockerfile
+    container_name: hotel-booking-agent-server
+    depends_on:
+      ollama:
+        condition: service_healthy
+      hotel-api:
+        condition: service_healthy
+    environment:
+      - OLLAMA_URL=http://ollama:11434
+      - OLLAMA_MODEL=qwen3:0.6b
+      - OLLAMA_TEMPERATURE=0.3
+      - MCP_HTTP_URL=http://host.docker.internal:8082/bookings/mcp
+      - AGENT_SERVER_PORT=8080
+    ports:
+      - "8080:8080"
+    restart: unless-stopped
+
+volumes:
+  ollama_data:
+    driver: local

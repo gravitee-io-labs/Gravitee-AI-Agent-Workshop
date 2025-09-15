@@ -1,0 +1,25 @@
+[build-system]
+requires = ["hatchling>=1.25.0"]
+build-backend = "hatchling.build"
+
+[project]
+name = "llm_client"
+version = "0.1.0"
+description = "LLM client for natural language processing with Ollama"
+requires-python = ">=3.12"
+dependencies = [
+  "ollama>=0.5.3",
+  "python-dotenv>=1.1.1",
+]
+
+[project.scripts]
+llm-client = "llm_client.main:main"
+
+[dependency-groups]
+dev = [
+  "pytest>=8.4.2",
+  "ruff>=0.13.0",
+]
+
+[tool.hatch.build.targets.wheel]
+packages = ["llm_client"]

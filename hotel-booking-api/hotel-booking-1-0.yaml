@@ -1,0 +1,191 @@
+openapi: 3.0.3
+info:
+  title: Hotel Booking API
+  version: "1.0"
+servers:
+  - url: http://localhost:8000
+tags:
+  - name: Bookings
+    description: Manage hotel bookings
+
+paths:
+  /bookings:
+    get:
+      tags: [Bookings]
+      summary: List all bookings
+      operationId: listBookings
+      responses:
+        "200":
+          description: List of bookings
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Booking"
+    post:
+      tags: [Bookings]
+      summary: Create a booking
+      operationId: createBooking
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/BookingCreate"
+      responses:
+        "201":
+          description: Booking created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Booking"
+
+  /bookings/{booking_id}:
+    get:
+      tags: [Bookings]
+      summary: Get booking detail
+      operationId: getBookingDetail
+      parameters:
+        - name: booking_id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Booking details
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Booking"
+        "404":
+          description: Booking not found
+    put:
+      tags: [Bookings]
+      summary: Update a booking
+      operationId: updateBooking
+      parameters:
+        - name: booking_id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/BookingCreate"
+      responses:
+        "200":
+          description: Booking updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Booking"
+        "404":
+          description: Booking not found
+    delete:
+      tags: [Bookings]
+      summary: Delete a booking
+      operationId: deleteBooking
+      parameters:
+        - name: booking_id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "204":
+          description: Booking deleted successfully
+        "404":
+          description: Booking not found
+
+  /bookings/user/{user_sub}:
+    get:
+      tags: [Bookings]
+      summary: Get bookings by user
+      operationId: getBookingsByUser
+      parameters:
+        - name: user_sub
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: List of bookings for a specific user
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Booking"
+
+components:
+  schemas:
+    Booking:
+      type: object
+      properties:
+        id:
+          type: integer
+          example: 1
+        user_sub:
+          type: string
+          description: JWT subject of the booking owner
+          example: 54e88daa-cbec-3b44-a0c7-1a997de66212
+        hotel_name:
+          type: string
+          example: Hotel California
+        room_number:
+          type: string
+          example: "101"
+        start_date:
+          type: string
+          format: date-time
+          example: "2025-08-01T14:00:00"
+        end_date:
+          type: string
+          format: date-time
+          example: "2025-08-10T11:00:00"
+        price:
+          type: number
+          format: float
+          example: 1500.0
+      required:
+        - id
+        - user_sub
+        - hotel_name
+        - room_number
+        - start_date
+        - end_date
+        - price
+
+    BookingCreate:
+      type: object
+      properties:
+        hotel_name:
+          type: string
+          example: Grand Budapest
+        room_number:
+          type: string
+          example: "202"
+        start_date:
+          type: string
+          format: date-time
+          example: "2025-09-05T15:00:00"
+        end_date:
+          type: string
+          format: date-time
+          example: "2025-09-12T10:00:00"
+        price:
+          type: number
+          format: float
+          example: 1200.0
+      required:
+        - hotel_name
+        - room_number
+        - start_date
+        - end_date
+        - price
