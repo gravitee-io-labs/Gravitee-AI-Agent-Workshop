@@ -3,9 +3,9 @@ requires = ["hatchling>=1.25.0"]
 build-backend = "hatchling.build"
 
 [project]
-name = "agent_server"
+name = "hotel-booking-a2a-agent"
 version = "0.1.0"
-description = "A2A Agent Server for Hotel Booking Management using MCP tools"
+description = "Hotel Booking A2A Agent Server using MCP tools for booking management"
 requires-python = ">=3.12"
 dependencies = [
   "a2a-sdk==0.3.4",
@@ -17,7 +17,7 @@ dependencies = [
 ]
 
 [project.scripts]
-agent-server = "agent_server.main:main"
+hotel-booking-a2a-agent = "agent_server.main:main"
 
 [dependency-groups]
 dev = [

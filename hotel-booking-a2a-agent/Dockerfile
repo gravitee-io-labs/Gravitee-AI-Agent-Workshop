@@ -10,9 +10,9 @@ COPY mcp-client /app/mcp-client
 COPY llm-client /app/llm-client
 
 # Copy the agent server project
-COPY a2a-agent /app/a2a-agent
+COPY hotel-booking-a2a-agent /app/hotel-booking-a2a-agent
 
-WORKDIR /app/a2a-agent
+WORKDIR /app/hotel-booking-a2a-agent
 
 # Install the package
 RUN pip install .
@@ -21,4 +21,4 @@ RUN pip install .
 EXPOSE 8080
 
 # Default command starts the agent server
-CMD ["agent-server"]
+CMD ["hotel-booking-a2a-agent"]
