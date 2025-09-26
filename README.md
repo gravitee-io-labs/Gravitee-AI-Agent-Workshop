@@ -14,14 +14,28 @@ Deploy and experiment with:
 
 ## 🚀 Quick Start
 
-### 1. Run the Workshop
+### 1. Configure Enterprise License
+
+> **⚠️ Important**: This workshop requires a **Gravitee Enterprise License** to access AI-specific policies (Token Tracking, Guard Rails, etc.).
+
+#### Option A: Environment Variable
 ```bash
-docker compose up
+export GRAVITEE_LICENSE="PUT_YOUR_BASE64_LICENSE_HERE"
+```
+
+#### Option B: Using .env File (Recommended)
+
+The `.env-template` file contains all necessary environment variables with default values.
+Rename or copy the `.env-template` to a `.env` file and simply replace `PUT_YOUR_BASE64_LICENSE_HERE` with your actual base64-encoded license key.
+
+### 2. Run the Workshop
+```bash
+docker compose up -d
 ```
 
 Wait 2-3 minutes for all services to start and the Ollama model to download.
 
-### 2. Access the Platform
+### 3. Access the Platform
 
 | Service | URL | Description |
 |---------|-----|-------------|
@@ -33,7 +47,7 @@ Wait 2-3 minutes for all services to start and the Ollama model to download.
 | **A2A Inspector** | http://localhost:8005 | Visual A2A Protocol Inspector |
 | **Ollama LLM** | http://localhost:11434 | Local LLM Runtime |
 
-### 3. Explore and Test
+### 4. Explore and Test
 
 > **💡 Pro Tip**: Notice how both inspectors use `apim-gateway:8082` URLs instead of direct service URLs. This demonstrates how all AI agent interactions flow through the Gravitee API Gateway for security, monitoring, and policy enforcement!
 
