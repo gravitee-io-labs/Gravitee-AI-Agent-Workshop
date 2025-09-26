@@ -58,6 +58,9 @@ class HotelBookingAgent:
             # Get LLM response with potential tool calls
             initial_content, tool_calls = await self.llm_client.process_query(message, available_tools)
 
+            logger.info(f"Initial content: {initial_content}")
+            logger.info(f"Tool calls: {tool_calls}")
+
             if tool_calls:
                 # Handle the first tool call
                 tool_call = tool_calls[0]
@@ -75,7 +78,7 @@ class HotelBookingAgent:
                 return final_response
 
             # Return initial response if no tools were called
-            return initial_content or "I'm here to help with hotel bookings. What can I do for you?"
+            return "No tools were called. Probably no tool is matching the request."
             
         except Exception as e:
             logger.error(f"Error processing request: {e}")
@@ -146,27 +149,35 @@ class HotelBookingRequestHandler(RequestHandler):
             
             # Extract message content from A2A params
             user_message = ""
-            if params and 'message' in params:
-                message = params['message']
-                
-                if hasattr(message, 'parts') and message.parts:
-                    # Extract text from message parts - parts contain Part objects with root TextPart
-                    for part in message.parts:
-                        if hasattr(part, 'root') and part.root:
-                            if hasattr(part.root, 'text') and part.root.text:
-                                user_message += part.root.text
-                        elif hasattr(part, 'text') and part.text:
-                            user_message += part.text
-                elif isinstance(message, dict) and 'parts' in message:
-                    # Handle dict format
-                    for part in message['parts']:
-                        if isinstance(part, dict) and 'text' in part:
-                            user_message += part['text']
-                        elif hasattr(part, 'text'):
-                            user_message += part.text
+            if params.message.parts:
+                for idx, part in enumerate(params.message.parts):
+                    if hasattr(part, 'text'):
+                        user_message = part.text # type: ignore
+                        break
+                    elif isinstance(part, dict):
+                        if 'text' in part:
+                            user_message = part['text']
+                            break
+                        elif part.get('type') == 'text' and 'value' in part:
+                            user_message = part['value']
+                            break
+                    elif hasattr(part, '__dict__'):
+                        part_dict = part.__dict__
+                        if 'text' in part_dict:
+                            user_message = part_dict['text']
+                            break
+                        elif 'root' in part_dict:
+                            root_obj = part_dict['root']
+                            if hasattr(root_obj, 'text'):
+                                user_message = getattr(root_obj, 'text', '')
+                                break
+                            elif isinstance(root_obj, dict) and 'text' in root_obj:
+                                user_message = root_obj['text']
+                                break
                         
             if not user_message:
-                user_message = "How can I help you with hotel bookings today?"
+                logger.error("No message content provided in the request.")
+                raise ValueError("No message content provided in the request.")
             
             logger.info(f"Processing message: {user_message}")
             
@@ -196,7 +207,7 @@ class HotelBookingRequestHandler(RequestHandler):
         # For simplicity, we'll use the same logic as send_message
         # In a real implementation, you might want to yield multiple events
         message_response = await self.on_message_send(params, context)
-        return [message_response]
+        yield message_response
     
     # Implement required methods with basic responses
     async def on_create_task(self, params, context=None):
