@@ -5,14 +5,10 @@ services:
   ### MongoDB
   mongodb:
     image: mongo:${MONGODB_VERSION:-7.0.24} # https://hub.docker.com/_/mongo/tags?name=7.0
-    
-    container_name: gio_apim_mongodb
+    container_name: gio-apim-mongodb
     restart: always
-    ports:
-      - "27017:27017"
     volumes:
       - data-mongo:/data/db
-      - ./logs/apim-mongodb:/var/log/mongodb
     healthcheck:
       test: mongosh --eval 'db.runCommand({serverStatus:1}).ok' --quiet | grep 1
       interval: 5s
@@ -24,11 +20,8 @@ services:
   ### Elasticsearch
   elasticsearch:
     image: docker.elastic.co/elasticsearch/elasticsearch:${ELASTIC_VERSION:-8.19.4} # https://www.docker.elastic.co/r/elasticsearch/elasticsearch
-    container_name: gio_apim_elasticsearch
+    container_name: gio-apim-elasticsearch
     restart: always
-    ports:
-      - 9200:9200
-      - 9300:9300
     volumes:
       - data-elasticsearch:/usr/share/elasticsearch/data
     environment:
@@ -55,7 +48,7 @@ services:
   ### Gravitee API Management Gateway
   apim-gateway:
     image: ${APIM_REGISTRY:-graviteeio}/apim-gateway:${APIM_VERSION_GATEWAY:-latest}
-    container_name: gio_apim_gateway
+    container_name: gio-apim-gateway
     restart: always
     ports:
       - "8082:8082" # Gateway Entrypoint for HTTP / TCP traffic
@@ -68,9 +61,9 @@ services:
     healthcheck:
       test: >
         sh -c '
-        response=$(curl -s -u admin:adminadmin http://localhost:18082/_node/health);
-        status=$(echo "$response" | grep "\"healthy\": true");
-        if [ -z "$status" ]; then echo "false"; else echo "true"; fi
+        response=$$(curl -s -u admin:adminadmin http://localhost:18082/_node/health);
+        status=$$(echo "$$response" | grep "\"healthy\": true");
+        if [ -z "$$status" ]; then echo "false"; else echo "true"; fi
         ' > /dev/null
       interval: 2s
       timeout: 2s
@@ -100,7 +93,7 @@ services:
   ### Gravitee API Management Management API
   apim-management-api:
     image: ${APIM_REGISTRY:-graviteeio}/apim-management-api:${APIM_VERSION:-latest}
-    container_name: gio_apim_management_api
+    container_name: gio-apim-management-api
     restart: always
     ports:
       - "8083:8083" # Management API Entrypoint
@@ -113,9 +106,9 @@ services:
     healthcheck:
       test: >
         sh -c '
-        response=$(curl -s -u admin:adminadmin http://localhost:18083/_node/health);
-        status=$(echo "$response" | grep "\"healthy\": true");
-        if [ -z "$status" ]; then echo "false"; else echo "true"; fi
+        response=$$(curl -s -u admin:adminadmin http://localhost:18083/_node/health);
+        status=$$(echo "$$response" | grep "\"healthy\": true");
+        if [ -z "$$status" ]; then echo "false"; else echo "true"; fi
         ' > /dev/null
       interval: 2s
       timeout: 2s
@@ -144,7 +137,7 @@ services:
   ### Gravitee API Management Management UI, aka Console
   apim-management-ui:
     image: ${APIM_REGISTRY:-graviteeio}/apim-management-ui:${APIM_VERSION:-latest}
-    container_name: gio_apim_management_ui
+    container_name: gio-apim-management-ui
     restart: always
     ports:
       - "8084:8080"
@@ -158,7 +151,7 @@ services:
   ### Gravitee API Management Portal UI, aka Developer Portal
   apim-portal-ui:
     image: ${APIM_REGISTRY:-graviteeio}/apim-portal-ui:${APIM_VERSION:-latest}
-    container_name: gio_apim_portal_ui
+    container_name: gio-apim-portal-ui
     restart: always
     ports:
       - "8085:8080"
@@ -176,7 +169,7 @@ services:
   ### Ollama LLM Runtime
   ollama:
     image: ollama/ollama:${OLLAMA_VERSION:-latest}
-    container_name: ollama
+    container_name: ollama-llm-runtime
     restart: unless-stopped
     ports:
       - "11434:11434"
@@ -201,7 +194,7 @@ services:
       - southbound
 
   ### Hotel Booking Fake API
-  hotel-api:
+  hotel-booking-api:
     build:
       context: ./hotel-booking-api
       dockerfile: Dockerfile
@@ -219,24 +212,24 @@ services:
       - southbound
 
   ### A2A Agent
-  a2a-agent:
+  hotel-booking-a2a-agent:
     build:
       context: .
-      dockerfile: ./a2a-agent/Dockerfile
-    container_name: hotel-booking-agent-server
+      dockerfile: ./hotel-booking-a2a-agent/Dockerfile
+    container_name: hotel-booking-a2a-agent
     depends_on:
       ollama:
         condition: service_healthy
-      hotel-api:
+      hotel-booking-api:
         condition: service_healthy
     environment:
       - OLLAMA_URL=http://ollama:11434
       - OLLAMA_MODEL=qwen3:0.6b
       - OLLAMA_TEMPERATURE=0.3
-      - MCP_HTTP_URL=http://apim-gateway:8082/bookings/mcp
-      - AGENT_SERVER_PORT=8080
+      - MCP_HTTP_URL=http://gio-apim-gateway:8082/bookings/mcp
+      - AGENT_SERVER_PORT=8001
     ports:
-      - "8080:8080"
+      - "8001:8001"
     restart: unless-stopped
     networks:
       - southbound
@@ -252,7 +245,7 @@ services:
       - "6277:6277"
     restart: unless-stopped
     environment:
-      - DANGEROUSLY_OMIT_AUTH=true
+      - DANGEROUSLY_OMIT_AUTH=true # Access MCP Inspector UI without Authentication
       - HOST=0.0.0.0
     networks:
       - southbound
@@ -263,7 +256,7 @@ services:
     image: dobl1/a2a-inspector:latest
     container_name: a2a-inspector
     ports:
-      - "8005:8080"
+      - "8004:8080"
     restart: unless-stopped
     networks:
       - southbound
@@ -280,7 +273,7 @@ volumes:
     driver: local
 
 networks:
-    northbound: # Upstream/Backend-facing
+    northbound: # Consumer/Client-facing
         name: northbound
     southbound: # Upstream/Backend-facing
         name: southbound
