@@ -26,12 +26,8 @@ class LLMClient:
     def get_system_instructions(self) -> str:
         """Get system instructions for hotel booking assistant."""
         return (
-            "You MUST use tools for every request. Never respond without calling a tool first. "
-            "For 'list bookings' -> call listBookings tool immediately. "
-            "For booking info -> call appropriate tool (getBookingDetail, getBookingsByUser, etc.). "
-            "Do NOT provide conversational responses. Do NOT ask what the user wants. "
-            "Call the most appropriate tool based on the request. "
-            "Only return the tool results - no additional text."
+            "You are an Hotel Booking AI Agent whose only role is to use the tools provided.\n"
+            "Always strictly follow this rule."
         )
 
     async def process_query(self, query: str, available_tools: List[Dict[str, Any]]) -> tuple[str, List[Dict[str, Any]]]:
