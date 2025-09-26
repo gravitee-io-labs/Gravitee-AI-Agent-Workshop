@@ -1,0 +1,184 @@
+{
+  "export": {
+    "date": "2025-09-26T12:41:59.707018924Z",
+    "apimVersion": "4.8.7"
+  },
+  "api": {
+    "definitionVersion": "V4",
+    "type": "MESSAGE",
+    "listeners": [
+      {
+        "type": "HTTP",
+        "paths": [
+          {
+            "path": "/agents/bookings/v1/",
+            "overrideAccess": false
+          }
+        ],
+        "pathMappings": [],
+        "entrypoints": [
+          {
+            "type": "agent-to-agent",
+            "qos": "NONE",
+            "configuration": {
+              "heartbeatIntervalInMs": 5000
+            }
+          }
+        ],
+        "servers": []
+      }
+    ],
+    "endpointGroups": [
+      {
+        "name": "Default Agent to agent group",
+        "type": "agent-to-agent",
+        "loadBalancer": {
+          "type": "ROUND_ROBIN"
+        },
+        "sharedConfiguration": "{\"proxy\":{\"useSystemProxy\":false,\"enabled\":false},\"http\":{\"keepAliveTimeout\":30000,\"keepAlive\":true,\"followRedirects\":false,\"readTimeout\":30000,\"idleTimeout\":60000,\"connectTimeout\":10000,\"useCompression\":true,\"maxConcurrentConnections\":20,\"version\":\"HTTP_1_1\",\"pipelining\":false},\"ssl\":{\"keyStore\":{\"type\":\"\"},\"hostnameVerifier\":true,\"trustStore\":{\"type\":\"\"},\"trustAll\":false}}",
+        "endpoints": [
+          {
+            "name": "Default Agent to agent",
+            "type": "agent-to-agent",
+            "weight": 1,
+            "inheritConfiguration": true,
+            "configuration": {
+              "target": "http://hotel-booking-agent-server:8080"
+            },
+            "sharedConfigurationOverride": "{}",
+            "services": {},
+            "secondary": false,
+            "tenants": []
+          }
+        ],
+        "services": {}
+      }
+    ],
+    "analytics": {
+      "enabled": true,
+      "logging": {
+        "content": {
+          "headers": true,
+          "messageHeaders": true,
+          "payload": false,
+          "messagePayload": true,
+          "messageMetadata": true
+        },
+        "phase": {
+          "request": true,
+          "response": true
+        },
+        "mode": {
+          "endpoint": true,
+          "entrypoint": true
+        }
+      },
+      "tracing": {
+        "enabled": false,
+        "verbose": false
+      }
+    },
+    "flowExecution": {
+      "mode": "DEFAULT",
+      "matchRequired": false
+    },
+    "flows": [],
+    "id": "53e1e903-080d-453f-a1e9-03080d153f76",
+    "name": "Hotel Booking AI Agent",
+    "description": "Hotel Booking AI Agent",
+    "apiVersion": "1.0",
+    "deployedAt": "2025-09-26T05:22:15.154Z",
+    "createdAt": "2025-09-25T16:38:21.653Z",
+    "updatedAt": "2025-09-26T05:22:15.154Z",
+    "disableMembershipNotifications": false,
+    "groups": [],
+    "state": "STARTED",
+    "visibility": "PRIVATE",
+    "labels": [],
+    "lifecycleState": "CREATED",
+    "tags": [],
+    "primaryOwner": {
+      "id": "a8fbc6e4-f4c9-4729-bbc6-e4f4c9f7299e",
+      "email": "dorian.blanc@graviteesource.com",
+      "displayName": "Dorian Blanc",
+      "type": "USER"
+    },
+    "categories": [],
+    "originContext": {
+      "origin": "MANAGEMENT"
+    },
+    "responseTemplates": {},
+    "resources": [],
+    "properties": []
+  },
+  "members": [
+    {
+      "id": "a8fbc6e4-f4c9-4729-bbc6-e4f4c9f7299e",
+      "displayName": "Dorian Blanc",
+      "roles": [
+        {
+          "name": "PRIMARY_OWNER",
+          "scope": "API"
+        }
+      ]
+    }
+  ],
+  "metadata": [
+    {
+      "key": "email-support",
+      "name": "email-support",
+      "format": "MAIL",
+      "value": "${(api.primaryOwner.email)!''}",
+      "defaultValue": "support@change.me"
+    }
+  ],
+  "pages": [],
+  "plans": [
+    {
+      "definitionVersion": "V4",
+      "flows": [
+        {
+          "id": "9bbda9fa-48a2-41e6-bda9-fa48a201e64c",
+          "enabled": true,
+          "selectors": [
+            {
+              "type": "CHANNEL",
+              "operations": [],
+              "channel": "/",
+              "channelOperator": "STARTS_WITH",
+              "entrypoints": []
+            }
+          ],
+          "request": [],
+          "response": [],
+          "subscribe": [],
+          "publish": [],
+          "connect": [],
+          "interact": [],
+          "tags": []
+        }
+      ],
+      "id": "5a013f21-c023-4be6-813f-21c0232be665",
+      "name": "Open",
+      "description": "Default unsecured plan",
+      "apiId": "53e1e903-080d-453f-a1e9-03080d153f76",
+      "security": {
+        "type": "KEY_LESS",
+        "configuration": {}
+      },
+      "mode": "STANDARD",
+      "characteristics": [],
+      "commentRequired": false,
+      "createdAt": "2025-09-25T16:38:21.711Z",
+      "excludedGroups": [],
+      "order": 1,
+      "publishedAt": "2025-09-25T16:38:21.734Z",
+      "status": "PUBLISHED",
+      "tags": [],
+      "type": "API",
+      "updatedAt": "2025-09-25T16:38:21.734Z",
+      "validation": "MANUAL"
+    }
+  ],
+  "apiMedia": []
+}

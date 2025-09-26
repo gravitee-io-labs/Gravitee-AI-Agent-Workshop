@@ -1,0 +1,395 @@
+{
+  "export": {
+    "date": "2025-09-26T12:41:55.56797788Z",
+    "apimVersion": "4.8.7"
+  },
+  "api": {
+    "definitionVersion": "V4",
+    "type": "PROXY",
+    "listeners": [
+      {
+        "type": "HTTP",
+        "paths": [
+          {
+            "path": "/bookings/",
+            "overrideAccess": false
+          }
+        ],
+        "pathMappings": [],
+        "entrypoints": [
+          {
+            "type": "http-proxy",
+            "qos": "AUTO",
+            "configuration": {}
+          },
+          {
+            "type": "mcp",
+            "qos": "AUTO",
+            "configuration": {
+              "mcpPath": "/mcp",
+              "tools": [
+                {
+                  "gatewayMapping": {
+                    "http": {
+                      "path": "/bookings",
+                      "method": "GET"
+                    }
+                  },
+                  "toolDefinition": {
+                    "inputSchema": {
+                      "type": "object",
+                      "properties": {},
+                      "required": []
+                    },
+                    "name": "listBookings",
+                    "description": "List all bookings"
+                  }
+                },
+                {
+                  "gatewayMapping": {
+                    "http": {
+                      "path": "/bookings",
+                      "method": "POST",
+                      "contentType": "application/json"
+                    }
+                  },
+                  "toolDefinition": {
+                    "inputSchema": {
+                      "type": "object",
+                      "properties": {
+                        "bodySchema": {
+                          "type": "object",
+                          "properties": {
+                            "end_date": {
+                              "format": "date-time",
+                              "type": "string",
+                              "example": "2025-09-12T10:00:00"
+                            },
+                            "price": {
+                              "format": "float",
+                              "type": "number",
+                              "example": 1200
+                            },
+                            "room_number": {
+                              "type": "string",
+                              "example": "202"
+                            },
+                            "hotel_name": {
+                              "type": "string",
+                              "example": "Grand Budapest"
+                            },
+                            "start_date": {
+                              "format": "date-time",
+                              "type": "string",
+                              "example": "2025-09-05T15:00:00"
+                            }
+                          },
+                          "required": [
+                            "hotel_name",
+                            "room_number",
+                            "start_date",
+                            "end_date",
+                            "price"
+                          ]
+                        }
+                      },
+                      "required": []
+                    },
+                    "name": "createBooking",
+                    "description": "Create a booking"
+                  }
+                },
+                {
+                  "gatewayMapping": {
+                    "http": {
+                      "path": "/bookings/:booking_id",
+                      "method": "GET",
+                      "pathParams": [
+                        "booking_id"
+                      ]
+                    }
+                  },
+                  "toolDefinition": {
+                    "inputSchema": {
+                      "type": "object",
+                      "properties": {
+                        "booking_id": {
+                          "type": "integer"
+                        }
+                      },
+                      "required": [
+                        "booking_id"
+                      ]
+                    },
+                    "name": "getBookingDetail",
+                    "description": "Get booking detail"
+                  }
+                },
+                {
+                  "gatewayMapping": {
+                    "http": {
+                      "path": "/bookings/:booking_id",
+                      "method": "PUT",
+                      "pathParams": [
+                        "booking_id"
+                      ],
+                      "contentType": "application/json"
+                    }
+                  },
+                  "toolDefinition": {
+                    "inputSchema": {
+                      "type": "object",
+                      "properties": {
+                        "booking_id": {
+                          "type": "integer"
+                        },
+                        "bodySchema": {
+                          "type": "object",
+                          "properties": {
+                            "end_date": {
+                              "format": "date-time",
+                              "type": "string",
+                              "example": "2025-09-12T10:00:00"
+                            },
+                            "price": {
+                              "format": "float",
+                              "type": "number",
+                              "example": 1200
+                            },
+                            "room_number": {
+                              "type": "string",
+                              "example": "202"
+                            },
+                            "hotel_name": {
+                              "type": "string",
+                              "example": "Grand Budapest"
+                            },
+                            "start_date": {
+                              "format": "date-time",
+                              "type": "string",
+                              "example": "2025-09-05T15:00:00"
+                            }
+                          },
+                          "required": [
+                            "hotel_name",
+                            "room_number",
+                            "start_date",
+                            "end_date",
+                            "price"
+                          ]
+                        }
+                      },
+                      "required": [
+                        "booking_id"
+                      ]
+                    },
+                    "name": "updateBooking",
+                    "description": "Update a booking"
+                  }
+                },
+                {
+                  "gatewayMapping": {
+                    "http": {
+                      "path": "/bookings/:booking_id",
+                      "method": "DELETE",
+                      "pathParams": [
+                        "booking_id"
+                      ]
+                    }
+                  },
+                  "toolDefinition": {
+                    "inputSchema": {
+                      "type": "object",
+                      "properties": {
+                        "booking_id": {
+                          "type": "integer"
+                        }
+                      },
+                      "required": [
+                        "booking_id"
+                      ]
+                    },
+                    "name": "deleteBooking",
+                    "description": "Delete a booking"
+                  }
+                },
+                {
+                  "gatewayMapping": {
+                    "http": {
+                      "path": "/bookings/user/:user_sub",
+                      "method": "GET",
+                      "pathParams": [
+                        "user_sub"
+                      ]
+                    }
+                  },
+                  "toolDefinition": {
+                    "inputSchema": {
+                      "type": "object",
+                      "properties": {
+                        "user_sub": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "user_sub"
+                      ]
+                    },
+                    "name": "getBookingsByUser",
+                    "description": "Get bookings by user"
+                  }
+                }
+              ]
+            }
+          }
+        ],
+        "servers": []
+      }
+    ],
+    "endpointGroups": [
+      {
+        "name": "Default HTTP proxy group",
+        "type": "http-proxy",
+        "loadBalancer": {
+          "type": "ROUND_ROBIN"
+        },
+        "sharedConfiguration": "{\"proxy\":{\"useSystemProxy\":false,\"enabled\":false},\"http\":{\"keepAliveTimeout\":30000,\"keepAlive\":true,\"propagateClientHost\":false,\"followRedirects\":false,\"readTimeout\":10000,\"idleTimeout\":60000,\"connectTimeout\":3000,\"useCompression\":true,\"maxConcurrentConnections\":20,\"version\":\"HTTP_1_1\",\"pipelining\":false},\"ssl\":{\"keyStore\":{\"type\":\"\"},\"hostnameVerifier\":true,\"trustStore\":{\"type\":\"\"},\"trustAll\":false}}",
+        "endpoints": [
+          {
+            "name": "Default HTTP proxy",
+            "type": "http-proxy",
+            "weight": 1,
+            "inheritConfiguration": true,
+            "configuration": {
+              "target": "http://hotel-api:8000/bookings"
+            },
+            "services": {},
+            "secondary": false,
+            "tenants": []
+          }
+        ],
+        "services": {}
+      }
+    ],
+    "analytics": {
+      "enabled": true
+    },
+    "flowExecution": {
+      "mode": "DEFAULT",
+      "matchRequired": false
+    },
+    "flows": [],
+    "id": "ebdadc8b-13e0-4638-9adc-8b13e0e638fa",
+    "name": "Hotel Booking",
+    "description": "Example Hotel Booking API",
+    "apiVersion": "1.0",
+    "deployedAt": "2025-09-25T16:35:45.114Z",
+    "createdAt": "2025-09-25T16:31:44.722Z",
+    "updatedAt": "2025-09-25T16:36:37.276Z",
+    "disableMembershipNotifications": false,
+    "groups": [],
+    "state": "STARTED",
+    "visibility": "PRIVATE",
+    "labels": [],
+    "lifecycleState": "PUBLISHED",
+    "tags": [],
+    "primaryOwner": {
+      "id": "a8fbc6e4-f4c9-4729-bbc6-e4f4c9f7299e",
+      "email": "dorian.blanc@graviteesource.com",
+      "displayName": "Dorian Blanc",
+      "type": "USER"
+    },
+    "categories": [],
+    "originContext": {
+      "origin": "MANAGEMENT"
+    },
+    "responseTemplates": {},
+    "resources": [],
+    "properties": []
+  },
+  "members": [
+    {
+      "id": "a8fbc6e4-f4c9-4729-bbc6-e4f4c9f7299e",
+      "displayName": "Dorian Blanc",
+      "roles": [
+        {
+          "name": "PRIMARY_OWNER",
+          "scope": "API"
+        }
+      ]
+    }
+  ],
+  "metadata": [
+    {
+      "key": "email-support",
+      "name": "email-support",
+      "format": "MAIL",
+      "value": "${(api.primaryOwner.email)!''}",
+      "defaultValue": "support@change.me"
+    }
+  ],
+  "pages": [
+    {
+      "id": "a829c45a-15a3-4fee-a9c4-5a15a39feedd",
+      "name": "Homepage",
+      "type": "SWAGGER",
+      "content": "openapi: 3.0.3\ninfo:\n  title: Hotel Booking API\n  version: \"1.0\"\nservers:\n  - url: http://localhost:8000\ntags:\n  - name: Bookings\n    description: Manage hotel bookings\n\npaths:\n  /bookings:\n    get:\n      tags: [Bookings]\n      summary: List all bookings\n      operationId: listBookings\n      responses:\n        \"200\":\n          description: List of bookings\n          content:\n            application/json:\n              schema:\n                type: array\n                items:\n                  $ref: \"#/components/schemas/Booking\"\n    post:\n      tags: [Bookings]\n      summary: Create a booking\n      operationId: createBooking\n      requestBody:\n        required: true\n        content:\n          application/json:\n            schema:\n              $ref: \"#/components/schemas/BookingCreate\"\n      responses:\n        \"201\":\n          description: Booking created\n          content:\n            application/json:\n              schema:\n                $ref: \"#/components/schemas/Booking\"\n\n  /bookings/{booking_id}:\n    get:\n      tags: [Bookings]\n      summary: Get booking detail\n      operationId: getBookingDetail\n      parameters:\n        - name: booking_id\n          in: path\n          required: true\n          schema:\n            type: integer\n      responses:\n        \"200\":\n          description: Booking details\n          content:\n            application/json:\n              schema:\n                $ref: \"#/components/schemas/Booking\"\n        \"404\":\n          description: Booking not found\n    put:\n      tags: [Bookings]\n      summary: Update a booking\n      operationId: updateBooking\n      parameters:\n        - name: booking_id\n          in: path\n          required: true\n          schema:\n            type: integer\n      requestBody:\n        required: true\n        content:\n          application/json:\n            schema:\n              $ref: \"#/components/schemas/BookingCreate\"\n      responses:\n        \"200\":\n          description: Booking updated\n          content:\n            application/json:\n              schema:\n                $ref: \"#/components/schemas/Booking\"\n        \"404\":\n          description: Booking not found\n    delete:\n      tags: [Bookings]\n      summary: Delete a booking\n      operationId: deleteBooking\n      parameters:\n        - name: booking_id\n          in: path\n          required: true\n          schema:\n            type: integer\n      responses:\n        \"204\":\n          description: Booking deleted successfully\n        \"404\":\n          description: Booking not found\n\n  /bookings/user/{user_sub}:\n    get:\n      tags: [Bookings]\n      summary: Get bookings by user\n      operationId: getBookingsByUser\n      parameters:\n        - name: user_sub\n          in: path\n          required: true\n          schema:\n            type: string\n      responses:\n        \"200\":\n          description: List of bookings for a specific user\n          content:\n            application/json:\n              schema:\n                type: array\n                items:\n                  $ref: \"#/components/schemas/Booking\"\n\ncomponents:\n  schemas:\n    Booking:\n      type: object\n      properties:\n        id:\n          type: integer\n          example: 1\n        user_sub:\n          type: string\n          description: JWT subject of the booking owner\n          example: 54e88daa-cbec-3b44-a0c7-1a997de66212\n        hotel_name:\n          type: string\n          example: Hotel California\n        room_number:\n          type: string\n          example: \"101\"\n        start_date:\n          type: string\n          format: date-time\n          example: \"2025-08-01T14:00:00\"\n        end_date:\n          type: string\n          format: date-time\n          example: \"2025-08-10T11:00:00\"\n        price:\n          type: number\n          format: float\n          example: 1500.0\n      required:\n        - id\n        - user_sub\n        - hotel_name\n        - room_number\n        - start_date\n        - end_date\n        - price\n\n    BookingCreate:\n      type: object\n      properties:\n        hotel_name:\n          type: string\n          example: Grand Budapest\n        room_number:\n          type: string\n          example: \"202\"\n        start_date:\n          type: string\n          format: date-time\n          example: \"2025-09-05T15:00:00\"\n        end_date:\n          type: string\n          format: date-time\n          example: \"2025-09-12T10:00:00\"\n        price:\n          type: number\n          format: float\n          example: 1200.0\n      required:\n        - hotel_name\n        - room_number\n        - start_date\n        - end_date\n        - price\n",
+      "order": 0,
+      "published": true,
+      "visibility": "PUBLIC",
+      "updatedAt": "2025-09-25T16:35:18.141Z",
+      "configuration": {},
+      "homepage": true,
+      "excludedAccessControls": false,
+      "accessControls": [],
+      "metadata": {}
+    }
+  ],
+  "plans": [
+    {
+      "definitionVersion": "V4",
+      "flows": [
+        {
+          "id": "5460c0fe-3444-4a8e-a0c0-fe3444aa8eeb",
+          "enabled": true,
+          "selectors": [
+            {
+              "type": "HTTP",
+              "path": "/",
+              "pathOperator": "STARTS_WITH",
+              "methods": []
+            }
+          ],
+          "request": [],
+          "response": [],
+          "subscribe": [],
+          "publish": [],
+          "connect": [],
+          "interact": [],
+          "tags": []
+        }
+      ],
+      "id": "69813101-1464-48bf-8131-01146408bf89",
+      "name": "Open",
+      "description": "Default unsecured plan",
+      "apiId": "ebdadc8b-13e0-4638-9adc-8b13e0e638fa",
+      "security": {
+        "type": "KEY_LESS",
+        "configuration": {}
+      },
+      "mode": "STANDARD",
+      "characteristics": [],
+      "commentRequired": false,
+      "createdAt": "2025-09-25T16:31:44.957Z",
+      "excludedGroups": [],
+      "order": 1,
+      "publishedAt": "2025-09-25T16:31:44.994Z",
+      "status": "PUBLISHED",
+      "tags": [],
+      "type": "API",
+      "updatedAt": "2025-09-25T16:31:44.994Z",
+      "validation": "MANUAL"
+    }
+  ],
+  "apiMedia": []
+}
