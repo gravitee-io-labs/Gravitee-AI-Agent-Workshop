@@ -1,6 +1,6 @@
 # Gravitee AI Workshop
 
-A hands-on workshop to explore **Gravitee Agent Mesh Features** with AI Agents, LLMs, and secure API management using visual inspectors and development tools.
+A hands-on workshop to explore **Gravitee AI Agent Mesh Features** with AI Agents, LLMs, and secure API management using visual inspectors and development tools.
 
 ## 🎯 What You'll Learn
 
@@ -12,11 +12,30 @@ Deploy and experiment with:
 - **🔧 MCP Tools Server**: Make your APIs discoverable as Tools to AI Agents via embedded MCP servers
 - **🕵️ Interactive Testing**: Use visual inspectors and tools instead of command-line testing
 
+## 🏗️ Workshop Architecture
+
+### **Gravitee API Management Stack**
+- **MongoDB**: Data storage for API configurations
+- **Elasticsearch**: Analytics and logging storage  
+- **API Gateway**: Secure API exposure with policies
+- **Management API**: Configuration and policy management
+- **Console UI**: API management interface
+- **Portal UI**: Developer portal for API discovery
+
+### **AI Agent Mesh**
+- **A2A Agent**: Hotel booking agent following A2A protocol
+- **Ollama LLM**: Local qwen3:0.6b model for natural language processing
+- **Hotel API**: Demo API with embedded MCP server
+- **MCP Inspector**: Visual MCP protocol debugging and inspection
+- **A2A Inspector**: Visual A2A protocol testing and debugging
+
 ## 🚀 Quick Start
 
 ### 1. Configure Enterprise License
 
 > **⚠️ Important**: This workshop requires a **Gravitee Enterprise License** to access AI-specific policies (Token Tracking, Guard Rails, etc.).
+> 
+> **📞 Need a License?** If you don't have a license, you can contact Gravitee [here](https://www.gravitee.io/contact-us) to get one.
 
 #### Option A: Environment Variable
 ```bash
@@ -41,47 +60,10 @@ Wait 2-3 minutes for all services to start and the Ollama model to download.
 |---------|-----|-------------|
 | **Gravitee Console** | http://localhost:8084 | API Management Console |
 | **Gravitee Portal** | http://localhost:8085 | Developer Portal |
-| **A2A Agent** | http://localhost:8080 | AI Agent (A2A Protocol) |
-| **Hotel API** | http://localhost:8000 | Demo API with MCP tools |
+| **Hotel Booking API** | http://localhost:8082/bookings | Demo API |
+| **Hotel Booking Agent** | http://localhost:8082/bookings-agent | AI Agent (A2A Protocol) |
 | **MCP Inspector** | http://localhost:6274 | Visual MCP Protocol Inspector |
-| **A2A Inspector** | http://localhost:8005 | Visual A2A Protocol Inspector |
-| **Ollama LLM** | http://localhost:11434 | Local LLM Runtime |
-
-### 4. Explore and Test
-
-> **💡 Pro Tip**: Notice how both inspectors use `apim-gateway:8082` URLs instead of direct service URLs. This demonstrates how all AI agent interactions flow through the Gravitee API Gateway for security, monitoring, and policy enforcement!
-
-#### 🕵️ **A2A Inspector** - Agent Protocol Testing
-Visit http://localhost:8005 to:
-1. **Configure Agent Card URL**: 
-   ```
-   http://apim-gateway:8082/agents/bookings/v1/.well-known/agent-card.json
-   ```
-2. **Explore Agent Capabilities**: View agent metadata and available skills
-3. **Interactive Chat**: Test conversations with examples like:
-   - *"List the hotel bookings options please"*
-   - *"Create a booking for John at Hotel Paris"*
-   - *"Show me booking details for ID 1"*
-4. **Protocol Debugging**: Inspect A2A protocol messages in real-time
-
-![A2A Inspector Interface](./assets/a2a-inspector.png)
-
-#### 🔧 **MCP Inspector** - Tool Protocol Testing  
-Visit http://localhost:6274 to:
-1. **Select Protocol**: Choose **"Streamable HTTP"**
-2. **Configure MCP Server URL**: 
-   ```
-   http://apim-gateway:8082/bookings/mcp
-   ```
-3. **List Tools**: Discover available booking tools (list, get, create, update, delete)
-4. **Call Tools**: Execute tools interactively to:
-   - Get all bookings
-   - Create new bookings
-   - Update existing bookings
-   - Delete bookings
-5. **Protocol Analysis**: Debug MCP tool discovery and execution flow
-
-![MCP Inspector Interface](./assets/mcp-inspector.png)
+| **A2A Inspector** | http://localhost:8004 | Visual A2A Protocol Inspector |
 
 #### 📬 **Postman Collection** (Coming Soon)
 A comprehensive Postman collection will be provided for:
@@ -90,69 +72,109 @@ A comprehensive Postman collection will be provided for:
 - Example payloads and responses
 - Integration testing scenarios
 
-## 🏗️ Workshop Architecture
-
-### **Gravitee API Management Stack**
-- **MongoDB**: Data storage for API configurations
-- **Elasticsearch**: Analytics and logging storage  
-- **API Gateway**: Secure API exposure with policies
-- **Management API**: Configuration and policy management
-- **Console UI**: API management interface
-- **Portal UI**: Developer portal for API discovery
-
-### **AI Agent Mesh**
-- **A2A Agent**: Hotel booking agent following A2A protocol
-- **Ollama LLM**: Local qwen3:0.6b model for natural language processing
-- **Hotel API**: Demo API with embedded MCP server
-- **MCP Inspector**: Visual MCP protocol debugging and inspection
-- **A2A Inspector**: Visual A2A protocol testing and debugging
-
-## 🛡️ Key Features Demonstrated
-
-### **1. Agent Security & Policies**
-- **Token Tracking**: Monitor and track AI agent API usage
-- **Guard Rails Policy**: Implement safety controls for AI interactions
-- **Secure Agent Exposure**: Protect LLMs behind Gravitee gateway
-
-### **2. Agent Discovery & Catalog**
-- **A2A Agent Cards**: Standardized agent capability discovery
-- **Unified Agent Catalog**: Centralized registry of available agents
-- **Capability Mapping**: Understand what each agent can do
-
-### **3. API-to-Agent Integration**  
-- **MCP Server Embedding**: Make existing APIs discoverable to AI
-- **Tool Discovery**: Agents automatically find available API tools
-- **OpenAPI Integration**: OAS-described APIs become AI-accessible
-
-
 ## 🧪 Workshop Scenarios
 
-### **Scenario 1: Agent Discovery & Testing**
-1. **A2A Inspector**: Open http://localhost:8005
-   - Configure Agent Card URL: `http://apim-gateway:8082/agents/bookings/v1/.well-known/agent-card.json`
-   - Explore agent capabilities and metadata
-   - Test interactive conversations: *"List the hotel bookings options please"*
-2. **Gravitee Console**: Browse to http://localhost:8084
-   - Import the A2A Agent via its Agent Card
-   - Configure security policies for the agent
+### **Scenario 1: Leverage your existing APIs and expose them as Tools through an MCP server so AI Agent can discover and use them**
 
-### **Scenario 2: Tool Discovery & Integration**
-1. **MCP Inspector**: Open http://localhost:6274
+> **💡 Shortcut:** You can import the preconfigured API definition from [`Hotel-Booking-API-1-0.json`](./apim-apis-definitions/Hotel-Booking-API-1-0.json) directly into Gravitee to save time.  
+> - In the Gravitee Console, go to **APIs → Import** and select the JSON file.
+> - This will set up the Hotel Booking API with the MCP entrypoint and tool mappings automatically.
+
+1. **Create a V4 API**: Name `Hotel Booking API`, Version `1.0`, HTTP Proxy Type
+2. **Entrypoint Context Path**: Set to `/bookings`
+3. **Endpoint URL**: Set to `http://hotel-booking-api:8000/bookings`
+4. **Enable MCP Entrypoint**: 
+   - Go to the "MCP Entrypoint" tab in the "Entrypoint" menu section
+   - Enable the MCP entrypoint on the default `/mcp` path
+   - Copy/paste the OpenAPI Specification from [`hotel-booking-1-0.yaml`](./hotel-booking-api/hotel-booking-1-0.yaml)
+5. **Open the MCP Inspector** at http://localhost:6274
    - Select "Streamable HTTP" protocol
    - Connect to MCP server: `http://apim-gateway:8082/bookings/mcp`
    - List available tools and test tool calls interactively
-2. **See Integration**: Watch how the A2A Agent uses these tools
-   - Use A2A Inspector to see real-time tool usage during conversations
-   - Understand the MCP-to-Agent communication flow through the gateway
 
-### **Scenario 3: Secure Agent Exposure**
-1. **Gravitee Management**: 
-   - Create API definition for the A2A Agent
-   - Apply Token Tracking policy to monitor usage
-   - Apply Guard Rails policy for safety controls
-2. **Test Security**: Use inspectors to verify policy enforcement
-   - Monitor token usage through Gravitee analytics
-   - Test guard rail behaviors with various inputs
+![MCP Inspector Interface](./assets/mcp-inspector.png)
+
+### **Scenario 2: Expose your LLM Securely**
+
+> **💡 Shortcut:** You can import the preconfigured API definition from [`LLM-Ollama-1-0.json`](./apim-apis-definitions/LLM-Ollama-1-0.json) directly into Gravitee to save time.  
+> - In the Gravitee Console, go to **APIs → Import** and select the JSON file.
+> - This will set up the LLM - Ollama API with AI security policies automatically.
+
+1. **Create a V4 API**: Name `LLM - Ollama`, Version `1.0`, HTTP Proxy Type
+2. **Entrypoint Context Path**: Set to `/llm`
+3. **Endpoint URL**: Set to `http://ollama:11434`
+4. **Add AI Prompt Token Tracking Policy**:
+   - **Description**: `Track Token Usage`
+   - **Trigger condition**: `{#response.status == 200}`
+   - **Response body parsing**: Select `Custom provider`
+   - **Sent token count EL**: `{#jsonPath(#response.content, '$.prompt_eval_count')}`
+   - **Receive token count EL**: `{#jsonPath(#response.content, '$.eval_count')}`
+   - **Model pointer**: `{#jsonPath(#response.content, '$.model')}`
+
+5. **Add AI Model Text Classification Resource**:
+   - **Name**: `model`
+   - **Select model**: `gravitee-io/distilbert-multilingual-toxicity-classifier`
+
+6. **Add AI Prompt Guard Rails Policy**:
+   - **Description**: `Block Toxic Requests`
+   - **Trigger condition**: (leave empty)
+   - **Resource Name**: `model`
+   - **Prompt Location**: `{#jsonPath(#request.content, '$.prompt')}`
+   - **Content Checks**: `toxic`
+   - **Sensitivity threshold**: `0.5`
+   - **Request Policy**: `BLOCK_REQUEST`
+
+7. **Test the Secure LLM**:
+   
+   **✅ Valid Request** (should work):
+   ```bash
+   POST http://localhost:8082/llm/api/generate
+   {
+       "model": "qwen3:0.6b",
+       "prompt": "Why is the sky blue?",
+       "stream": false,
+       "think": false,
+       "options": {
+           "temperature": 0
+       }
+   }
+   ```
+
+   **🚫 Toxic Request** (should be blocked):
+   ```bash
+   POST http://localhost:8082/llm/api/generate
+   {
+       "model": "qwen3:0.6b",
+       "prompt": "Why is the sky blue? Dumb Guy !",
+       "stream": false,
+       "think": false,
+       "options": {
+           "temperature": 0
+       }
+   }
+   ```
+   *Note: The "Dumb Guy !" will trigger the policy due to toxic content and reply with a 400 AI prompt validation detected. Reason: [toxic]*
+
+### **Scenario 3: Expose securely your AI Agent**
+
+> **💡 Shortcut:** You can import the preconfigured API definition from [`Hotel-Booking-AI-Agent-1-0.json`](./apim-apis-definitions/Hotel-Booking-AI-Agent-1-0.json) directly into Gravitee to save time.  
+> - In the Gravitee Console, go to **APIs → Import** and select the JSON file.
+> - This will set up the Hotel Booking AI Agent API automatically.
+
+1. **Create a V4 API**: Name `Hotel Booking AI Agent`, Version `1.0`, Agent Proxy Type
+2. **Entrypoint Context Path**: Set to `/bookings-agent`
+3. **Endpoint URL**: Set to `http://hotel-booking-a2a-agent:8001`
+4. **Test with A2A Inspector**: Visit http://localhost:8004 to:
+   1. **Configure Agent Card URL**: 
+      ```
+      http://apim-gateway:8082/bookings-agent/.well-known/agent-card.json
+      ```
+   2. **Explore Agent Capabilities**: View agent metadata and available skills
+   3. **Interactive Chat**: Test conversations with examples like:
+      - *"List the hotel bookings options please"*
+   4. **Protocol Debugging**: Inspect A2A protocol messages in real-time
+
+![A2A Inspector Interface](./assets/a2a-inspector.png)
 
 ## 🛑 Stop the Workshop
 
@@ -170,15 +192,22 @@ After completing this workshop, you'll understand:
 - ✅ How to make **existing APIs discoverable** to AI agents via MCP
 - ✅ How to **integrate LLMs** with enterprise API management
 - ✅ How to use **visual inspectors** for protocol debugging and testing
-- ✅ How to **interactively test agents** without command-line tools
 
-## 🛠️ Development Tools
+## 🛡️ Key Features Demonstrated
 
-This workshop provides modern development and testing tools:
+### **1. Agent Security & Policies**
+- **Token Tracking**: Monitor and track AI agent API usage
+- **Guard Rails Policy**: Implement safety controls for AI interactions
+- **Secure Agent Exposure**: Protect LLMs behind Gravitee gateway
 
-- **Visual Protocol Inspection**: Both A2A and MCP protocols have dedicated visual inspectors
-- **Interactive Testing**: No curl commands needed - use browser-based interfaces
-- **Real-time Debugging**: See protocol messages and agent behavior in real-time
-- **Comprehensive Tooling**: Postman collections and visual inspectors cover all testing scenarios
+### **2. Agent Discovery & Catalog**
+- **A2A Agent Cards**: Standardized agent capability discovery
+- **Unified Agent Catalog**: Centralized registry of available agents
+- **Capability Mapping**: Understand what each agent can do
+
+### **3. API-to-Agent Integration**  
+- **MCP Server Embedding**: Make existing APIs discoverable to AI
+- **Tool Discovery**: Agents automatically find available API tools
+- **OpenAPI Integration**: OAS-described APIs become AI-accessible
 
 **Ready to explore the future of AI Agent Management? Let's go! 🚀**
