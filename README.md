@@ -14,20 +14,7 @@ Deploy and experiment with:
 
 ## 🏗️ Workshop Architecture
 
-### **Gravitee API Management Stack**
-- **MongoDB**: Data storage for API configurations
-- **Elasticsearch**: Analytics and logging storage  
-- **API Gateway**: Secure API exposure with policies
-- **Management API**: Configuration and policy management
-- **Console UI**: API management interface
-- **Portal UI**: Developer portal for API discovery
-
-### **AI Agent Mesh**
-- **A2A Agent**: Hotel booking agent following A2A protocol
-- **Ollama LLM**: Local qwen3:0.6b model for natural language processing
-- **Hotel API**: Demo API with embedded MCP server
-- **MCP Inspector**: Visual MCP protocol debugging and inspection
-- **A2A Inspector**: Visual A2A protocol testing and debugging
+![Workshop Architecture Diagram](./assets/architecture-diagram.png)
 
 ## 🚀 Quick Start
 
