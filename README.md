@@ -24,6 +24,23 @@ Deploy and experiment with:
 > 
 > **📞 Need a License?** If you don't have a license, you can contact Gravitee [here](https://www.gravitee.io/contact-us) to get one.
 
+**🔑 Generate Base64 License Key** 
+
+You need to convert your `license.key` file into a base64 string before using it in the workshop.
+
+* Linux:
+```bash
+base64 -w 0 license.key
+```
+
+* MacOS:
+```bash
+base64 -i license.key | tr -d '\n'
+```
+
+The command will print a long string ending with `=`, which is your base64 license.
+Copy this string and use it in the next steps.
+
 #### Option A: Environment Variable
 ```bash
 export GRAVITEE_LICENSE="PUT_YOUR_BASE64_LICENSE_HERE"
@@ -115,30 +132,32 @@ A comprehensive Postman collection will be provided for:
    
    **✅ Valid Request** (should work):
    ```bash
-   POST http://localhost:8082/llm/api/generate
-   {
+   curl -X POST http://localhost:8082/llm/api/generate \
+     -H "Content-Type: application/json" \
+     -d '{
        "model": "qwen3:0.6b",
        "prompt": "Why is the sky blue?",
        "stream": false,
        "think": false,
        "options": {
-           "temperature": 0
+         "temperature": 0
        }
-   }
+     }'
    ```
 
    **🚫 Toxic Request** (should be blocked):
    ```bash
-   POST http://localhost:8082/llm/api/generate
-   {
+   curl -X POST http://localhost:8082/llm/api/generate \
+     -H "Content-Type: application/json" \
+     -d '{
        "model": "qwen3:0.6b",
        "prompt": "Why is the sky blue? Dumb Guy !",
        "stream": false,
        "think": false,
        "options": {
-           "temperature": 0
+         "temperature": 0
        }
-   }
+     }'
    ```
    *Note: The "Dumb Guy !" will trigger the policy due to toxic content and reply with a 400 AI prompt validation detected. Reason: [toxic]*
 
