@@ -4,7 +4,7 @@ services:
 
   ### MongoDB
   mongodb:
-    image: mongo:${MONGODB_VERSION:-7.0.24} # https://hub.docker.com/_/mongo/tags?name=7.0
+    image: mongo:${MONGODB_VERSION:-7.0.25} # https://hub.docker.com/_/mongo/tags?name=7.0
     container_name: gio-apim-mongodb
     restart: always
     volumes:
@@ -19,7 +19,7 @@ services:
 
   ### Elasticsearch
   elasticsearch:
-    image: docker.elastic.co/elasticsearch/elasticsearch:${ELASTIC_VERSION:-8.19.4} # https://www.docker.elastic.co/r/elasticsearch/elasticsearch
+    image: docker.elastic.co/elasticsearch/elasticsearch:${ELASTIC_VERSION:-8.19.5} # https://www.docker.elastic.co/r/elasticsearch/elasticsearch
     container_name: gio-apim-elasticsearch
     restart: always
     volumes:
@@ -222,6 +222,8 @@ services:
         condition: service_healthy
       hotel-booking-api:
         condition: service_healthy
+      apim-gateway:
+        condition: service_healthy
     environment:
       - OLLAMA_URL=http://ollama:11434
       - OLLAMA_MODEL=qwen3:0.6b
@@ -238,7 +240,7 @@ services:
 
   ### MCP Inspector
   mcp-inspector:
-    image: ghcr.io/modelcontextprotocol/inspector:0.16.8
+    image: ghcr.io/modelcontextprotocol/inspector:0.17.1
     container_name: mcp-inspector
     ports:
       - "6274:6274"
