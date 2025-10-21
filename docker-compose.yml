@@ -225,7 +225,7 @@ services:
       apim-gateway:
         condition: service_healthy
     environment:
-      - OLLAMA_URL=http://ollama:11434
+      - OLLAMA_URL=http://gio-apim-gateway:8082/llm
       - OLLAMA_MODEL=qwen3:0.6b
       - OLLAMA_TEMPERATURE=0.3
       - MCP_HTTP_URL=http://gio-apim-gateway:8082/bookings/mcp
