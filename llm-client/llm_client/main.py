@@ -3,7 +3,7 @@ import os
 import sys
 from typing import Dict, Any, List, Optional
 
-from ollama import Client as OllamaClient, ChatResponse
+from ollama import Client as OllamaClient, ChatResponse, ResponseError
 from dotenv import load_dotenv
 
 load_dotenv()
@@ -42,17 +42,26 @@ class LLMClient:
             {"role": "user", "content": query}
         ]
 
-        response: ChatResponse = self.ollama.chat(
-            model=self.model,
-            messages=messages,
-            tools=available_tools,
-            options={"temperature": self.temperature}
-        )
+        try:
+            response: ChatResponse = self.ollama.chat(
+                model=self.model,
+                messages=messages,
+                tools=available_tools,
+                options={"temperature": self.temperature},
+                stream=False
+            )
 
-        initial_content = (response.get('message') or {}).get('content', "")
-        tool_calls = (response.get('message') or {}).get('tool_calls') or []
+            initial_content = (response.get('message') or {}).get('content', "")
+            tool_calls = (response.get('message') or {}).get('tool_calls') or []
 
-        return initial_content, tool_calls
+            return initial_content, tool_calls
+        
+        except ResponseError as e:
+            print(f'Ollama ResponseError: {e.error}')
+            raise Exception(f"Failed to process query: {e.error}") from e
+        except Exception as e:
+            print(f'Unexpected error in process_query: {str(e)}')
+            raise Exception(f"Failed to process query: {str(e)}") from e
 
     async def process_tool_result(self, 
                                   original_query: str, 
@@ -77,13 +86,22 @@ class LLMClient:
             }
         ]
 
-        followup_response = self.ollama.chat(
-            model=self.model,
-            messages=followup_messages,
-            options={"temperature": self.temperature}
-        )
+        try:
+            followup_response = self.ollama.chat(
+                model=self.model,
+                messages=followup_messages,
+                options={"temperature": self.temperature},
+                stream=False
+            )
 
-        return followup_response['message']['content'].strip()
+            return followup_response['message']['content'].strip()
+        
+        except ResponseError as e:
+            print(f'Ollama ResponseError: {e.error}')
+            raise Exception(f"Failed to process tool result: {e.error}") from e
+        except Exception as e:
+            print(f'Unexpected error in process_tool_result: {str(e)}')
+            raise Exception(f"Failed to process tool result: {str(e)}") from e
 
 async def main_async():
     """Main async function for LLM Client."""
