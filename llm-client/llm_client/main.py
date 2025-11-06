@@ -8,7 +8,7 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-OLLAMA_URL = os.getenv("OLLAMA_URL", "http://localhost:11434")
+OLLAMA_URL = os.getenv("OLLAMA_URL", "http://gio-apim-gateway:8082/llm")
 OLLAMA_MODEL = os.getenv("OLLAMA_MODEL", "qwen3:0.6b")
 OLLAMA_TEMPERATURE = float(os.getenv("OLLAMA_TEMPERATURE", "0.3"))
 
@@ -22,25 +22,29 @@ class LLMClient:
         self.ollama = OllamaClient(host=ollama_url or OLLAMA_URL)
         self.model = model or OLLAMA_MODEL
         self.temperature = temperature or OLLAMA_TEMPERATURE
-        
-    def get_system_instructions(self) -> str:
-        """Get system instructions for hotel booking assistant."""
-        return (
-            "You are an Hotel Booking AI Agent whose only role is to use the tools provided.\n"
-            "Always strictly follow this rule."
-        )
 
-    async def process_query(self, query: str, available_tools: List[Dict[str, Any]]) -> tuple[str, List[Dict[str, Any]]]:
+    async def process_query(self, 
+                           query: str, 
+                           available_tools: List[Dict[str, Any]],
+                           system_prompt: Optional[str] = None) -> tuple[str, List[Dict[str, Any]]]:
         """
         Process a query using the LLM with available tools.
+        
+        Args:
+            query: The user query to process
+            available_tools: List of available tools for the LLM
+            system_prompt: Optional system prompt to guide the LLM behavior
+            
         Returns: (response_content, tool_calls)
         """
-        system_instructions = self.get_system_instructions()
         
         messages = [
-            {"role": "system", "content": system_instructions},
             {"role": "user", "content": query}
         ]
+        
+        # Add system prompt if provided
+        if system_prompt:
+            messages.insert(0, {"role": "system", "content": system_prompt})
 
         try:
             response: ChatResponse = self.ollama.chat(
@@ -66,14 +70,21 @@ class LLMClient:
     async def process_tool_result(self, 
                                   original_query: str, 
                                   tool_call: Dict[str, Any], 
-                                  tool_result: Any) -> str:
+                                  tool_result: Any,
+                                  system_prompt: Optional[str] = None) -> str:
         """
         Process the result of a tool call and generate final response.
+        
+        Args:
+            original_query: The original user query
+            tool_call: The tool call that was executed
+            tool_result: The result from the tool execution
+            system_prompt: Optional system prompt to guide the LLM behavior
+            
+        Returns: Final response string
         """
-        system_instructions = self.get_system_instructions()
         
         followup_messages = [
-            {"role": "system", "content": system_instructions},
             {"role": "user", "content": original_query},
             {
                 "role": "assistant",
@@ -85,6 +96,10 @@ class LLMClient:
                 "content": str(tool_result)
             }
         ]
+        
+        # Add system prompt if provided
+        if system_prompt:
+            followup_messages.insert(0, {"role": "system", "content": system_prompt})
 
         try:
             followup_response = self.ollama.chat(

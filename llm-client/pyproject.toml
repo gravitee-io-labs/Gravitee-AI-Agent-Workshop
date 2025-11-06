@@ -8,8 +8,8 @@ version = "0.1.0"
 description = "LLM client for natural language processing with Ollama"
 requires-python = ">=3.12"
 dependencies = [
-  "ollama>=0.5.3",
-  "python-dotenv>=1.1.1",
+  "ollama",
+  "python-dotenv",
 ]
 
 [project.scripts]
@@ -17,8 +17,8 @@ llm-client = "llm_client.main:main"
 
 [dependency-groups]
 dev = [
-  "pytest>=8.4.2",
-  "ruff>=0.13.0",
+  "pytest",
+  "ruff",
 ]
 
 [tool.hatch.build.targets.wheel]
