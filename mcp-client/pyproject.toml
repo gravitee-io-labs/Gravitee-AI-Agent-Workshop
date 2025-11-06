@@ -8,9 +8,9 @@ version = "0.1.0"
 description = "MCP client for discovering and calling tools from MCP servers"
 requires-python = ">=3.12"
 dependencies = [
-  "mcp>=1.13.1",
-  "python-dotenv>=1.1.1",
-  "httpx>=0.28.1",
+  "mcp",
+  "python-dotenv",
+  "httpx",
 ]
 
 [project.scripts]
@@ -18,8 +18,8 @@ mcp-client = "mcp_client.main:main"
 
 [dependency-groups]
 dev = [
-  "pytest>=8.4.2",
-  "ruff>=0.13.0",
+  "pytest",
+  "ruff",
 ]
 
 [tool.hatch.build.targets.wheel]
