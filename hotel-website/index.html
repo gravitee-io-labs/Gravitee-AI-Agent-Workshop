@@ -1,0 +1,270 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Gravitee Hotels - Your AI-Powered Booking Experience</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Kanit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <!-- Navigation -->
+    <nav class="navbar">
+        <div class="nav-container">
+            <div class="nav-logo">
+                <img src="assets/gravitee-logo/Horizontal_LightMode.svg" alt="Gravitee" class="logo">
+                <span class="hotel-name">Hotels</span>
+            </div>
+            <div class="nav-actions">
+                <button id="signInBtn" class="btn btn-primary">Sign In</button>
+                <div id="userMenu" class="user-menu hidden">
+                    <button id="userMenuBtn" class="user-menu-btn">
+                        <div class="user-avatar-small">
+                            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path>
+                                <circle cx="12" cy="7" r="4"></circle>
+                            </svg>
+                        </div>
+                        <span id="userDisplayName" class="user-display-name">User</span>
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <polyline points="6 9 12 15 18 9"></polyline>
+                        </svg>
+                    </button>
+                    <div id="userDropdown" class="user-dropdown hidden">
+                        <div class="user-dropdown-email" id="userDropdownEmail">user@example.com</div>
+                        <button id="logoutBtn" class="btn btn-secondary user-dropdown-logout">Logout</button>
+                    </div>
+                </div>
+                <button id="settingsBtn" class="btn-with-icon" title="Settings">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6z"></path>
+                        <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path>
+                    </svg>
+                    <span>Settings</span>
+                </button>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Hero Section -->
+    <section class="hero">
+        <div class="hero-content">
+            <h1 class="hero-title">Welcome to Gravitee Hotels</h1>
+            <p class="hero-subtitle">Experience AI-powered hotel booking like never before</p>
+            <button id="openChatBtn" class="btn btn-large btn-accent">
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path>
+                </svg>
+                Chat with Our AI Assistant
+            </button>
+        </div>
+    </section>
+
+    <!-- Features Section -->
+    <section class="features">
+        <div class="container">
+            <h2 class="section-title">Why Choose Gravitee Hotels?</h2>
+            <div class="features-grid">
+                <div class="feature-card">
+                    <div class="feature-icon">🤖</div>
+                    <h3>AI-Powered Booking</h3>
+                    <p>Chat naturally with our intelligent AI agent to find your perfect hotel</p>
+                </div>
+                <div class="feature-card">
+                    <div class="feature-icon">🔒</div>
+                    <h3>Secure & Private</h3>
+                    <p>Enterprise-grade security protecting your data and conversations</p>
+                </div>
+                <div class="feature-card">
+                    <div class="feature-icon">⚡</div>
+                    <h3>Instant Results</h3>
+                    <p>Get personalized recommendations in seconds, not hours</p>
+                </div>
+                <div class="feature-card">
+                    <div class="feature-icon">🌍</div>
+                    <h3>Global Selection</h3>
+                    <p>Access to hotels worldwide, all from one conversation</p>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Chat Widget Button -->
+    <button id="chatWidgetBtn" class="chat-widget-btn" title="Open Chat">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path>
+        </svg>
+    </button>
+
+    <!-- Chat Window -->
+    <div id="chatWindow" class="chat-window hidden">
+        <div class="chat-header">
+            <div class="chat-header-info">
+                <img src="assets/gravitee-logo/Mark.svg" alt="Gravitee Bot" class="chat-logo">
+                <div>
+                    <h3>Gravitee Bot</h3>
+                    <p class="chat-status" id="chatStatus">Initializing...</p>
+                </div>
+            </div>
+            <div class="chat-header-actions">
+                <button id="toggleChatSizeBtn" class="icon-btn" title="Toggle Size">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3m0 18h3a2 2 0 0 0 2-2v-3M3 16v3a2 2 0 0 0 2 2h3"></path>
+                    </svg>
+                </button>
+                <button id="closeChatBtn" class="icon-btn">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <line x1="18" y1="6" x2="6" y2="18"></line>
+                        <line x1="6" y1="6" x2="18" y2="18"></line>
+                    </svg>
+                </button>
+            </div>
+        </div>
+        <div class="chat-messages" id="chatMessages">
+            <div class="message agent-message">
+                <div class="message-avatar">
+                    <img src="assets/gravitee-logo/Mark.svg" alt="Bot">
+                </div>
+                <div class="message-content">
+                    <p>👋 Hello! I'm your Gravitee Hotels AI assistant. How can I help you today?</p>
+                </div>
+            </div>
+        </div>
+        <div class="chat-input-container">
+            <input type="text" id="chatInput" class="chat-input" placeholder="Type your message..." disabled>
+            <button id="sendBtn" class="send-btn" disabled>
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <line x1="22" y1="2" x2="11" y2="13"></line>
+                    <polygon points="22 2 15 22 11 13 2 9 22 2"></polygon>
+                </svg>
+            </button>
+        </div>
+    </div>
+
+    <!-- Settings Modal -->
+    <div id="settingsModal" class="modal hidden">
+        <div class="modal-overlay" id="settingsOverlay"></div>
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>Settings</h2>
+                <button class="icon-btn" id="closeSettingsBtn">
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <line x1="18" y1="6" x2="6" y2="18"></line>
+                        <line x1="6" y1="6" x2="18" y2="18"></line>
+                    </svg>
+                </button>
+            </div>
+            <div class="modal-body">
+                <!-- AI Agent Section -->
+                <div class="connection-section">
+                    <h3>🤖 AI Agent Configuration</h3>
+                    <div class="form-group">
+                        <label for="agentCardUrl">Agent Card URL</label>
+                        <input 
+                            type="text" 
+                            id="agentCardUrl" 
+                            class="form-input">
+                        <small class="form-hint">The URL to your AI Agent's card endpoint</small>
+                    </div>
+                    <div class="connection-header">
+                        <div class="connection-status" id="agentConnectionStatus">
+                            <div class="status-indicator status-disconnected"></div>
+                            <span>Not tested</span>
+                        </div>
+                        <button class="btn-connect" id="connectAgentBtn">Test Connection</button>
+                    </div>
+                    <div id="agentDebugInfo" class="debug-info hidden">
+                        <pre></pre>
+                    </div>
+                </div>
+
+                <!-- OIDC Section -->
+                <div class="connection-section">
+                    <h3>🔐 Authentication Configuration</h3>
+                    <div class="form-group">
+                        <label for="oidcUrl">OpenID Connect Discovery URL</label>
+                        <input 
+                            type="text" 
+                            id="oidcUrl" 
+                            class="form-input">
+                        <small class="form-hint">Your IAM OpenID Connect configuration endpoint</small>
+                    </div>
+                    <div class="form-group">
+                        <label for="clientId">Client ID</label>
+                        <input 
+                            type="text" 
+                            id="clientId" 
+                            class="form-input">
+                        <small class="form-hint">Your OAuth2/OIDC client identifier</small>
+                    </div>
+                    <div class="form-group">
+                        <label for="clientSecret">Client Secret</label>
+                        <input 
+                            type="password" 
+                            id="clientSecret" 
+                            class="form-input">
+                        <small class="form-hint">Your OAuth2/OIDC client secret</small>
+                    </div>
+                    <div class="connection-header">
+                        <div class="connection-status" id="oidcConnectionStatus">
+                            <div class="status-indicator status-disconnected"></div>
+                            <span>Not tested</span>
+                        </div>
+                        <button class="btn-connect" id="testOidcBtn">Test Connection</button>
+                    </div>
+                    <div id="oidcDebugInfo" class="debug-info hidden">
+                        <pre></pre>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary" id="cancelSettingsBtn">Close</button>
+                <button class="btn btn-primary" id="saveSettingsBtn">Save Settings</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Debug Panel -->
+    <div id="debugPanel" class="debug-panel collapsed">
+        <div class="debug-panel-resize-handle" id="debugPanelResizeHandle"></div>
+        <div class="debug-panel-header">
+            <div class="debug-panel-title">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                    <path d="M12 2L2 7l10 5 10-5-10-5z"></path>
+                    <path d="M2 17l10 5 10-5M2 12l10 5 10-5"></path>
+                </svg>
+                <span>API Request Inspector</span>
+                <span class="debug-panel-count" id="debugPanelCount">0 requests</span>
+            </div>
+            <div class="debug-panel-actions">
+                <button id="clearDebugBtn" class="debug-panel-btn" title="Clear history">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M3 6h18M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2m3 0v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6h14z"></path>
+                    </svg>
+                </button>
+                <button id="toggleDebugBtn" class="debug-panel-btn" title="Toggle panel">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <polyline points="18 15 12 9 6 15"></polyline>
+                    </svg>
+                </button>
+            </div>
+        </div>
+        <div class="debug-panel-content">
+            <div class="debug-panel-empty" id="debugPanelEmpty">
+                <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                    <path d="M12 2L2 7l10 5 10-5-10-5z"></path>
+                    <path d="M2 17l10 5 10-5M2 12l10 5 10-5"></path>
+                </svg>
+                <p>No API requests yet</p>
+                <small>Send a message to see the API calls</small>
+            </div>
+            <div class="debug-panel-list" id="debugPanelList"></div>
+        </div>
+    </div>
+
+    <script src="config.js"></script>
+    <script type="module" src="script.js"></script>
+</body>
+</html>

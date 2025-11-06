@@ -1,0 +1,19 @@
+{
+  "name": "gravitee-hotels-website",
+  "version": "1.0.0",
+  "description": "AI-powered hotel booking website with Gravitee chatbot integration",
+  "scripts": {
+    "start": "npx http-server -p 3000 -c-1",
+    "dev": "npx http-server -p 3000 -c-1 -o"
+  },
+  "keywords": [
+    "gravitee",
+    "ai",
+    "chatbot",
+    "a2a",
+    "hotel",
+    "booking"
+  ],
+  "author": "Gravitee",
+  "license": "Apache-2.0"
+}
