@@ -1,7 +1,6 @@
-import asyncio
 import os
 import uuid
-from typing import Dict, Any, List, Optional
+from typing import Dict, Any, Optional
 import sys
 import logging
 
@@ -13,6 +12,7 @@ sys.path.insert(0, '/app/llm-client')
 
 from mcp_client.main import MCPClient
 from llm_client.main import LLMClient
+from agent_server.auth_service import AuthService, AuthenticationError
 
 # A2A SDK imports
 from a2a.server.apps import A2AStarletteApplication
@@ -23,13 +23,18 @@ load_dotenv()
 
 # Configuration
 AGENT_SERVER_PORT = int(os.getenv("AGENT_SERVER_PORT", "8080"))
-MCP_HTTP_URL = os.getenv("MCP_HTTP_URL", "http://localhost:8082/bookings/mcp")
-
-# Global clients
-mcp_client = None
-llm_client = None
+MCP_HTTP_URL = os.getenv("MCP_HTTP_URL", "http://gio-apim-gateway:8082/hotels/mcp")
+OIDC_DISCOVERY_URL = os.getenv("OIDC_DISCOVERY_URL", "http://am-gateway:8092/gravitee/oidc/.well-known/openid-configuration")
+JWT_SECRET = os.getenv("JWT_SECRET", "my-example-secret")
 
 logger = logging.getLogger(__name__)
+
+# System prompt for the hotel booking agent
+HOTEL_BOOKING_SYSTEM_PROMPT = (
+    "You are an Hotel Booking AI Agent whose only role is to use the tools provided.\n"
+    "Always strictly follow this rule.\n"
+    "Whenever possible, personalize your responses using the guest's first name to create a friendly experience."
+)
 
 class HotelBookingAgent:
     """Hotel Booking Agent that uses MCP tools via LLM."""
@@ -37,57 +42,117 @@ class HotelBookingAgent:
     def __init__(self):
         self.mcp_client = MCPClient(mcp_url=MCP_HTTP_URL)
         self.llm_client = LLMClient()
+        self.auth_service = AuthService(
+            oidc_discovery_url=OIDC_DISCOVERY_URL,
+            jwt_secret=JWT_SECRET
+        )
+        self.system_prompt = HOTEL_BOOKING_SYSTEM_PROMPT
         
     async def initialize(self):
-        """Initialize the agent by connecting to MCP server."""
+        """Initialize the agent by connecting to MCP server and auth service."""
         try:
             await self.mcp_client.connect()
             logger.info("Successfully connected to MCP server")
+            
+            await self.auth_service.initialize()
+            logger.info("Successfully initialized auth service")
         except Exception as e:
-            logger.error(f"Failed to connect to MCP server: {e}")
+            logger.error(f"Failed to initialize agent: {e}")
             raise
 
-    async def process_request(self, message: str) -> str:
+    async def process_request(self, message: str, authorization_header: Optional[str] = None) -> str:
         """Process a hotel booking request using MCP tools and LLM."""
         try:
             # Get available tools from MCP
             available_tools = await self.mcp_client.list_tools()
 
-            logger.info(f"Available tools: {available_tools}")
-            logger.info(f"Processing request: {message}")
             # Get LLM response with potential tool calls
-            initial_content, tool_calls = await self.llm_client.process_query(message, available_tools)
-
-            logger.info(f"Initial content: {initial_content}")
-            logger.info(f"Tool calls: {tool_calls}")
+            initial_content, tool_calls = await self.llm_client.process_query(
+                message, 
+                available_tools,
+                system_prompt=self.system_prompt
+            )
 
             if tool_calls:
                 # Handle the first tool call
                 tool_call = tool_calls[0]
                 tool_name = tool_call.get("function", {}).get("name")
                 tool_args = tool_call.get("function", {}).get("arguments")
-
-                logger.info(f"Calling MCP tool: {tool_name}")
                 
-                # Call the tool using MCP
-                tool_result = await self.mcp_client.call_tool(tool_name, tool_args)
-                logger.info(f"Tool result: {tool_result}")
+                # Try calling the tool first
+                tool_result, response_headers = await self.mcp_client.call_tool(tool_name, tool_args)
+                
+                # Check if authentication is required via X-Gravitee-Endpoint-Status header
+                # HTTP headers are case-insensitive, so check both variations
+                endpoint_status = (
+                    response_headers.get('X-Gravitee-Endpoint-Status', '') or 
+                    response_headers.get('x-gravitee-endpoint-status', '')
+                ).strip()
+                
+                if endpoint_status == '401':
+                    logger.info(f"Tool {tool_name} requires authorization")
+                    
+                    # Process authorization header and get internal JWT
+                    try:
+                        internal_jwt = await self.auth_service.process_authorization_for_tool(authorization_header)
+                        
+                        # Remove Authorization from tool_args if it was added there by mistake
+                        if isinstance(tool_args, dict) and "Authorization" in tool_args:
+                            del tool_args["Authorization"]
+                        
+                        # Retry the tool call with authorization header
+                        extra_headers = {
+                            "Authorization": f"Bearer {internal_jwt}"
+                        }
+                        tool_result, response_headers = await self.mcp_client.call_tool(tool_name, tool_args, extra_headers=extra_headers)
+                    except AuthenticationError as auth_error:
+                        logger.error(f"Authentication error: {auth_error}")
+                        return (
+                            "You need to be signed in to complete this action. "
+                            "Please sign in and try again."
+                        )
 
                 # Get final response from LLM with tool result
-                final_response = await self.llm_client.process_tool_result(message, tool_call, tool_result)
+                final_response = await self.llm_client.process_tool_result(
+                    message, 
+                    tool_call, 
+                    tool_result,
+                    system_prompt=self.system_prompt
+                )
                 return final_response
 
             # Return initial response if no tools were called
-            return "No tools were called. Probably no tool is matching the request."
+            return (
+                "I couldn't determine a clear action from your message. "
+                "Please rephrase or provide more details (for example: search for hotels in New York) "
+                "and I'll help you."
+            )
             
         except Exception as e:
             logger.error(f"Error processing request: {e}")
-            return f"Sorry, I encountered an error while processing your request: {str(e)}"
+            # Use LLM to generate a user-friendly error message
+            try:
+                error_prompt = (
+                    f"An error occurred: {str(e)}\n\n"
+                    "Generate a polite, user-friendly response explaining that something went wrong "
+                    "and suggest what the user could try instead. Keep it brief and helpful."
+                )
+                friendly_error = await self.llm_client.process_query(
+                    error_prompt,
+                    [],
+                    system_prompt="You are a helpful hotel booking assistant. Convert technical errors into friendly, actionable messages for users."
+                )
+                return friendly_error[0] if friendly_error[0] else f"Sorry, I encountered an error while processing your request: {str(e)}"
+            except Exception as llm_error:
+                logger.error(f"Failed to generate friendly error message: {llm_error}")
+                return f"Sorry, I encountered an error while processing your request: {str(e)}"
 
     async def cleanup(self):
         """Clean up resources."""
         if self.mcp_client:
             await self.mcp_client.cleanup()
+        if self.auth_service:
+            await self.auth_service.cleanup()
 
 # Global agent instance (will be initialized by the executor)
 hotel_agent = None
@@ -134,7 +199,7 @@ class HotelBookingRequestHandler(RequestHandler):
         self.agent = HotelBookingAgent()
         super().__init__()
         
-    async def on_message_send(self, params, context=None):
+    async def on_message_send(self, params, context):
         """Handle message/send requests."""
         try:
             # Initialize the agent if not already done
@@ -146,6 +211,22 @@ class HotelBookingRequestHandler(RequestHandler):
                     await self.agent.initialize()
             else:
                 await self.agent.initialize()
+            
+            # Extract Authorization header from context
+            authorization_header = None
+            
+            # Try to get from context.state['headers'] first (A2A SDK structure)
+            if context and hasattr(context, 'state'):
+                state = context.state
+                if isinstance(state, dict) and 'headers' in state:
+                    headers = state['headers']
+                    authorization_header = headers.get('authorization') or headers.get('Authorization')
+            
+            # Fallback: try context.http_request if not found
+            if not authorization_header and context and hasattr(context, 'http_request'):
+                http_request = context.http_request
+                if hasattr(http_request, 'headers'):
+                    authorization_header = http_request.headers.get('Authorization') or http_request.headers.get('authorization')
             
             # Extract message content from A2A params
             user_message = ""
@@ -179,12 +260,8 @@ class HotelBookingRequestHandler(RequestHandler):
                 logger.error("No message content provided in the request.")
                 raise ValueError("No message content provided in the request.")
             
-            logger.info(f"Processing message: {user_message}")
-            
-            # Process the request using the hotel agent
-            response_content = await self.agent.process_request(user_message)
-            
-            logger.info("Message processed successfully")
+            # Process the request using the hotel agent with authorization header
+            response_content = await self.agent.process_request(user_message, authorization_header)
             
             # Return A2A Message response
             return Message(
@@ -202,7 +279,7 @@ class HotelBookingRequestHandler(RequestHandler):
                 parts=[TextPart(text=error_message)]
             )
     
-    async def on_message_send_stream(self, params, context=None):
+    async def on_message_send_stream(self, params, context):
         """Handle message/stream requests."""
         # For simplicity, we'll use the same logic as send_message
         # In a real implementation, you might want to yield multiple events
@@ -243,6 +320,7 @@ async def hotel_booking_handler(request: Dict[str, Any]) -> Dict[str, Any]:
     try:
         # Extract message from request
         message = request.get("message", "")
+        authorization_header = request.get("authorization")
         
         if not message:
             return {
@@ -251,7 +329,7 @@ async def hotel_booking_handler(request: Dict[str, Any]) -> Dict[str, Any]:
             }
         
         # Process the request using the hotel agent
-        response = await hotel_agent.process_request(message)
+        response = await hotel_agent.process_request(message, authorization_header)
         
         return {
             "response": response,

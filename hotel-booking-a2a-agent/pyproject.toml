@@ -8,21 +8,21 @@ version = "0.1.0"
 description = "Hotel Booking A2A Agent Server using MCP tools for booking management"
 requires-python = ">=3.12"
 dependencies = [
-  "a2a-sdk==0.3.4",
-  "mcp>=1.13.1",
-  "ollama>=0.5.3",
-  "python-dotenv>=1.1.1",
-  "httpx>=0.28.1",
-  "uvicorn>=0.35.0",
+  "a2a-sdk",
+  "mcp",
+  "ollama",
+  "python-dotenv",
+  "httpx",
+  "uvicorn",
+  "pyjwt",
 ]
-
 [project.scripts]
 hotel-booking-a2a-agent = "agent_server.main:main"
 
 [dependency-groups]
 dev = [
-  "pytest>=8.4.2",
-  "ruff>=0.13.0",
+  "pytest",
+  "ruff",
 ]
 
 [tool.hatch.build.targets.wheel]
