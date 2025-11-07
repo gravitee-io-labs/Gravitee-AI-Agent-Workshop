@@ -188,16 +188,15 @@ Open the **MCP Inspector** at http://localhost:6274 to see your API through an A
 
 **🌐 Experience the Magic with Gravitee Hotels:**
 
-Visit http://localhost:3002 to interact with your AI-powered booking platform through a beautiful, production-ready interface:
+Visit http://localhost:3002 to interact with your AI-powered booking platform through a beautiful, production-like ready interface:
 
 1. **Natural Language Booking**: Use the chat window to communicate with the AI agent and book hotels
 2. **Smart Conversations**: Try queries like:
    - *"Show me available hotels in Paris"*
-   - *"Find me a hotel in Paris for 2 nights"*
-   - *"I need a pet-friendly hotel in London"*
    - *"Show me my current bookings"*
+   - *"Dumb AI, you're useless"* (should trigger Guard Rails)
 3. **Real-Time AI Responses**: Watch as the agent understands your intent and interacts with your booking APIs automatically
-4. **Production-Ready UX**: Experience how your customers would interact with the AI-powered platform
+4. **Production-Like Ready UX**: Experience how your customers would interact with the AI-powered platform
 
 ![Gravitee Hotels Demo Website](./assets/demo-website.png)
 
