@@ -1,9 +1,8 @@
 # Gravitee Hands-On AI Workshop : The Hotel Booking AI Revolution 🏨🤖
 
-
 ## 🎯 What You'll Learn : Going From Traditional API to Intelligent Agent
 
-Imagine you're working for **BookEasy**, a rapidly growing hotel booking platform. Your customers love your service, but they're asking for something more - they want to interact with your platform naturally, asking questions like *"Find me a pet-friendly hotel in Paris for next weekend"* or *"Show me all my bookings and cancel the one in London."*
+Imagine you're working for **Gravitee Hotels**, a rapidly growing hotel booking platform. Your customers love your service, but they're asking for something more - they want to interact with your platform naturally, asking questions like *"Find me a pet-friendly hotel in Paris for next weekend"* or *"Show me all my bookings and cancel the one in London."*
 
 Your leadership team has decided it's time to embrace AI. The goal is ambitious but clear: **transform your existing hotel booking REST API into an intelligent, conversational AI agent** that customers can chat with naturally while maintaining enterprise-grade security and observability.
 
@@ -21,7 +20,7 @@ This workshop takes you through that transformation journey, showing you how **G
 
 ## 🚀 Setting Up Your AI Transformation Lab
 
-Before we begin BookEasy's AI transformation, we need to prepare our development environment. Think of this as setting up your innovation lab where you'll experiment with cutting-edge AI agent technology.
+Before we begin Gravitee Hotels' AI transformation, we need to prepare our development environment. Think of this as setting up your innovation lab where you'll experiment with cutting-edge AI agent technology.
 
 ### 1. Unlock Gravitee Enterprise AI Features
 
@@ -29,38 +28,26 @@ Your AI transformation requires enterprise-grade capabilities - token tracking, 
 
 > **⚠️ Enterprise License Required**: The AI policies and agent mesh features demonstrated in this workshop require a **Gravitee Enterprise License**.
 > 
-> **📞 Need a License?** If you don't have one, contact Gravitee [here](https://www.gravitee.io/contact-us) to get started.
+> **🎁 Need a License ? Get Your Free 2-Week License in 1 minute**: Fill out [this form](https://landing.gravitee.io/gravitee-hands-on-ai-workshop) and receive your license automatically via email!
 
-**🔑 Generate Base64 License Key** 
+**🔑 Configure Your License** 
 
-You need to convert your `license.key` file into a base64 string before using it in the workshop.
+Once you receive your base64-encoded license key by email, configure it using one of the following options:
 
-* Linux:
-```bash
-base64 -w 0 license.key
-```
-
-* MacOS:
-```bash
-base64 -i license.key | tr -d '\n'
-```
-
-The command will print a long string ending with `=`, which is your base64 license.
-Copy this string and use it in the next steps.
-
-#### Option A: Environment Variable
-```bash
-export GRAVITEE_LICENSE="PUT_YOUR_BASE64_LICENSE_HERE"
-```
-
-#### Option B: Using .env File (Recommended)
+#### Option A: Using .env File (Recommended)
 
 The `.env-template` file contains all necessary environment variables with default values.
-Rename or copy the `.env-template` to a `.env` file and simply replace `PUT_YOUR_BASE64_LICENSE_HERE` with your actual base64-encoded license key.
+Rename or copy the `.env-template` to a `.env` file and simply replace `PUT_YOUR_BASE64_LICENSE_HERE` with the base64-encoded license key you received by email.
+
+#### Option B: Export the `GRAVITEE_LICENSE` Environment Variable
+
+```bash
+export GRAVITEE_LICENSE="YOUR_BASE64_LICENSE_FROM_EMAIL"
+```
 
 ### 2. Launch Your AI Transformation Environment
 
-With your license configured, it's time to spin up BookEasy's complete AI-enabled infrastructure. This includes your existing hotel booking API, a local AI model, the Gravitee API Gateway with AI features, and powerful debugging tools.
+With your license configured, it's time to spin up Gravitee Hotels' complete AI-enabled infrastructure.
 
 ```bash
 docker compose up -d
@@ -74,10 +61,10 @@ docker compose up -d
 |---------|-----|-------------|
 | **Gravitee Console** | http://localhost:8084 | API Management Console |
 | **Gravitee Portal** | http://localhost:8085 | Developer Portal |
-| **Hotel Booking API** | http://localhost:8082/bookings | Demo API *(available only during the workshop)* |
-| **Hotel Booking Agent** | http://localhost:8082/bookings-agent | AI Agent (A2A Protocol) *(available only during the workshop)* |
+| **Gravitee Hotels Demo Website** | http://localhost:3002 | Demo Website - Chat with the AI agent to book hotels |
+| **Hotel Booking API** | http://localhost:8082/bookings | Demo API *(available during the workshop)* |
+| **Hotel Booking Agent** | http://localhost:8082/bookings-agent | AI Agent (A2A Protocol) *(available during the workshop)* |
 | **MCP Inspector** | http://localhost:6274 | Visual MCP Protocol Inspector |
-| **A2A Inspector** | http://localhost:8004 | Visual A2A Protocol Inspector |
 
 #### 📬 **Postman Collection** (Coming Soon)
 A comprehensive Postman collection will be provided for:
@@ -86,7 +73,7 @@ A comprehensive Postman collection will be provided for:
 - Example payloads and responses
 - Integration testing scenarios
 
-## 📖 BookEasy's AI Transformation Workshop
+## 📖 Gravitee Hotels AI Transformation Workshop
 
 Your journey unfolds across three critical phases, each building upon the last to create a complete AI-powered hotel booking experience.
 
@@ -187,7 +174,7 @@ Open the **MCP Inspector** at http://localhost:6274 to see your API through an A
 
 *The Final Challenge: You have a secure LLM and AI-discoverable APIs, but customers can't talk to them naturally. You need to create an intelligent agent that understands customer intent, uses your APIs automatically, and provides a conversational interface.*
 
-**Your Mission**: Deploy BookEasy's intelligent hotel booking agent that customers can chat with naturally. The agent will automatically discover and use your hotel booking tools while being fully monitored and secured.
+**Your Mission**: Deploy Gravitee Hotels' intelligent hotel booking agent that customers can chat with naturally. The agent will automatically discover and use your hotel booking tools while being fully monitored and secured.
 
 > **💡 Shortcut:** You can import the preconfigured API definition from [`Hotel-Booking-AI-Agent-1-0.json`](./apim-apis-definitions/Hotel-Booking-AI-Agent-1-0.json) directly into Gravitee to save time.  
 > - In the Gravitee Console, go to **APIs → Import** and select the JSON file.
@@ -199,28 +186,28 @@ Open the **MCP Inspector** at http://localhost:6274 to see your API through an A
 2. **Connect Agent to Gateway**: Point entrypoint `/bookings-agent` to `http://hotel-booking-a2a-agent:8001`
 3. **Agent Goes Live**: Your agent is now running and ready to help customers!
 
-**🗣️ Experience the Magic with A2A Inspector:**
+**🌐 Experience the Magic with Gravitee Hotels:**
 
-Visit http://localhost:8004 to chat with your newly deployed AI agent:
+Visit http://localhost:3002 to interact with your AI-powered booking platform through a beautiful, production-ready interface:
 
-1. **Connect to Your Agent**: Use the agent card URL:
-   ```
-   http://apim-gateway:8082/bookings-agent/.well-known/agent-card.json
-   ```
-2. **Discover Capabilities**: See what your agent can do - it automatically knows about your hotel booking tools
-3. **Start Conversations**: Try natural language queries like:
-   - *"List the hotel booking options please"*
+1. **Natural Language Booking**: Use the chat window to communicate with the AI agent and book hotels
+2. **Smart Conversations**: Try queries like:
+   - *"Show me available hotels in Paris"*
    - *"Find me a hotel in Paris for 2 nights"*
+   - *"I need a pet-friendly hotel in London"*
    - *"Show me my current bookings"*
-4. **Watch the Protocol**: See real-time A2A protocol messages as your agent thinks and acts
+3. **Real-Time AI Responses**: Watch as the agent understands your intent and interacts with your booking APIs automatically
+4. **Production-Ready UX**: Experience how your customers would interact with the AI-powered platform
 
-![A2A Inspector Interface](./assets/a2a-inspector.png)
+![Gravitee Hotels Demo Website](./assets/demo-website.png)
 
-*🎉 **Success Milestone**: BookEasy customers can now chat naturally with AI to book hotels - your transformation is complete!*
+> **💡 Advanced Debugging**: For developers who want to see the underlying A2A protocol messages, the inspector is still available at http://localhost:8004
+
+*🎉 **Success Milestone**: Gravitee Hotels customers can now chat naturally with AI to book hotels - your transformation is complete!*
 
 ## 🏁 Wrapping Up
 
-When you're done exploring BookEasy's new AI-powered future:
+When you're done exploring Gravitee Hotels' new AI-powered future:
 
 ```bash
 docker compose down
@@ -228,7 +215,7 @@ docker compose down
 
 ## 🎓 What You've Accomplished
 
-**Congratulations! 🎉** You've just completed a complete AI transformation journey. Here's what BookEasy (and you) now have:
+**Congratulations! 🎉** You've just completed a complete AI transformation journey. Here's what Gravitee Hotels (and you) now have:
 
 ### **🚀 Your AI-Powered Hotel Booking Platform**
 - **✅ Intelligent Conversations**: Customers can now chat naturally with your booking system
@@ -266,15 +253,53 @@ You've built a platform that scales:
 
 ---
 
-## 🚀 Your AI Journey Continues...
-
-**BookEasy's transformation is complete**, but this is just the beginning. You now have the foundation to:
-
-- **🔄 Add More Agents**: Build travel, restaurant, or activity booking agents using the same patterns
-- **🏢 Scale Across Enterprise**: Roll out AI agents for different business units with proper security
-- **📈 Optimize & Monitor**: Use the analytics to improve agent performance and control costs
-- **🛡️ Enhance Security**: Implement OAuth, JWT, and advanced AI safety measures
-
 **The future of customer experience is conversational, and you're now ready to build it! 🌟**
 
 *Ready to revolutionize how your customers interact with your platform? The tools are in your hands!* 🛠️✨
+
+---
+
+## 🗺️ Roadmap
+
+We're continuously improving this workshop to showcase the latest in AI agent technology. Here's what's coming next:
+
+### **🔜 Upcoming Enhancements**
+
+#### **Enhanced MCP Security** 🔐
+- **Target Date**: November 25th, 2025
+- **Description**: The next version of the Model Context Protocol specification will include metadata capabilities to describe security requirements for Tools
+- **Impact**: This will enable more granular control over which agents can access specific tools, with clear security policies defined at the protocol level
+- **Workshop Update**: We'll enhance Part 1 to demonstrate how to define security metadata for your hotel booking tools, showing best practices for secure tool discovery
+
+#### **Multi-Agent Communication** 🤝
+- **Coming Soon**
+- **Description**: Add a second A2A Agent to demonstrate proper Agent-to-Agent communications
+- **Impact**: Experience how multiple specialized agents can collaborate to handle complex customer requests
+- **Use Case**: Imagine a customer asking to "Book a hotel in Paris and arrange airport transportation" - watch as the Hotel Booking Agent coordinates with a Transportation Agent to fulfill the complete request
+- **Workshop Update**: Part 3 will expand to show agent orchestration patterns and cross-agent security policies
+
+#### **Advanced Authentication with Gravitee AM** 🔑
+- **Coming Soon**
+- **Description**: Gravitee Access Management may include proper Token Exchange and On-Behalf-Of (OBO) flows
+- **Impact**: Enable secure delegation scenarios where agents can act on behalf of users while maintaining proper audit trails
+- **Use Case**: Allow the booking agent to access user-specific data and make reservations using delegated credentials, with full traceability
+- **Workshop Update**: Add authentication and authorization patterns showing how agents securely represent users across multiple services
+
+#### **GPU-Accelerated LLM Performance** ⚡
+- **Status**: Available for systems with GPU access
+- **Description**: Option to use faster LLM models when Docker has access to host GPU
+- **Impact**: Dramatically reduced response times for AI interactions, enabling real-time conversational experiences
+- **Requirements**: NVIDIA GPU with Docker GPU support enabled
+- **Workshop Update**: Alternative docker-compose configuration for GPU-enabled deployments with performance benchmarks
+
+---
+
+### **📢 Continuous Evolution**
+
+This workshop evolves alongside the ecosystem it demonstrates:
+- **Gravitee Platform Updates**: New features and capabilities from Gravitee APIM and AM releases
+- **MCP Specification**: Following the Model Context Protocol specification as it matures
+- **A2A Protocol**: Adapting to Agent-to-Agent communication protocol enhancements
+- **Industry Best Practices**: Incorporating emerging patterns in AI agent security and orchestration
+
+**Stay tuned for these exciting updates!** ⭐
