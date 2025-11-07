@@ -8,11 +8,13 @@ version = "0.1.0"
 description = "Hotel Booking API with MCP server support"
 requires-python = ">=3.12"
 dependencies = [
-  "fastapi>=0.116.1",
-  "uvicorn>=0.35.0",
-  "pydantic>=2.11.7",
-  "python-dotenv>=1.1.1",
-  "mcp>=1.13.1",
+  "fastapi",
+  "uvicorn",
+  "pydantic",
+  "email-validator",
+  "python-dotenv",
+  "mcp",
+  "pyjwt",
 ]
 
 [project.scripts]
@@ -20,8 +22,8 @@ hotel-api = "hotel_booking_api.main:main"
 
 [dependency-groups]
 dev = [
-  "pytest>=8.4.2",
-  "ruff>=0.13.0",
+  "pytest",
+  "ruff",
 ]
 
 [tool.hatch.build.targets.wheel]

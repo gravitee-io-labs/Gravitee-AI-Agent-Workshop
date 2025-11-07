@@ -1,118 +1,47 @@
 openapi: 3.0.3
 info:
-  title: Hotel Booking API
+  title: Hotel Booking API (Secured)
   version: "1.0"
+  description: Secured version of the Hotel Booking API with OAuth2 authentication
 servers:
   - url: http://localhost:8000
 tags:
+  - name: Accommodations
+    description: Browse available accommodations
   - name: Bookings
     description: Manage hotel bookings
 
 paths:
-  /bookings:
+  /accommodations:
     get:
-      tags: [Bookings]
-      summary: List all bookings
-      operationId: listBookings
+      tags: [Accommodations]
+      summary: Retrieves a list of available accommodations. Optionally filter by location.
+      operationId: getAccommodations
+      parameters:
+        - name: location
+          in: query
+          required: false
+          schema:
+            type: string
+          description: Filter by city name (e.g., London, Paris, New York)
       responses:
         "200":
-          description: List of bookings
+          description: List of accommodations
           content:
             application/json:
               schema:
                 type: array
                 items:
-                  $ref: "#/components/schemas/Booking"
-    post:
-      tags: [Bookings]
-      summary: Create a booking
-      operationId: createBooking
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: "#/components/schemas/BookingCreate"
-      responses:
-        "201":
-          description: Booking created
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/Booking"
+                  $ref: "#/components/schemas/Accommodation"
 
-  /bookings/{booking_id}:
+  /bookings:
     get:
       tags: [Bookings]
-      summary: Get booking detail
-      operationId: getBookingDetail
-      parameters:
-        - name: booking_id
-          in: path
-          required: true
-          schema:
-            type: integer
-      responses:
-        "200":
-          description: Booking details
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/Booking"
-        "404":
-          description: Booking not found
-    put:
-      tags: [Bookings]
-      summary: Update a booking
-      operationId: updateBooking
-      parameters:
-        - name: booking_id
-          in: path
-          required: true
-          schema:
-            type: integer
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: "#/components/schemas/BookingCreate"
-      responses:
-        "200":
-          description: Booking updated
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/Booking"
-        "404":
-          description: Booking not found
-    delete:
-      tags: [Bookings]
-      summary: Delete a booking
-      operationId: deleteBooking
-      parameters:
-        - name: booking_id
-          in: path
-          required: true
-          schema:
-            type: integer
-      responses:
-        "204":
-          description: Booking deleted successfully
-        "404":
-          description: Booking not found
-
-  /bookings/user/{user_sub}:
-    get:
-      tags: [Bookings]
-      summary: Get bookings by user
-      operationId: getBookingsByUser
-      parameters:
-        - name: user_sub
-          in: path
-          required: true
-          schema:
-            type: string
+      summary: Retrieves all existing bookings.
+      operationId: getBookings
+      security:
+        - oauth2: [read:bookings]
+        - bearerAuth: []
       responses:
         "200":
           description: List of bookings for a specific user
@@ -122,68 +51,119 @@ paths:
                 type: array
                 items:
                   $ref: "#/components/schemas/Booking"
+        "401":
+          description: Unauthorized - Missing or invalid authentication token
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+                    example: "Unauthorized"
+                  message:
+                    type: string
+                    example: "Valid authentication token is required"
+        "403":
+          description: Forbidden - Insufficient permissions
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+                    example: "Forbidden"
+                  message:
+                    type: string
+                    example: "Insufficient permissions to access this resource"
 
 components:
+  securitySchemes:
+    oauth2:
+      type: oauth2
+      description: OAuth2 authentication with authorization code flow
+      flows:
+        authorizationCode:
+          authorizationUrl: https://auth.example.com/oauth/authorize
+          tokenUrl: https://auth.example.com/oauth/token
+          scopes:
+            read:bookings: Read access to booking information
+            write:bookings: Write access to create or modify bookings
+        clientCredentials:
+          tokenUrl: https://auth.example.com/oauth/token
+          scopes:
+            read:bookings: Read access to booking information
+            write:bookings: Write access to create or modify bookings
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: JWT Bearer token authentication
+
   schemas:
+    Accommodation:
+      type: object
+      properties:
+        id:
+          type: integer
+          example: 1
+        name:
+          type: string
+          example: The Grand Hotel London
+        location:
+          type: string
+          example: London
+        description:
+          type: string
+          example: Luxury 5-star hotel in central London with exceptional service
+        price_per_night:
+          type: number
+          format: float
+          example: 350.0
+        available_rooms:
+          type: integer
+          example: 15
+      required:
+        - id
+        - name
+        - location
+        - description
+        - price_per_night
+        - available_rooms
+
     Booking:
       type: object
       properties:
         id:
           type: integer
           example: 1
-        user_sub:
+        user_email:
           type: string
-          description: JWT subject of the booking owner
-          example: 54e88daa-cbec-3b44-a0c7-1a997de66212
+          format: email
+          description: Email address of the booking owner
+          example: john.doe@gravitee.io
         hotel_name:
           type: string
-          example: Hotel California
+          example: The Grand Hotel London
         room_number:
           type: string
-          example: "101"
+          example: "305"
         start_date:
           type: string
           format: date-time
-          example: "2025-08-01T14:00:00"
+          example: "2025-10-17T14:00:00"
         end_date:
           type: string
           format: date-time
-          example: "2025-08-10T11:00:00"
+          example: "2025-10-24T11:00:00"
         price:
           type: number
           format: float
-          example: 1500.0
+          example: 2450.0
       required:
         - id
-        - user_sub
-        - hotel_name
-        - room_number
-        - start_date
-        - end_date
-        - price
-
-    BookingCreate:
-      type: object
-      properties:
-        hotel_name:
-          type: string
-          example: Grand Budapest
-        room_number:
-          type: string
-          example: "202"
-        start_date:
-          type: string
-          format: date-time
-          example: "2025-09-05T15:00:00"
-        end_date:
-          type: string
-          format: date-time
-          example: "2025-09-12T10:00:00"
-        price:
-          type: number
-          format: float
-          example: 1200.0
-      required:
+        - user_email
         - hotel_name
         - room_number
         - start_date
