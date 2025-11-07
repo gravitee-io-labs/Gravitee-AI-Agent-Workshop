@@ -164,6 +164,82 @@ services:
     networks:
       - northbound
 
+# --- Gravitee Access Management Components ---
+
+  ### Gravitee Access Management Gateway
+  am-gateway:
+    image: ${AM_REGISTRY:-graviteeio}/am-gateway:${AM_VERSION:-latest}
+    container_name: gio-am-gateway
+    restart: always
+    ports:
+      - "8092:8092"
+    depends_on:
+      mongodb:
+        condition: service_healthy
+      am-management-api:
+        condition: service_started
+    volumes:
+      - ./plugins-am:/opt/graviteeio-am-gateway/plugins-ext
+    environment:
+      - gravitee_license_key=${GRAVITEE_LICENSE}
+      - gravitee_management_mongodb_uri=mongodb://mongodb:27017/graviteeam?serverSelectionTimeoutMS=5000&connectTimeoutMS=5000&socketTimeoutMS=5000
+      - gravitee_oauth2_mongodb_uri=mongodb://mongodb:27017/graviteeam?serverSelectionTimeoutMS=5000&connectTimeoutMS=5000&socketTimeoutMS=5000
+      - gravitee_plugins_path_0=/opt/graviteeio-am-gateway/plugins
+      - gravitee_plugins_path_1=/opt/graviteeio-am-gateway/plugins-ext
+    networks:
+      - southbound
+      - northbound
+
+  ### Gravitee Access Management Management API
+  am-management-api:
+    image: ${AM_REGISTRY:-graviteeio}/am-management-api:${AM_VERSION:-latest}
+    container_name: gio-am-management-api
+    restart: always
+    ports:
+      - "8093:8093"
+    depends_on:
+      mongodb:
+        condition: service_healthy
+    volumes:
+      - ./plugins-am:/opt/graviteeio-am-management-api/plugins-ext
+    environment:
+      - gravitee_license_key=${GRAVITEE_LICENSE}
+      - gravitee_management_mongodb_uri=mongodb://mongodb:27017/graviteeam?serverSelectionTimeoutMS=5000&connectTimeoutMS=5000&socketTimeoutMS=5000
+      - gravitee_oauth2_mongodb_uri=mongodb://mongodb:27017/graviteeam?serverSelectionTimeoutMS=5000&connectTimeoutMS=5000&socketTimeoutMS=5000
+      - gravitee_dataPlanes_0_mongodb_uri=mongodb://mongodb:27017/graviteeam?serverSelectionTimeoutMS=5000&connectTimeoutMS=5000&socketTimeoutMS=5000
+      - gravitee_plugins_path_0=/opt/graviteeio-am-management-api/plugins
+      - gravitee_plugins_path_1=/opt/graviteeio-am-management-api/plugins-ext
+    networks:
+      - southbound
+      - northbound
+
+  ### Gravitee Access Management Management UI
+  am-management-ui:
+    image: ${AM_REGISTRY:-graviteeio}/am-management-ui:${AM_VERSION:-latest}
+    container_name: gio-am-management-ui
+    restart: always
+    ports:
+      - "8081:8080"
+    depends_on:
+      - am-management-api
+    environment:
+      - MGMT_API_URL=http://localhost:8093
+      - MGMT_UI_URL=http://localhost:8081
+    networks:
+      - northbound
+
+# --- Alert Engine Components ---
+
+  ### Alert Engine
+  alert-engine:
+    image: graviteeio/ae-engine:${AE_VERSION:-2}
+    container_name: gio-alert-engine
+    restart: always
+    environment:
+      - gravitee_license_key=${GRAVITEE_LICENSE}
+    networks:
+      - southbound
+
 # --- AI Agents Components ---
 
   ### Ollama LLM Runtime
@@ -203,13 +279,31 @@ services:
     ports:
       - "8000:8000"
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8000/bookings"]
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
       interval: 5s
       timeout: 5s
       retries: 3
       start_period: 3s
     networks:
       - southbound
+
+  ### Hotel Website
+  hotel-website:
+    build:
+      context: ./hotel-website
+      dockerfile: Dockerfile
+    container_name: hotel-website
+    restart: unless-stopped
+    ports:
+      - "8002:80"
+    environment:
+      - AGENT_CARD_URL=http://localhost:8082/bookings-agent/.well-known/agent-card.json
+      - OIDC_URL=http://localhost:8092/gravitee/oidc/.well-known/openid-configuration
+      - CLIENT_ID=gravitee-hotels
+      - CLIENT_SECRET=gravitee-hotels
+      - REDIRECT_URI=http://localhost:8002/
+    networks:
+      - northbound
 
   ### A2A Agent
   hotel-booking-a2a-agent:
@@ -228,8 +322,10 @@ services:
       - OLLAMA_URL=http://gio-apim-gateway:8082/llm
       - OLLAMA_MODEL=qwen3:0.6b
       - OLLAMA_TEMPERATURE=0.3
-      - MCP_HTTP_URL=http://gio-apim-gateway:8082/bookings/mcp
+      - MCP_HTTP_URL=http://gio-apim-gateway:8082/hotels/mcp
       - AGENT_SERVER_PORT=8001
+      - OIDC_DISCOVERY_URL=http://am-gateway:8092/gravitee/oidc/.well-known/openid-configuration
+      - JWT_SECRET=my-example-secret
     ports:
       - "8001:8001"
     restart: unless-stopped
