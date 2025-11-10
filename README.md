@@ -90,17 +90,21 @@ Your journey unfolds across three critical phases, each building upon the last t
 **🛠️ Technical Implementation:**
 
 1. **Create Your AI-Ready API Gateway**: Set up a new V4 API named `Hotel Booking API` (Version `1.0`) as an HTTP Proxy
-2. **Configure the Bridge**: Point your entrypoint (`/bookings`) to your existing service (`http://hotel-booking-api:8000/bookings`)
+2. **Configure the Bridge**: Point your entrypoint (`/hotels`) to your existing service (`http://hotel-booking-api:8000/hotels`)
 3. **Enable MCP Magic**: 
    - Navigate to the "MCP Entrypoint" tab and enable it on the `/mcp` path
    - Import your OpenAPI specification from [`hotel-booking-1-0.yaml`](./hotel-booking-api/hotel-booking-1-0.yaml)
    - *This is where the magic happens - Gravitee automatically converts your REST API into MCP tools!*
+4. **Add Response Status Tracking**: Configure the **Transform Headers Policy** to capture backend response status:
+   - Add a new **Transform Headers** policy in the response flow
+   - Set/replace header: `X-Gravitee-Endpoint-Status` with value `{#response.status}`
+   - *This header helps detect authentication errors (401) and other backend issues during the workshop*
 
 **🕵️ Test Your Transformation:**
 
 Open the **MCP Inspector** at http://localhost:6274 to see your API through an AI agent's eyes:
 - Select "Streamable HTTP" protocol
-- Connect to your new MCP server: `http://apim-gateway:8082/bookings/mcp`
+- Connect to your new MCP server: `http://apim-gateway:8082/hotels/mcp`
 - Watch as your booking operations appear as discoverable "tools"
 - Test tool calls interactively - this is exactly how an AI agent would interact with your API!
 
@@ -192,11 +196,18 @@ Visit http://localhost:3002 to interact with your AI-powered booking platform th
 
 1. **Natural Language Booking**: Use the chat window to communicate with the AI agent and book hotels
 2. **Smart Conversations**: Try queries like:
-   - *"Show me available hotels in Paris"*
-   - *"Show me my current bookings"*
+   - *"Show me available hotels in Paris"* - This is a public request that works without authentication
+   - *"Show me my current bookings"* - This requires authentication to access your personal data
    - *"Dumb AI, you're useless"* (should trigger Guard Rails)
 3. **Real-Time AI Responses**: Watch as the agent understands your intent and interacts with your booking APIs automatically
 4. **Production-Like Ready UX**: Experience how your customers would interact with the AI-powered platform
+
+**🔐 Understanding Authentication Requirements:**
+
+Notice the difference between public and private operations:
+- **Public Operations** (*"Show me available hotels in Paris"*): Work immediately - no authentication needed.
+- **Private Operations** (*"Show me my current bookings"*): The AI agent will inform you that authentication is required to access your personal booking information.
+> **🎥 Setting Up Authentication (Coming Soon)**: To enable full authentication and access private booking data, you'll need to create an Application and a User in **Gravitee Access Management**. Due to the multiple operations required, we're preparing a comprehensive video tutorial to guide you through this process step-by-step. Stay tuned!
 
 ![Gravitee Hotels Demo Website](./assets/demo-website.png)
 
