@@ -207,7 +207,7 @@ Visit http://localhost:3002 to interact with your AI-powered booking platform th
 Notice the difference between public and private operations:
 - **Public Operations** (*"Show me available hotels in Paris"*): Work immediately - no authentication needed.
 - **Private Operations** (*"Show me my current bookings"*): The AI agent will inform you that authentication is required to access your personal booking information.
-> **🎥 Setting Up Authentication (Coming Soon)**: To enable full authentication and access private booking data, you'll need to create an Application and a User in **Gravitee Access Management**. Due to the multiple operations required, we're preparing a comprehensive video tutorial to guide you through this process step-by-step. Stay tuned!
+  > **🎥 Setting Up Authentication (Coming Soon)**: To enable full authentication and access private booking data, you'll need to create an Application and a User in **Gravitee Access Management**. Due to the multiple operations required, we're preparing a comprehensive video tutorial to guide you through this process step-by-step. Stay tuned!
 
 ![Gravitee Hotels Demo Website](./assets/demo-website.png)
 
