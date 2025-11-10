@@ -1,7 +1,7 @@
 {
   "export": {
-    "date": "2025-09-26T19:06:48.093165958Z",
-    "apimVersion": "4.8.7"
+    "date": "2025-11-10T17:26:42.687550555Z",
+    "apimVersion": "4.9.2"
   },
   "api": {
     "definitionVersion": "V4",
@@ -11,11 +11,27 @@
         "type": "HTTP",
         "paths": [
           {
-            "path": "/bookings/",
+            "path": "/hotels/",
             "overrideAccess": false
           }
         ],
         "pathMappings": [],
+        "cors": {
+          "allowCredentials": false,
+          "allowHeaders": [
+            "*"
+          ],
+          "allowMethods": [
+            "*"
+          ],
+          "allowOrigin": [
+            "*"
+          ],
+          "enabled": true,
+          "exposeHeaders": [],
+          "maxAge": -1,
+          "runPolicies": false
+        },
         "entrypoints": [
           {
             "type": "http-proxy",
@@ -31,6 +47,31 @@
                 {
                   "gatewayMapping": {
                     "http": {
+                      "path": "/accommodations",
+                      "method": "GET",
+                      "queryParams": [
+                        "location"
+                      ]
+                    }
+                  },
+                  "toolDefinition": {
+                    "inputSchema": {
+                      "type": "object",
+                      "properties": {
+                        "location": {
+                          "description": "Filter by city name (e.g., London, Paris, New York)",
+                          "type": "string"
+                        }
+                      },
+                      "required": []
+                    },
+                    "name": "getAccommodations",
+                    "description": "Retrieves a list of available accommodations. Optionally filter by location."
+                  }
+                },
+                {
+                  "gatewayMapping": {
+                    "http": {
                       "path": "/bookings",
                       "method": "GET"
                     }
@@ -41,202 +82,8 @@
                       "properties": {},
                       "required": []
                     },
-                    "name": "listBookings",
-                    "description": "List all bookings"
-                  }
-                },
-                {
-                  "gatewayMapping": {
-                    "http": {
-                      "path": "/bookings",
-                      "method": "POST",
-                      "contentType": "application/json"
-                    }
-                  },
-                  "toolDefinition": {
-                    "inputSchema": {
-                      "type": "object",
-                      "properties": {
-                        "bodySchema": {
-                          "type": "object",
-                          "properties": {
-                            "end_date": {
-                              "format": "date-time",
-                              "type": "string",
-                              "example": "2025-09-12T10:00:00"
-                            },
-                            "price": {
-                              "format": "float",
-                              "type": "number",
-                              "example": 1200
-                            },
-                            "room_number": {
-                              "type": "string",
-                              "example": "202"
-                            },
-                            "hotel_name": {
-                              "type": "string",
-                              "example": "Grand Budapest"
-                            },
-                            "start_date": {
-                              "format": "date-time",
-                              "type": "string",
-                              "example": "2025-09-05T15:00:00"
-                            }
-                          },
-                          "required": [
-                            "hotel_name",
-                            "room_number",
-                            "start_date",
-                            "end_date",
-                            "price"
-                          ]
-                        }
-                      },
-                      "required": []
-                    },
-                    "name": "createBooking",
-                    "description": "Create a booking"
-                  }
-                },
-                {
-                  "gatewayMapping": {
-                    "http": {
-                      "path": "/bookings/:booking_id",
-                      "method": "GET",
-                      "pathParams": [
-                        "booking_id"
-                      ]
-                    }
-                  },
-                  "toolDefinition": {
-                    "inputSchema": {
-                      "type": "object",
-                      "properties": {
-                        "booking_id": {
-                          "type": "integer"
-                        }
-                      },
-                      "required": [
-                        "booking_id"
-                      ]
-                    },
-                    "name": "getBookingDetail",
-                    "description": "Get booking detail"
-                  }
-                },
-                {
-                  "gatewayMapping": {
-                    "http": {
-                      "path": "/bookings/:booking_id",
-                      "method": "PUT",
-                      "pathParams": [
-                        "booking_id"
-                      ],
-                      "contentType": "application/json"
-                    }
-                  },
-                  "toolDefinition": {
-                    "inputSchema": {
-                      "type": "object",
-                      "properties": {
-                        "booking_id": {
-                          "type": "integer"
-                        },
-                        "bodySchema": {
-                          "type": "object",
-                          "properties": {
-                            "end_date": {
-                              "format": "date-time",
-                              "type": "string",
-                              "example": "2025-09-12T10:00:00"
-                            },
-                            "price": {
-                              "format": "float",
-                              "type": "number",
-                              "example": 1200
-                            },
-                            "room_number": {
-                              "type": "string",
-                              "example": "202"
-                            },
-                            "hotel_name": {
-                              "type": "string",
-                              "example": "Grand Budapest"
-                            },
-                            "start_date": {
-                              "format": "date-time",
-                              "type": "string",
-                              "example": "2025-09-05T15:00:00"
-                            }
-                          },
-                          "required": [
-                            "hotel_name",
-                            "room_number",
-                            "start_date",
-                            "end_date",
-                            "price"
-                          ]
-                        }
-                      },
-                      "required": [
-                        "booking_id"
-                      ]
-                    },
-                    "name": "updateBooking",
-                    "description": "Update a booking"
-                  }
-                },
-                {
-                  "gatewayMapping": {
-                    "http": {
-                      "path": "/bookings/:booking_id",
-                      "method": "DELETE",
-                      "pathParams": [
-                        "booking_id"
-                      ]
-                    }
-                  },
-                  "toolDefinition": {
-                    "inputSchema": {
-                      "type": "object",
-                      "properties": {
-                        "booking_id": {
-                          "type": "integer"
-                        }
-                      },
-                      "required": [
-                        "booking_id"
-                      ]
-                    },
-                    "name": "deleteBooking",
-                    "description": "Delete a booking"
-                  }
-                },
-                {
-                  "gatewayMapping": {
-                    "http": {
-                      "path": "/bookings/user/:user_sub",
-                      "method": "GET",
-                      "pathParams": [
-                        "user_sub"
-                      ]
-                    }
-                  },
-                  "toolDefinition": {
-                    "inputSchema": {
-                      "type": "object",
-                      "properties": {
-                        "user_sub": {
-                          "type": "string"
-                        }
-                      },
-                      "required": [
-                        "user_sub"
-                      ]
-                    },
-                    "name": "getBookingsByUser",
-                    "description": "Get bookings by user"
+                    "name": "getBookings",
+                    "description": "Retrieves all existing bookings."
                   }
                 }
               ]
@@ -261,7 +108,7 @@
             "weight": 1,
             "inheritConfiguration": true,
             "configuration": {
-              "target": "http://hotel-booking-api:8000/bookings"
+              "target": "http://hotel-booking-api:8000"
             },
             "sharedConfigurationOverride": "{}",
             "services": {},
@@ -305,9 +152,9 @@
     "name": "Hotel Booking API",
     "description": "Hotel Booking API",
     "apiVersion": "1.0",
-    "deployedAt": "2025-09-26T19:04:59.922Z",
+    "deployedAt": "2025-11-06T17:31:42.465Z",
     "createdAt": "2025-09-25T16:31:44.722Z",
-    "updatedAt": "2025-09-26T19:04:59.922Z",
+    "updatedAt": "2025-11-06T18:53:49.427Z",
     "disableMembershipNotifications": false,
     "groups": [],
     "state": "STARTED",
@@ -333,14 +180,45 @@
   },
   "pages": [
     {
-      "id": "a829c45a-15a3-4fee-a9c4-5a15a39feedd",
-      "name": "Homepage",
+      "id": "17613053-52bb-472c-a130-5352bb572c43",
+      "name": "OpenAPI",
       "type": "SWAGGER",
-      "content": "openapi: 3.0.3\ninfo:\n  title: Hotel Booking API\n  version: \"1.0\"\nservers:\n  - url: http://localhost:8000\ntags:\n  - name: Bookings\n    description: Manage hotel bookings\n\npaths:\n  /bookings:\n    get:\n      tags: [Bookings]\n      summary: List all bookings\n      operationId: listBookings\n      responses:\n        \"200\":\n          description: List of bookings\n          content:\n            application/json:\n              schema:\n                type: array\n                items:\n                  $ref: \"#/components/schemas/Booking\"\n    post:\n      tags: [Bookings]\n      summary: Create a booking\n      operationId: createBooking\n      requestBody:\n        required: true\n        content:\n          application/json:\n            schema:\n              $ref: \"#/components/schemas/BookingCreate\"\n      responses:\n        \"201\":\n          description: Booking created\n          content:\n            application/json:\n              schema:\n                $ref: \"#/components/schemas/Booking\"\n\n  /bookings/{booking_id}:\n    get:\n      tags: [Bookings]\n      summary: Get booking detail\n      operationId: getBookingDetail\n      parameters:\n        - name: booking_id\n          in: path\n          required: true\n          schema:\n            type: integer\n      responses:\n        \"200\":\n          description: Booking details\n          content:\n            application/json:\n              schema:\n                $ref: \"#/components/schemas/Booking\"\n        \"404\":\n          description: Booking not found\n    put:\n      tags: [Bookings]\n      summary: Update a booking\n      operationId: updateBooking\n      parameters:\n        - name: booking_id\n          in: path\n          required: true\n          schema:\n            type: integer\n      requestBody:\n        required: true\n        content:\n          application/json:\n            schema:\n              $ref: \"#/components/schemas/BookingCreate\"\n      responses:\n        \"200\":\n          description: Booking updated\n          content:\n            application/json:\n              schema:\n                $ref: \"#/components/schemas/Booking\"\n        \"404\":\n          description: Booking not found\n    delete:\n      tags: [Bookings]\n      summary: Delete a booking\n      operationId: deleteBooking\n      parameters:\n        - name: booking_id\n          in: path\n          required: true\n          schema:\n            type: integer\n      responses:\n        \"204\":\n          description: Booking deleted successfully\n        \"404\":\n          description: Booking not found\n\n  /bookings/user/{user_sub}:\n    get:\n      tags: [Bookings]\n      summary: Get bookings by user\n      operationId: getBookingsByUser\n      parameters:\n        - name: user_sub\n          in: path\n          required: true\n          schema:\n            type: string\n      responses:\n        \"200\":\n          description: List of bookings for a specific user\n          content:\n            application/json:\n              schema:\n                type: array\n                items:\n                  $ref: \"#/components/schemas/Booking\"\n\ncomponents:\n  schemas:\n    Booking:\n      type: object\n      properties:\n        id:\n          type: integer\n          example: 1\n        user_sub:\n          type: string\n          description: JWT subject of the booking owner\n          example: 54e88daa-cbec-3b44-a0c7-1a997de66212\n        hotel_name:\n          type: string\n          example: Hotel California\n        room_number:\n          type: string\n          example: \"101\"\n        start_date:\n          type: string\n          format: date-time\n          example: \"2025-08-01T14:00:00\"\n        end_date:\n          type: string\n          format: date-time\n          example: \"2025-08-10T11:00:00\"\n        price:\n          type: number\n          format: float\n          example: 1500.0\n      required:\n        - id\n        - user_sub\n        - hotel_name\n        - room_number\n        - start_date\n        - end_date\n        - price\n\n    BookingCreate:\n      type: object\n      properties:\n        hotel_name:\n          type: string\n          example: Grand Budapest\n        room_number:\n          type: string\n          example: \"202\"\n        start_date:\n          type: string\n          format: date-time\n          example: \"2025-09-05T15:00:00\"\n        end_date:\n          type: string\n          format: date-time\n          example: \"2025-09-12T10:00:00\"\n        price:\n          type: number\n          format: float\n          example: 1200.0\n      required:\n        - hotel_name\n        - room_number\n        - start_date\n        - end_date\n        - price\n",
+      "content": "openapi: 3.0.3\ninfo:\n  title: Hotel Booking API (Secured)\n  version: \"1.0\"\n  description: Secured version of the Hotel Booking API with OAuth2 authentication\nservers:\n  - url: http://localhost:8082/hotels\ntags:\n  - name: Accommodations\n    description: Browse available accommodations\n  - name: Bookings\n    description: Manage hotel bookings\n\npaths:\n  /accommodations:\n    get:\n      tags: [Accommodations]\n      summary: Retrieves a list of available accommodations. Optionally filter by location.\n      operationId: getAccommodations\n      parameters:\n        - name: location\n          in: query\n          required: false\n          schema:\n            type: string\n          description: Filter by city name (e.g., London, Paris, New York)\n      responses:\n        \"200\":\n          description: List of accommodations\n          content:\n            application/json:\n              schema:\n                type: array\n                items:\n                  $ref: \"#/components/schemas/Accommodation\"\n\n  /bookings:\n    get:\n      tags: [Bookings]\n      summary: Retrieves all existing bookings.\n      operationId: getBookings\n      security:\n        - oauth2: [read:bookings]\n        - bearerAuth: []\n      responses:\n        \"200\":\n          description: List of bookings for a specific user\n          content:\n            application/json:\n              schema:\n                type: array\n                items:\n                  $ref: \"#/components/schemas/Booking\"\n        \"401\":\n          description: Unauthorized - Missing or invalid authentication token\n          content:\n            application/json:\n              schema:\n                type: object\n                properties:\n                  error:\n                    type: string\n                    example: \"Unauthorized\"\n                  message:\n                    type: string\n                    example: \"Valid authentication token is required\"\n        \"403\":\n          description: Forbidden - Insufficient permissions\n          content:\n            application/json:\n              schema:\n                type: object\n                properties:\n                  error:\n                    type: string\n                    example: \"Forbidden\"\n                  message:\n                    type: string\n                    example: \"Insufficient permissions to access this resource\"\n\ncomponents:\n  securitySchemes:\n    oauth2:\n      type: oauth2\n      description: OAuth2 authentication with authorization code flow\n      flows:\n        authorizationCode:\n          authorizationUrl: http://localhost:8092/gravitee/oauth/authorize\n          tokenUrl: http://localhost:8092/gravitee/oauth/token\n          scopes:\n            read:bookings: Read access to booking information\n            write:bookings: Write access to create or modify bookings\n        clientCredentials:\n          tokenUrl: http://localhost:8092/gravitee/oauth/token\n          scopes:\n            read:bookings: Read access to booking information\n            write:bookings: Write access to create or modify bookings\n    bearerAuth:\n      type: http\n      scheme: bearer\n      bearerFormat: JWT\n      description: JWT Bearer token authentication\n\n  schemas:\n    Accommodation:\n      type: object\n      properties:\n        id:\n          type: integer\n          example: 1\n        name:\n          type: string\n          example: The Grand Hotel London\n        location:\n          type: string\n          example: London\n        description:\n          type: string\n          example: Luxury 5-star hotel in central London with exceptional service\n        price_per_night:\n          type: number\n          format: float\n          example: 350.0\n        available_rooms:\n          type: integer\n          example: 15\n      required:\n        - id\n        - name\n        - location\n        - description\n        - price_per_night\n        - available_rooms\n\n    Booking:\n      type: object\n      properties:\n        id:\n          type: integer\n          example: 1\n        user_email:\n          type: string\n          format: email\n          description: Email address of the booking owner\n          example: john.doe@gravitee.io\n        hotel_name:\n          type: string\n          example: The Grand Hotel London\n        room_number:\n          type: string\n          example: \"305\"\n        start_date:\n          type: string\n          format: date-time\n          example: \"2025-10-17T14:00:00\"\n        end_date:\n          type: string\n          format: date-time\n          example: \"2025-10-24T11:00:00\"\n        price:\n          type: number\n          format: float\n          example: 2450.0\n      required:\n        - id\n        - user_email\n        - hotel_name\n        - room_number\n        - start_date\n        - end_date\n        - price\n",
       "order": 0,
       "published": true,
       "visibility": "PUBLIC",
-      "updatedAt": "2025-09-25T16:35:18.141Z",
+      "updatedAt": "2025-11-06T17:33:23.305Z",
+      "configuration": {
+        "viewer": "Swagger",
+        "entrypointAsBasePath": "false",
+        "entrypointsAsServers": "false",
+        "tryItURL": "",
+        "tryIt": "true",
+        "disableSyntaxHighlight": "false",
+        "tryItAnonymous": "false",
+        "showURL": "false",
+        "displayOperationId": "false",
+        "usePkce": "false",
+        "docExpansion": "none",
+        "enableFiltering": "false",
+        "showExtensions": "false",
+        "showCommonExtensions": "false",
+        "maxDisplayedTags": "-1"
+      },
+      "homepage": false,
+      "excludedAccessControls": false,
+      "accessControls": [],
+      "metadata": {}
+    },
+    {
+      "id": "7ddd1907-922e-4ed5-9d19-07922e2ed5ba",
+      "name": "Homepage",
+      "type": "MARKDOWN",
+      "content": "# 🏨 Hotel Booking API\n\nThe **Hotel Booking API** provides a modern, secure interface for discovering hotel accommodations and managing bookings.  \nIt is designed for partners, agencies, and internal applications that require authenticated access to booking data.\n\n---\n\n## 🌐 Overview\n\nThis API enables seamless integration with hotel reservation systems.  \nIt supports both **public data retrieval** (accommodation browsing) and **protected operations** (booking management).\n\nAuthentication is enforced via **OAuth2** or **JWT Bearer tokens**, ensuring sensitive information such as booking details remains secure.\n\n---\n\n## 🔐 Authentication\n\nThe API uses standard authentication mechanisms for maximum flexibility and security.\n\n### OAuth2 Authentication\nSupports both the **Authorization Code** and **Client Credentials** flows for delegated and machine-to-machine access.\n\n**Endpoints:**\n- Authorization URL: `https://auth.example.com/oauth/authorize`\n- Token URL: `https://auth.example.com/oauth/token`\n\n**Scopes:**\n- `read:bookings` – Read access to booking data  \n- `write:bookings` – Create or modify bookings\n\n### Bearer Token (JWT)\nApplications can also use JWT Bearer tokens for quick access.\n\nHeader example:\n```\nAuthorization: Bearer <your_jwt_token>\n```\n\n---\n\n## 💡 Key Features\n\n- 🔎 **Browse Accommodations:** Search for available hotels by location.  \n- 🛎️ **Manage Bookings:** View or manage confirmed reservations (requires authentication).  \n- 🧭 **Flexible Security:** Compatible with OAuth2 and JWT-based authentication.  \n- 💬 **Rich Metadata:** Each accommodation includes detailed descriptions, pricing, and room availability.  \n- ⚙️ **Standardized Model:** Follows OpenAPI 3.0.3 specifications for easy integration.  \n\n---\n\n## 📦 Data Models\n\n### Accommodation\nDescribes a hotel listing, including pricing and availability.\n\n| Field | Type | Description |\n|--------|------|-------------|\n| `id` | integer | Unique accommodation identifier |\n| `name` | string | Name of the hotel |\n| `location` | string | City or region where the hotel is located |\n| `description` | string | Hotel summary or key features |\n| `price_per_night` | number | Price per night (in USD) |\n| `available_rooms` | integer | Number of available rooms |\n\n### Booking\nRepresents a confirmed reservation made by an authenticated user.\n\n| Field | Type | Description |\n|--------|------|-------------|\n| `id` | integer | Unique booking identifier |\n| `user_email` | string | Email of the booking owner |\n| `hotel_name` | string | Name of the booked hotel |\n| `room_number` | string | Room number assigned |\n| `start_date` | date-time | Start date/time of the stay |\n| `end_date` | date-time | End date/time of the stay |\n| `price` | number | Total cost of the booking |\n\n## 📖 API Reference\n\nThe full OpenAPI specification is available in the documentation pages.\n\n---\n\n© 2025 Gravitee – Hotel Booking API\n",
+      "order": 1,
+      "published": true,
+      "visibility": "PUBLIC",
+      "updatedAt": "2025-11-06T17:30:43.973Z",
       "configuration": {},
       "homepage": true,
       "excludedAccessControls": false,
@@ -353,18 +231,39 @@
       "definitionVersion": "V4",
       "flows": [
         {
-          "id": "5460c0fe-3444-4a8e-a0c0-fe3444aa8eeb",
+          "id": "355859e1-cf29-40b2-9859-e1cf2970b2bf",
+          "name": "MCP Server",
           "enabled": true,
           "selectors": [
             {
               "type": "HTTP",
               "path": "/",
               "pathOperator": "STARTS_WITH",
-              "methods": []
+              "methods": [
+                "GET"
+              ]
             }
           ],
           "request": [],
-          "response": [],
+          "response": [
+            {
+              "name": "Transform Headers",
+              "description": "Add backend response status to an header",
+              "enabled": true,
+              "policy": "transform-headers",
+              "configuration": {
+                "whitelistHeaders": [],
+                "addHeaders": [
+                  {
+                    "name": "X-Gravitee-Endpoint-Status",
+                    "value": "{#response.status}"
+                  }
+                ],
+                "scope": "REQUEST",
+                "removeHeaders": []
+              }
+            }
+          ],
           "subscribe": [],
           "publish": [],
           "connect": [],
@@ -390,7 +289,7 @@
       "status": "PUBLISHED",
       "tags": [],
       "type": "API",
-      "updatedAt": "2025-09-25T16:31:44.994Z",
+      "updatedAt": "2025-11-06T02:06:17.912Z",
       "validation": "MANUAL"
     }
   ],
