@@ -1,7 +1,7 @@
 {
   "export": {
-    "date": "2025-11-10T17:26:21.222559753Z",
-    "apimVersion": "4.9.2"
+    "date": "2025-11-10T17:33:04.592958052Z",
+    "apimVersion": "4.9.3"
   },
   "api": {
     "definitionVersion": "V4",
@@ -41,7 +41,7 @@
             "weight": 1,
             "inheritConfiguration": true,
             "configuration": {
-              "target": "http://host.docker.internal:11434"
+              "target": "http://ollama:11434"
             },
             "sharedConfigurationOverride": "{}",
             "services": {},
@@ -85,9 +85,9 @@
     "name": "LLM - Ollama",
     "description": "LLM - Ollama.\nUsed by the agent to decide which tool to use.",
     "apiVersion": "1.0",
-    "deployedAt": "2025-11-04T23:36:05.186Z",
+    "deployedAt": "2025-11-10T17:32:57.359Z",
     "createdAt": "2025-09-25T16:41:01.216Z",
-    "updatedAt": "2025-11-06T16:39:46.791Z",
+    "updatedAt": "2025-11-10T17:32:57.359Z",
     "disableMembershipNotifications": false,
     "groups": [],
     "state": "STARTED",
