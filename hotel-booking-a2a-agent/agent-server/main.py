@@ -8,8 +8,8 @@ import json
 from dotenv import load_dotenv
 
 # Add the client packages to Python path (Docker container paths)
-sys.path.insert(0, '/app/mcp-client')
-sys.path.insert(0, '/app/llm-client')
+sys.path.insert(0, '/app/hotel-booking-a2a-agent/mcp-client')
+sys.path.insert(0, '/app/hotel-booking-a2a-agent/llm-client')
 
 from mcp_client.main import MCPClient
 from llm_client.main import LLMClient

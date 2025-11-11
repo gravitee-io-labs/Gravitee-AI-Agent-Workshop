@@ -5,12 +5,8 @@ ENV PYTHONUNBUFFERED=1 \
 
 WORKDIR /app
 
-# Copy the client packages first
-COPY mcp-client /app/mcp-client
-COPY llm-client /app/llm-client
-
-# Copy the agent server project
-COPY hotel-booking-a2a-agent /app/hotel-booking-a2a-agent
+# Copy the agent server project with integrated clients
+COPY . /app/hotel-booking-a2a-agent
 
 WORKDIR /app/hotel-booking-a2a-agent
 

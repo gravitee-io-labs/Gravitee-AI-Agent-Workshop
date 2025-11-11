@@ -26,4 +26,4 @@ dev = [
 ]
 
 [tool.hatch.build.targets.wheel]
-packages = ["agent_server"]
+packages = ["agent-server", "llm-client", "mcp-client"]

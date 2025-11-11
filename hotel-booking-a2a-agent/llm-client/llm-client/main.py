@@ -8,8 +8,8 @@ from typing import Dict, Any, List, Optional
 from ollama import Client as OllamaClient, ChatResponse, ResponseError
 from dotenv import load_dotenv
 
-# Add the agent_server package to Python path to access colored_logger
-sys.path.insert(0, '/app/agent-server')
+# Add the agent-server package to Python path to access colored_logger
+sys.path.insert(0, '/app/hotel-booking-a2a-agent/agent-server')
 
 try:
     from agent_server.colored_logger import get_llm_logger

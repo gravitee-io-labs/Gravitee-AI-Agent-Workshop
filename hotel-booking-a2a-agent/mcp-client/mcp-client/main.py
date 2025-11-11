@@ -10,8 +10,8 @@ from mcp import ClientSession
 from mcp.client.streamable_http import streamablehttp_client as mcp_http_client
 from dotenv import load_dotenv
 
-# Add the agent_server package to Python path to access colored_logger
-sys.path.insert(0, '/app/agent-server')
+# Add the agent-server package to Python path to access colored_logger
+sys.path.insert(0, '/app/hotel-booking-a2a-agent/agent-server')
 
 try:
     from agent_server.colored_logger import get_mcp_logger
