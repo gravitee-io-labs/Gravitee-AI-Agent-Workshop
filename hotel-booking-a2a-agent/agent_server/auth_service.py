@@ -5,7 +5,9 @@ import jwt
 import httpx
 from datetime import datetime, timedelta
 
-logger = logging.getLogger(__name__)
+from agent_server.colored_logger import get_agent_logger
+
+logger = get_agent_logger(__name__)
 
 
 class AuthenticationError(Exception):
@@ -32,7 +34,7 @@ class AuthService:
     async def initialize(self):
         """Initialize the service by discovering OIDC endpoints."""
         try:
-            logger.info(f"Discovering OIDC configuration from {self.oidc_discovery_url}")
+            logger.debug(f"Discovering OIDC configuration from {self.oidc_discovery_url}")
             response = await self._http_client.get(self.oidc_discovery_url)
             response.raise_for_status()
             
@@ -42,7 +44,7 @@ class AuthService:
             if not self.userinfo_endpoint:
                 raise AuthenticationError("userinfo_endpoint not found in OIDC discovery configuration")
             
-            logger.info(f"Successfully discovered userinfo endpoint: {self.userinfo_endpoint}")
+            logger.debug(f"Successfully discovered userinfo endpoint: {self.userinfo_endpoint}")
             
         except Exception as e:
             logger.error(f"Failed to discover OIDC configuration: {e}")
@@ -65,7 +67,7 @@ class AuthService:
             raise AuthenticationError("AuthService not initialized. Call initialize() first.")
         
         try:
-            logger.info("Calling userinfo endpoint to retrieve user email")
+            logger.debug("Calling userinfo endpoint to retrieve user email")
             
             # Call userinfo endpoint with the access token
             headers = {
@@ -81,7 +83,7 @@ class AuthService:
             if not email:
                 raise AuthenticationError("Email not found in userinfo response")
             
-            logger.info(f"Successfully retrieved user email: {email}")
+            logger.debug(f"Successfully retrieved user email: {email}")
             return email
             
         except httpx.HTTPStatusError as e:
@@ -115,7 +117,7 @@ class AuthService:
             }
             
             token = jwt.encode(payload, self.jwt_secret, algorithm="HS256")
-            logger.info(f"Created internal JWT token for email: {email} (expires in {expiration_seconds}s)")
+            logger.debug(f"Created internal JWT token for email: {email} (expires in {expiration_seconds}s)")
             
             return token
             

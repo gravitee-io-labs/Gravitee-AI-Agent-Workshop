@@ -3,6 +3,7 @@ import uuid
 from typing import Dict, Any, Optional
 import sys
 import logging
+import json
 
 from dotenv import load_dotenv
 
@@ -13,6 +14,7 @@ sys.path.insert(0, '/app/llm-client')
 from mcp_client.main import MCPClient
 from llm_client.main import LLMClient
 from agent_server.auth_service import AuthService, AuthenticationError
+from agent_server.colored_logger import get_agent_logger
 
 # A2A SDK imports
 from a2a.server.apps import A2AStarletteApplication
@@ -27,7 +29,7 @@ MCP_HTTP_URL = os.getenv("MCP_HTTP_URL", "http://gio-apim-gateway:8082/hotels/mc
 OIDC_DISCOVERY_URL = os.getenv("OIDC_DISCOVERY_URL", "http://am-gateway:8092/gravitee/oidc/.well-known/openid-configuration")
 JWT_SECRET = os.getenv("JWT_SECRET", "my-example-secret")
 
-logger = logging.getLogger(__name__)
+logger = get_agent_logger(__name__)
 
 # System prompt for the hotel booking agent
 HOTEL_BOOKING_SYSTEM_PROMPT = (
@@ -47,15 +49,15 @@ class HotelBookingAgent:
             jwt_secret=JWT_SECRET
         )
         self.system_prompt = HOTEL_BOOKING_SYSTEM_PROMPT
+        self._initialized = False
         
     async def initialize(self):
         """Initialize the agent by connecting to MCP server and auth service."""
         try:
             await self.mcp_client.connect()
-            logger.info("Successfully connected to MCP server")
-            
             await self.auth_service.initialize()
-            logger.info("Successfully initialized auth service")
+            self._initialized = True
+            logger.info("Agent initialized successfully")
         except Exception as e:
             logger.error(f"Failed to initialize agent: {e}")
             raise
@@ -63,10 +65,19 @@ class HotelBookingAgent:
     async def process_request(self, message: str, authorization_header: Optional[str] = None) -> str:
         """Process a hotel booking request using MCP tools and LLM."""
         try:
+            logger.info("=" * 80)
+            logger.info("Received new request")
+            logger.info(f"User message: {message}")
+            if authorization_header:
+                logger.debug("Authorization header present (masked for security)")
+            logger.info("=" * 80)
+            
             # Get available tools from MCP
             available_tools = await self.mcp_client.list_tools()
+            logger.info(f"Retrieved {len(available_tools)} available tools from MCP")
 
             # Get LLM response with potential tool calls
+            logger.info("Querying LLM to determine action...")
             initial_content, tool_calls = await self.llm_client.process_query(
                 message, 
                 available_tools,
@@ -79,6 +90,8 @@ class HotelBookingAgent:
                 tool_name = tool_call.get("function", {}).get("name")
                 tool_args = tool_call.get("function", {}).get("arguments")
                 
+                logger.info(f"Executing tool: {tool_name}")
+                
                 # Try calling the tool first
                 tool_result, response_headers = await self.mcp_client.call_tool(tool_name, tool_args)
                 
@@ -90,7 +103,7 @@ class HotelBookingAgent:
                 ).strip()
                 
                 if endpoint_status == '401':
-                    logger.info(f"Tool {tool_name} requires authorization")
+                    logger.info(f"Tool {tool_name} requires authorization - retrying with auth")
                     
                     # Process authorization header and get internal JWT
                     try:
@@ -104,6 +117,7 @@ class HotelBookingAgent:
                         extra_headers = {
                             "Authorization": f"Bearer {internal_jwt}"
                         }
+                        logger.info(f"Retrying tool call with authorization...")
                         tool_result, response_headers = await self.mcp_client.call_tool(tool_name, tool_args, extra_headers=extra_headers)
                     except AuthenticationError as auth_error:
                         logger.error(f"Authentication error: {auth_error}")
@@ -113,15 +127,21 @@ class HotelBookingAgent:
                         )
 
                 # Get final response from LLM with tool result
+                logger.info("Generating final response from LLM with tool result...")
                 final_response = await self.llm_client.process_tool_result(
                     message, 
                     tool_call, 
                     tool_result,
                     system_prompt=self.system_prompt
                 )
+                
+                logger.info("Request processing completed successfully")
+                logger.info("=" * 80)
                 return final_response
 
             # Return initial response if no tools were called
+            logger.warning("No tools were called by LLM")
+            logger.info("=" * 80)
             return (
                 "I couldn't determine a clear action from your message. "
                 "Please rephrase or provide more details (for example: search for hotels in New York) "
@@ -129,7 +149,8 @@ class HotelBookingAgent:
             )
             
         except Exception as e:
-            logger.error(f"Error processing request: {e}")
+            logger.error(f"Error processing request: {e}", exc_info=True)
+            logger.info("=" * 80)
             # Use LLM to generate a user-friendly error message
             try:
                 error_prompt = (
@@ -203,14 +224,9 @@ class HotelBookingRequestHandler(RequestHandler):
         """Handle message/send requests."""
         try:
             # Initialize the agent if not already done
-            if hasattr(self.agent, 'mcp_client') and self.agent.mcp_client:
-                # Check if MCP client is connected
-                try:
-                    await self.agent.mcp_client.list_tools()
-                except:
-                    await self.agent.initialize()
-            else:
+            if not hasattr(self.agent, '_initialized') or not self.agent._initialized:
                 await self.agent.initialize()
+                self.agent._initialized = True
             
             # Extract Authorization header from context
             authorization_header = None
@@ -372,7 +388,7 @@ async def startup():
         if hotel_agent is None:
             hotel_agent = HotelBookingAgent()
             await hotel_agent.initialize()
-        logger.info("Hotel Booking Agent Server started successfully")
+        logger.info("Server ready")
     except Exception as e:
         logger.error(f"Failed to start agent server: {e}")
         raise
@@ -387,7 +403,9 @@ async def shutdown():
 
 def main():
     """Main entry point."""
-    logging.basicConfig(level=logging.INFO)
+    # Don't use basicConfig as we have custom colored loggers
+    # Just ensure root logger is at INFO level
+    logging.getLogger().setLevel(logging.INFO)
     
     app = create_app()
     
@@ -396,11 +414,18 @@ def main():
     app.add_event_handler("shutdown", shutdown)
     
     import uvicorn
+    
+    # Configure uvicorn to use our custom log config
+    log_config = uvicorn.config.LOGGING_CONFIG
+    log_config["formatters"]["default"]["fmt"] = "%(asctime)s %(levelprefix)s %(message)s"
+    log_config["formatters"]["access"]["fmt"] = '%(asctime)s %(levelprefix)s %(client_addr)s - "%(request_line)s" %(status_code)s'
+    
     uvicorn.run(
         app,
         host="0.0.0.0",
         port=AGENT_SERVER_PORT,
-        log_level="info"
+        log_level="info",
+        log_config=log_config
     )
 
 if __name__ == "__main__":
