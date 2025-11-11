@@ -228,6 +228,38 @@ services:
     networks:
       - northbound
 
+# --- Gravitee Initialization ---
+
+  ### Gravitee Init Container
+  gravitee-init:
+    build:
+      context: ./gravitee-init
+      dockerfile: Dockerfile
+    container_name: gio-gravitee-init
+    restart: "no"
+    depends_on:
+      am-management-api:
+        condition: service_started
+      apim-management-api:
+        condition: service_healthy
+    volumes:
+      - ./apim-apis-definitions:/api-definitions:ro
+    environment:
+      # Access Management (AM) configuration
+      - AM_BASE_URL=http://am-management-api:8093
+      - AM_USERNAME=admin
+      - AM_PASSWORD=adminadmin
+      # API Management (APIM) configuration
+      - APIM_BASE_URL=http://apim-management-api:8083
+      - APIM_USERNAME=admin
+      - APIM_PASSWORD=admin
+      - API_DEFINITIONS_DIR=/api-definitions
+      # Common configuration
+      - ORGANIZATION=DEFAULT
+      - ENVIRONMENT=DEFAULT
+    networks:
+      - southbound
+
 # --- Alert Engine Components ---
 
   ### Alert Engine
