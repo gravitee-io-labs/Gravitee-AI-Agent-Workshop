@@ -385,10 +385,17 @@ async function connectToAgent() {
         const response = await fetch(config.agentCardUrl);
         const duration = Date.now() - startTime;
         
+        // Extract response headers
+        const responseHeaders = {};
+        response.headers.forEach((value, key) => {
+            responseHeaders[key] = value;
+        });
+        
         if (!response.ok) {
             updateDebugRequest(requestId, {
                 status: response.status,
                 duration: duration,
+                responseHeaders: responseHeaders,
                 responseBody: { error: response.statusText }
             });
             throw new Error(`Failed to fetch agent card: ${response.statusText}`);
@@ -400,6 +407,7 @@ async function connectToAgent() {
         updateDebugRequest(requestId, {
             status: response.status,
             duration: duration,
+            responseHeaders: responseHeaders,
             responseBody: agentCard
         });
         
@@ -564,11 +572,18 @@ async function sendToAgent(message) {
         
         const duration = Date.now() - startTime;
         
+        // Extract response headers
+        const responseHeaders = {};
+        response.headers.forEach((value, key) => {
+            responseHeaders[key] = value;
+        });
+        
         if (!response.ok) {
             // Update debug panel with error
             updateDebugRequest(requestId, {
                 status: response.status,
                 duration: duration,
+                responseHeaders: responseHeaders,
                 responseBody: { error: response.statusText }
             });
             throw new Error(`Agent request failed: ${response.statusText}`);
@@ -581,6 +596,7 @@ async function sendToAgent(message) {
         updateDebugRequest(requestId, {
             status: response.status,
             duration: duration,
+            responseHeaders: responseHeaders,
             responseBody: data
         });
         
@@ -1110,22 +1126,18 @@ function updateDebugPanel() {
                 </div>
                 <div class="debug-request-body">
                     <div class="debug-request-tabs">
-                        <div class="debug-request-tab active" onclick="switchDebugTab('${request.id}', 'headers')">Headers</div>
+                        <div class="debug-request-tab active" onclick="switchDebugTab('${request.id}', 'metadata')">Metadata</div>
                         <div class="debug-request-tab" onclick="switchDebugTab('${request.id}', 'request')">Request</div>
                         <div class="debug-request-tab" onclick="switchDebugTab('${request.id}', 'response')">Response</div>
-                        <div class="debug-request-tab" onclick="switchDebugTab('${request.id}', 'metadata')">Metadata</div>
                     </div>
-                    <div class="debug-request-tab-content active" data-tab="headers">
-                        ${formatHeaders(request.headers)}
+                    <div class="debug-request-tab-content active" data-tab="metadata">
+                        ${formatMetadata(request)}
                     </div>
                     <div class="debug-request-tab-content" data-tab="request">
-                        ${formatJson(request.requestBody)}
+                        ${formatRequestColumns(request)}
                     </div>
                     <div class="debug-request-tab-content" data-tab="response">
-                        ${formatJson(request.responseBody)}
-                    </div>
-                    <div class="debug-request-tab-content" data-tab="metadata">
-                        ${formatMetadata(request)}
+                        ${formatResponseColumns(request)}
                     </div>
                 </div>
             </div>
@@ -1180,6 +1192,36 @@ function formatJson(data) {
     } catch (e) {
         return `<div class="debug-code-block"><pre>Error formatting data: ${escapeHtml(String(data))}</pre></div>`;
     }
+}
+
+function formatRequestColumns(request) {
+    return `
+        <div class="debug-two-columns">
+            <div class="debug-column">
+                <h4 class="debug-column-header">Headers</h4>
+                ${formatHeaders(request.headers)}
+            </div>
+            <div class="debug-column">
+                <h4 class="debug-column-header">Payload</h4>
+                ${formatJson(request.requestBody)}
+            </div>
+        </div>
+    `;
+}
+
+function formatResponseColumns(request) {
+    return `
+        <div class="debug-two-columns">
+            <div class="debug-column">
+                <h4 class="debug-column-header">Headers</h4>
+                ${formatHeaders(request.responseHeaders)}
+            </div>
+            <div class="debug-column">
+                <h4 class="debug-column-header">Payload</h4>
+                ${formatJson(request.responseBody)}
+            </div>
+        </div>
+    `;
 }
 
 function formatMetadata(request) {

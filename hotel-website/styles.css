@@ -1157,6 +1157,40 @@ body {
     word-break: break-all;
 }
 
+.debug-two-columns {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 1rem;
+    padding: 1rem;
+}
+
+.debug-column {
+    min-width: 0; /* Allow column to shrink below content size */
+}
+
+.debug-column-header {
+    font-size: 0.9rem;
+    font-weight: 600;
+    color: var(--dark-brown);
+    margin-bottom: 0.5rem;
+    padding: 0.5rem;
+    background: var(--light-cream);
+    border-radius: 4px;
+}
+
+/* Make code blocks scrollable within columns */
+.debug-column .debug-code-block {
+    max-height: 400px;
+    overflow: auto;
+}
+
+/* Responsive for two-column layout */
+@media (max-width: 1024px) {
+    .debug-two-columns {
+        grid-template-columns: 1fr;
+    }
+}
+
 /* Utility Classes */
 .hidden {
     display: none !important;
