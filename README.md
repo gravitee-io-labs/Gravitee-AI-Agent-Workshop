@@ -32,7 +32,7 @@ Want to dive straight in? Follow these simple steps:
      
      *Now retry the request - you can now access your personal bookings!*
 
----
+    > **⚠️ Note**: If you experience timeouts (~30 seconds) during AI requests, this is due to Docker's network proxy timeout. See the [Troubleshooting section](#-troubleshooting) for a quick fix.
 
 **💡 Want to understand how this all works?** Continue below to follow the complete workshop and learn how to build this AI-powered platform from scratch, understand the architecture, and master enterprise AI security! 👇
 
@@ -230,6 +230,8 @@ Open the **MCP Inspector** at http://localhost:6274 to see your API through an A
 
 Visit http://localhost:3002 to interact with your AI-powered booking platform through a beautiful, production-like ready interface:
 
+> **⚠️ Note**: If you experience timeouts (~30 seconds) during AI requests, this is due to Docker's network proxy timeout. See the [Troubleshooting section](#-troubleshooting) for a quick fix.
+
 1. **Natural Language Booking**: Use the chat window to communicate with the AI agent and book hotels
 2. **Smart Conversations**: Try queries like:
    - *"Show me available hotels in Paris"* - This is a public request that works without authentication
@@ -349,3 +351,46 @@ This workshop evolves alongside the ecosystem it demonstrates:
 - **Industry Best Practices**: Incorporating emerging patterns in AI agent security and orchestration
 
 **Stay tuned for these exciting updates!** ⭐
+
+---
+
+## 🔧 Troubleshooting
+
+### Request Timeout (30 seconds) on Gravitee Hotels Demo Website
+
+**Problem**: Requests to the AI agent timeout after ~30 seconds, especially on the [Gravitee Hotels Demo Website](http://localhost:8002/).
+
+**Cause**: The LLM running in Docker (CPU-only mode) can take longer than 30 seconds to process requests. Docker Desktop's default network proxy timeout cuts off these long-running connections.
+
+**Solution**: Increase Docker Desktop's `vpnKitMaxPortIdleTime` to 600 seconds (10 minutes).
+
+#### macOS
+
+1. **Quit Docker Desktop** completely (click 🐳 in menu bar → Quit)
+2. **Open the settings file**:
+   ```bash
+   open ~/Library/Group\ Containers/group.com.docker/settings.json
+   ```
+3. **Add or modify** this line in the JSON:
+   ```json
+   {
+     "vpnKitMaxPortIdleTime": 600
+   }
+   ```
+4. **Save** the file
+5. **Restart Docker Desktop**
+
+#### Windows
+
+1. **Quit Docker Desktop** (right-click 🐳 in system tray → Quit)
+2. **Open the settings file**: Navigate to `%APPDATA%\Docker\settings.json`
+3. **Edit** the file and add:
+   ```json
+   {
+     "vpnKitMaxPortIdleTime": 600
+   }
+   ```
+4. **Save** the file
+5. **Restart Docker Desktop**
+
+**⚠️ Important**: Always quit Docker Desktop before editing `settings.json`, or your changes may be overwritten.
