@@ -360,37 +360,34 @@ This workshop evolves alongside the ecosystem it demonstrates:
 
 **Problem**: Requests to the AI agent timeout after ~30 seconds, especially on the [Gravitee Hotels Demo Website](http://localhost:8002/).
 
-**Cause**: The LLM running in Docker (CPU-only mode) can take longer than 30 seconds to process requests. Docker Desktop's default network proxy timeout cuts off these long-running connections.
+**Cause**: This is a **known issue with macOS Docker Desktop**. The LLM running in Docker (CPU-only mode) can take longer than 30 seconds to process requests. Docker Desktop's network proxy has a hardcoded timeout that cuts off these long-running connections.
 
-**Solution**: Increase Docker Desktop's `vpnKitMaxPortIdleTime` to 600 seconds (10 minutes).
+**⚠️ Important**: There is **no real workaround** for this Docker Desktop limitation. Attempts to modify `vpnKitMaxPortIdleTime` or other settings do not reliably solve this issue.
 
-#### macOS
+**💡 Recommended Solution for macOS Users**: Run Ollama locally on your Mac for significantly better performance (GPU acceleration) and no timeout issues!
 
-1. **Quit Docker Desktop** completely (click 🐳 in menu bar → Quit)
-2. **Open the settings file**:
+**Alternative Solution**: Use **[Colima](https://github.com/abiosoft/colima)** or another Docker Desktop alternative that doesn't have this timeout limitation.
+
+### macOS: Use Local Ollama (Recommended ⚡)
+
+Running Ollama locally on macOS provides much faster responses and avoids timeout issues entirely by leveraging your Mac's GPU.
+
+**Setup Steps**:
+
+1. **Install Ollama** on your Mac (if not already installed):
    ```bash
-   open ~/Library/Group\ Containers/group.com.docker/settings.json
+   # Download from https://ollama.ai or use Homebrew:
+   brew install ollama
    ```
-3. **Add or modify** this line in the JSON:
-   ```json
-   {
-     "vpnKitMaxPortIdleTime": 600
-   }
+
+2. **Start Ollama** and pull the required model:
+   ```bash
+   ollama serve  # Start Ollama (or launch the Ollama.app)
+   ollama run qwen3:0.6b  # Download and test the model
    ```
-4. **Save** the file
-5. **Restart Docker Desktop**
 
-#### Windows
+3. **Update the Gravitee API configuration**: Update the `LLM - Ollama` API definition to point to `http://host.docker.internal:11434`, which allows containers to connect to services running on your Mac.
 
-1. **Quit Docker Desktop** (right-click 🐳 in system tray → Quit)
-2. **Open the settings file**: Navigate to `%APPDATA%\Docker\settings.json`
-3. **Edit** the file and add:
-   ```json
-   {
-     "vpnKitMaxPortIdleTime": 600
-   }
-   ```
-4. **Save** the file
-5. **Restart Docker Desktop**
-
-**⚠️ Important**: Always quit Docker Desktop before editing `settings.json`, or your changes may be overwritten.
+**✅ Benefits**:
+- ⚡ **Much faster responses** (GPU acceleration)
+- 🚫 **No timeout issues**
