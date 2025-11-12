@@ -6,9 +6,7 @@ ENV PYTHONUNBUFFERED=1 \
 WORKDIR /app
 
 # Copy the agent server project with integrated clients
-COPY . /app/hotel-booking-a2a-agent
-
-WORKDIR /app/hotel-booking-a2a-agent
+COPY ./hotel-booking-a2a-agent /app
 
 # Install the package
 RUN pip install .
