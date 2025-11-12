@@ -77,8 +77,119 @@ class ApimInitializer:
         self.log(f"Found {len(json_files)} API definition file(s)")
         return sorted(json_files)
 
+    def get_api_id_by_listener_path(self, api_definition: dict, api_name: str) -> Optional[str]:
+        """Get the API ID by searching for the listener path"""
+        # Extract listener paths from the API definition (under "api" key)
+        api_data = api_definition.get("api", {})
+        listeners = api_data.get("listeners", [])
+        if not listeners:
+            self.log(f"No listeners found in API definition for '{api_name}'")
+            return None
+        
+        # Get the first path from the first listener
+        paths = listeners[0].get("paths", [])
+        if not paths:
+            self.log(f"No paths found in listener for '{api_name}'")
+            return None
+        
+        search_path = paths[0].get("path", "")
+        if not search_path:
+            self.log(f"No path value found for '{api_name}'")
+            return None
+        
+        self.log(f"Searching for existing API with listener path: '{search_path}'...")
+        
+        try:
+            url = f"{APIM_BASE_URL}/management/v2/environments/{ENVIRONMENT}/apis"
+            
+            response = self.session.get(url, timeout=10)
+            response.raise_for_status()
+            
+            apis_data = response.json()
+            apis = apis_data.get("data", [])
+            
+            for api in apis:
+                api_listeners = api.get("listeners", [])
+                for listener in api_listeners:
+                    api_paths = listener.get("paths", [])
+                    for path_obj in api_paths:
+                        if path_obj.get("path") == search_path:
+                            api_id = api.get("id")
+                            self.log(f"Found existing API with path '{search_path}' - ID: {api_id}")
+                            return api_id
+            
+            self.log(f"No existing API found with listener path '{search_path}'")
+            return None
+            
+        except requests.exceptions.RequestException as e:
+            self.log(f"ERROR: Failed to search for API with path '{search_path}': {e}")
+            return None
+
+    def publish_api(self, api_id: str, api_name: str) -> bool:
+        """Publish an API by setting its lifecycle state to PUBLISHED"""
+        self.log(f"Publishing API '{api_name}' (ID: {api_id})...")
+        
+        try:
+            url = f"{APIM_BASE_URL}/management/v2/environments/{ENVIRONMENT}/apis/{api_id}"
+            
+            # First, fetch the current API configuration
+            get_response = self.session.get(url, timeout=10)
+            get_response.raise_for_status()
+            
+            api_config = get_response.json()
+            
+            # Update the lifecycle state to PUBLISHED
+            api_config["lifecycleState"] = "PUBLISHED"
+            
+            # Send the full API configuration with updated lifecycle state
+            put_response = self.session.put(
+                url,
+                json=api_config,
+                timeout=10
+            )
+            
+            put_response.raise_for_status()
+            self.log(f"✓ API '{api_name}' published successfully")
+            return True
+            
+        except requests.exceptions.RequestException as e:
+            self.log(f"ERROR: Failed to publish API '{api_name}': {e}")
+            if hasattr(e, 'response') and hasattr(e.response, 'text'):
+                self.log(f"Response: {e.response.text}")
+            return False
+
+    def start_api(self, api_id: str, api_name: str) -> bool:
+        """Start an API"""
+        self.log(f"Starting API '{api_name}' (ID: {api_id})...")
+        
+        try:
+            url = f"{APIM_BASE_URL}/management/v2/environments/{ENVIRONMENT}/apis/{api_id}/_start"
+            
+            response = self.session.post(
+                url,
+                timeout=10
+            )
+            
+            # Check if API is already started
+            if response.status_code == 400:
+                error_data = response.json()
+                error_message = str(error_data)
+                if "already started" in error_message.lower():
+                    self.log(f"✓ API '{api_name}' is already started")
+                    return True
+            
+            response.raise_for_status()
+            self.log(f"✓ API '{api_name}' started successfully")
+            return True
+            
+        except requests.exceptions.RequestException as e:
+            self.log(f"ERROR: Failed to start API '{api_name}': {e}")
+            if hasattr(e, 'response') and hasattr(e.response, 'text'):
+                self.log(f"Response: {e.response.text}")
+            return False
+
     def import_api_definition(self, definition_file: Path) -> bool:
-        """Import a single API definition"""
+        """Import a single API definition, then publish and start it"""
         self.log(f"Importing API definition from: {definition_file.name}")
         
         try:
@@ -86,8 +197,9 @@ class ApimInitializer:
             with open(definition_file, 'r') as f:
                 api_definition = json.load(f)
             
-            # Extract API name for logging
-            api_name = api_definition.get("name", definition_file.stem)
+            # Extract API name for logging (from "api" object)
+            api_data = api_definition.get("api", {})
+            api_name = api_data.get("name", definition_file.stem)
             
             # Import the API
             url = f"{APIM_BASE_URL}/management/v2/environments/{ENVIRONMENT}/apis/_import/definition"
@@ -98,21 +210,33 @@ class ApimInitializer:
                 timeout=30
             )
             
+            api_id = None
+            
             # Check if API already exists
             if response.status_code == 400:
                 error_data = response.json()
                 error_message = str(error_data)
                 if "already exists" in error_message.lower() or "duplicate" in error_message.lower():
-                    self.log(f"✓ API '{api_name}' already exists, skipping import")
-                    self.imported_apis.append(api_name)
-                    return True
+                    self.log(f"✓ API '{api_name}' already exists")
+                    # Get the API ID for the existing API by listener path
+                    api_id = self.get_api_id_by_listener_path(api_definition, api_name)
+                    if not api_id:
+                        self.log(f"ERROR: Could not find API ID for '{api_name}'")
+                        return False
+            else:
+                response.raise_for_status()
+                result = response.json()
+                api_id = result.get("id", "unknown")
+                self.log(f"✓ API '{api_name}' imported successfully (ID: {api_id})")
             
-            response.raise_for_status()
+            # Publish the API
+            if not self.publish_api(api_id, api_name):
+                self.log(f"WARNING: Failed to publish API '{api_name}', but continuing...")
             
-            result = response.json()
-            api_id = result.get("id", "unknown")
+            # Start the API
+            if not self.start_api(api_id, api_name):
+                self.log(f"WARNING: Failed to start API '{api_name}', but continuing...")
             
-            self.log(f"✓ API '{api_name}' imported successfully (ID: {api_id})")
             self.imported_apis.append(api_name)
             return True
             
@@ -164,11 +288,11 @@ class ApimInitializer:
         self.log("")
         self.log("Summary:")
         self.log(f"  - Total API definitions: {len(definition_files)}")
-        self.log(f"  - Successfully imported: {success_count}")
+        self.log(f"  - Successfully processed: {success_count}")
         self.log(f"  - Failed: {failure_count}")
         
         if self.imported_apis:
-            self.log(f"  - Imported APIs: {', '.join(self.imported_apis)}")
+            self.log(f"  - Processed APIs (imported, published, started): {', '.join(self.imported_apis)}")
         
         return failure_count == 0
 
