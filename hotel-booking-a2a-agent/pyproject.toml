@@ -26,4 +26,9 @@ dev = [
 ]
 
 [tool.hatch.build.targets.wheel]
-packages = ["agent-server", "llm-client", "mcp-client"]
+only-include = ["agent-server", "llm-client/llm-client", "mcp-client/mcp-client"]
+
+[tool.hatch.build.targets.wheel.force-include]
+"agent-server" = "agent_server"
+"llm-client/llm-client" = "llm_client"
+"mcp-client/mcp-client" = "mcp_client"
