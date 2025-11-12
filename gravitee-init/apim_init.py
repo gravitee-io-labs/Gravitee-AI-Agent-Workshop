@@ -159,6 +159,55 @@ class ApimInitializer:
                 self.log(f"Response: {e.response.text}")
             return False
 
+    def create_portal_menu_link(self) -> bool:
+        """Create a portal menu link for App Creation"""
+        self.log("Creating portal menu link for App Creation...")
+        
+        try:
+            # GET existing menu links to check if it already exists
+            get_url = f"{APIM_BASE_URL}/management/v2/environments/{ENVIRONMENT}/ui/portal-menu-links"
+            
+            get_response = self.session.get(get_url, timeout=10)
+            get_response.raise_for_status()
+            
+            menu_data = get_response.json()
+            existing_links = menu_data.get("data", [])
+            
+            # Check if a link with the same target already exists
+            target_url = "http://localhost:8085/applications/creation"
+            
+            for link in existing_links:
+                if link.get("target") == target_url:
+                    self.log(f"✓ Portal menu link for App Creation already exists (ID: {link.get('id')})")
+                    return True
+            
+            # Create the new menu link
+            post_url = f"{APIM_BASE_URL}/management/v2/environments/{ENVIRONMENT}/ui/portal-menu-links"
+            
+            menu_link_payload = {
+                "name": "Create App",
+                "type": "EXTERNAL",
+                "target": target_url,
+                "visibility": "PUBLIC"
+            }
+            
+            post_response = self.session.post(
+                post_url,
+                json=menu_link_payload,
+                timeout=10
+            )
+            
+            post_response.raise_for_status()
+            result = post_response.json()
+            self.log(f"✓ Portal menu link for App Creation created successfully (ID: {result.get('id')})")
+            return True
+            
+        except requests.exceptions.RequestException as e:
+            self.log(f"ERROR: Failed to create portal menu link: {e}")
+            if hasattr(e, 'response') and hasattr(e.response, 'text'):
+                self.log(f"Response: {e.response.text}")
+            return False
+
     def get_api_definition_files(self) -> List[Path]:
         """Get all API definition JSON files from the definitions directory"""
         self.log(f"Looking for API definitions in: {API_DEFINITIONS_DIR}")
@@ -368,6 +417,10 @@ class ApimInitializer:
         # Update portal homepage
         if not self.update_portal_homepage():
             self.log("WARNING: Failed to update portal homepage, but continuing...")
+        
+        # Create portal menu link for App Creation
+        if not self.create_portal_menu_link():
+            self.log("WARNING: Failed to create portal menu link, but continuing...")
         
         # Get all API definition files
         definition_files = self.get_api_definition_files()
