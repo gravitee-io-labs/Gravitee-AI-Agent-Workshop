@@ -279,8 +279,8 @@ services:
     image: ollama/ollama:${OLLAMA_VERSION:-latest}
     container_name: ollama-llm-runtime
     restart: unless-stopped
-    ports:
-      - "11434:11434"
+    # ports:
+    #   - "11434:11434" # Commented out to avoid conflicts if Ollama is already running on the host
     volumes:
       - ollama_data:/root/.ollama
     environment:
