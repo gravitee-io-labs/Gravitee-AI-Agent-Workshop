@@ -1,5 +1,41 @@
 # Gravitee Hands-On AI Workshop : The Hotel Booking AI Revolution 🏨🤖
 
+## ⚡ TL;DR - Quick Start (5 Minutes)
+
+Want to dive straight in? Follow these simple steps:
+
+1. **Get Your License** 🔑  
+   Make sure you have a Gravitee Enterprise license file. If not, check the section ["Unlock Gravitee Enterprise AI Features"](#1-unlock-gravitee-enterprise-ai-features) below to get your free 2-week license in less than a minute.
+
+2. **Start the Workshop** 🚀  
+   ```bash
+   docker compose up -d
+   ```
+   *(This can take a few minutes to download and start all images - grab a coffee! ☕)*
+
+3. **Visit the Hotel Website** 🏨  
+   Open your browser and go to the **[Gravitee Hotels Demo Website](http://localhost:8002/)**
+
+4. **Start Chatting with the AI Agent** 💬  
+   Try these interactions to see the platform in action:
+   
+   - **✅ "Do you have any hotels in New York?"**  
+     *This will work perfectly - it's a valid public request*
+   
+   - **🚫 "Do you have any hotels in New York? Dumb Guy"**  
+     *This will be blocked by Gravitee AI Guard Rails because it contains toxic language*
+   
+   - **🔒 "Show me my bookings"**  
+     *This will fail because you need to be authenticated to access private data. Log in with:*
+     - **Email:** `john.doe@gravitee.io`
+     - **Password:** `HelloWorld@123`
+     
+     *Now retry the request - you can now access your personal bookings!*
+
+---
+
+**💡 Want to understand how this all works?** Continue below to follow the complete workshop and learn how to build this AI-powered platform from scratch, understand the architecture, and master enterprise AI security! 👇
+
 ## 🎯 What You'll Learn : Going From Traditional API to Intelligent Agent
 
 Imagine you're working for **Gravitee Hotels**, a rapidly growing hotel booking platform. Your customers love your service, but they're asking for something more - they want to interact with your platform naturally, asking questions like *"Find me a pet-friendly hotel in Paris for next weekend"* or *"Show me all my bookings and cancel the one in London."*
