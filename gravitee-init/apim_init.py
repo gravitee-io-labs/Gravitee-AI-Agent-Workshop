@@ -59,6 +59,106 @@ class ApimInitializer:
         self.log("ERROR: API Management API did not become ready in time")
         return False
 
+    def enable_next_gen_portal(self) -> bool:
+        """Enable the next generation portal"""
+        self.log("Enabling next generation portal...")
+        
+        try:
+            url = f"{APIM_BASE_URL}/management/organizations/{ORGANIZATION}/environments/{ENVIRONMENT}/settings"
+            
+            # First, GET the current settings
+            get_response = self.session.get(url, timeout=10)
+            get_response.raise_for_status()
+            
+            settings = get_response.json()
+            
+            # Update the portalNext.access.enabled setting to true
+            if "portalNext" not in settings:
+                settings["portalNext"] = {}
+            if "access" not in settings["portalNext"]:
+                settings["portalNext"]["access"] = {}
+            
+            settings["portalNext"]["access"]["enabled"] = True
+            
+            # POST the updated settings back
+            post_response = self.session.post(
+                url,
+                json=settings,
+                timeout=10
+            )
+            
+            post_response.raise_for_status()
+            self.log("✓ Next generation portal enabled successfully")
+            return True
+            
+        except requests.exceptions.RequestException as e:
+            self.log(f"ERROR: Failed to enable next generation portal: {e}")
+            if hasattr(e, 'response') and hasattr(e.response, 'text'):
+                self.log(f"Response: {e.response.text}")
+            return False
+
+    def update_portal_homepage(self) -> bool:
+        """Update the Next Gen Dev Portal homepage to add /next prefix to links"""
+        self.log("Updating Next Gen Dev Portal homepage...")
+        
+        try:
+            # GET the homepage content
+            get_url = f"{APIM_BASE_URL}/management/v2/environments/{ENVIRONMENT}/portal-pages?type=homepage&expands=content"
+            
+            get_response = self.session.get(get_url, timeout=10)
+            get_response.raise_for_status()
+            
+            pages_data = get_response.json()
+            pages = pages_data.get("pages", [])
+            
+            if not pages:
+                self.log("WARNING: No homepage found")
+                return False
+            
+            homepage = pages[0]
+            page_id = homepage.get("id")
+            content = homepage.get("content", "")
+            
+            self.log(f"Found homepage with ID: {page_id}")
+            
+            # Update all links to include /next prefix (only if not already present)
+            # Replace link="/catalog" with link="/next/catalog", etc.
+            # But skip if link already starts with "/next"
+            import re
+            updated_content = re.sub(r'link="(/(?!next/)([^"]+))"', r'link="/next/\2"', content)
+            
+            # Check if any changes were made
+            if updated_content == content:
+                self.log("✓ Homepage already has /next prefix in links")
+                return True
+            
+            # PATCH the updated content
+            patch_url = f"{APIM_BASE_URL}/management/v2/environments/{ENVIRONMENT}/portal-pages/{page_id}"
+            
+            patch_payload = {
+                "id": page_id,
+                "content": updated_content,
+                "type": homepage.get("type"),
+                "context": homepage.get("context"),
+                "published": homepage.get("published")
+            }
+            
+            patch_response = self.session.patch(
+                patch_url,
+                json=patch_payload,
+                timeout=10
+            )
+            
+            patch_response.raise_for_status()
+            self.log("✓ Portal homepage updated successfully with /next prefix")
+            return True
+            
+        except requests.exceptions.RequestException as e:
+            self.log(f"ERROR: Failed to update portal homepage: {e}")
+            if hasattr(e, 'response') and hasattr(e.response, 'text'):
+                self.log(f"Response: {e.response.text}")
+            return False
+
     def get_api_definition_files(self) -> List[Path]:
         """Get all API definition JSON files from the definitions directory"""
         self.log(f"Looking for API definitions in: {API_DEFINITIONS_DIR}")
@@ -260,6 +360,14 @@ class ApimInitializer:
         # Wait for APIM API to be ready
         if not self.wait_for_apim_api():
             return False
+        
+        # Enable next generation portal
+        if not self.enable_next_gen_portal():
+            self.log("WARNING: Failed to enable next generation portal, but continuing...")
+        
+        # Update portal homepage
+        if not self.update_portal_homepage():
+            self.log("WARNING: Failed to update portal homepage, but continuing...")
         
         # Get all API definition files
         definition_files = self.get_api_definition_files()

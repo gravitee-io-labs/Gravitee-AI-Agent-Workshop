@@ -129,7 +129,7 @@ services:
       - gravitee_installation_type=standalone
       - gravitee_installation_standalone_api_url=http://localhost:8083
       - gravitee_installation_standalone_console_url=http://localhost:8084
-      - gravitee_installation_standalone_portal_url=http://localhost:8085
+      - gravitee_installation_standalone_portal_url=http://localhost:8085/next/
     networks:
       - southbound
       - northbound
