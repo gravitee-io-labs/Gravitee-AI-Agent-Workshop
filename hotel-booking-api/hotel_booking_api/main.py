@@ -4,6 +4,8 @@ from pydantic import BaseModel, Field, EmailStr
 from datetime import datetime, timedelta
 import logging
 import jwt
+import json
+from pathlib import Path
 
 logger = logging.getLogger('uvicorn.error')
 logger.setLevel(logging.DEBUG)
@@ -28,64 +30,62 @@ class Booking(BaseModel):
     end_date: datetime = Field(..., example="2025-08-10T11:00:00")
     price: float = Field(..., example=1500.0)
 
+# --- Helper Functions ---
+def load_accommodations() -> List[Accommodation]:
+    """Load accommodations from external JSON file"""
+    json_path = Path(__file__).parent / "accommodations.json"
+    with open(json_path, 'r') as f:
+        data = json.load(f)
+    return [Accommodation(**item) for item in data]
+
+def load_bookings() -> List[Booking]:
+    """Load bookings from external JSON file and calculate dynamic dates"""
+    json_path = Path(__file__).parent / "bookings.json"
+    with open(json_path, 'r') as f:
+        data = json.load(f)
+    
+    current_date = datetime.now()
+    bookings = []
+    
+    for item in data:
+        # Calculate dynamic dates based on offset from current date
+        start_date = current_date + timedelta(days=item['start_date_offset_days'])
+        end_date = current_date + timedelta(days=item['end_date_offset_days'])
+        
+        # Parse time from string (format: "HH:MM:SS")
+        start_time_parts = list(map(int, item['start_date_time'].split(':')))
+        end_time_parts = list(map(int, item['end_date_time'].split(':')))
+        
+        # Set time components
+        start_date = start_date.replace(
+            hour=start_time_parts[0],
+            minute=start_time_parts[1],
+            second=start_time_parts[2],
+            microsecond=0
+        )
+        end_date = end_date.replace(
+            hour=end_time_parts[0],
+            minute=end_time_parts[1],
+            second=end_time_parts[2],
+            microsecond=0
+        )
+        
+        booking = Booking(
+            id=item['id'],
+            user_email=item['user_email'],
+            hotel_name=item['hotel_name'],
+            room_number=item['room_number'],
+            start_date=start_date,
+            end_date=end_date,
+            price=item['price']
+        )
+        bookings.append(booking)
+    
+    return bookings
+
 # --- In-memory data ---
-# Generate dynamic dates relative to current date
-current_date = datetime.now()
-past_booking_start = current_date - timedelta(days=15)
-past_booking_end = current_date - timedelta(days=8)
-future_booking_start = current_date + timedelta(days=10)
-future_booking_end = current_date + timedelta(days=17)
-
-accommodations_db = [
-    # London
-    Accommodation(id=1, name="The Grand Hotel London", location="London", 
-                  description="Luxury 5-star hotel in central London with exceptional service", 
-                  price_per_night=350.0, available_rooms=15),
-    Accommodation(id=2, name="Riverside Inn London", location="London", 
-                  description="Charming boutique hotel along the Thames", 
-                  price_per_night=180.0, available_rooms=8),
-    # Paris
-    Accommodation(id=3, name="Le Château Paris", location="Paris", 
-                  description="Elegant hotel near the Eiffel Tower with stunning views", 
-                  price_per_night=420.0, available_rooms=12),
-    Accommodation(id=4, name="Montmartre Boutique", location="Paris", 
-                  description="Cozy hotel in the artistic Montmartre district", 
-                  price_per_night=210.0, available_rooms=10),
-    # New York
-    Accommodation(id=5, name="Manhattan Grand Hotel", location="New York", 
-                  description="Modern luxury hotel in the heart of Manhattan", 
-                  price_per_night=450.0, available_rooms=20),
-    Accommodation(id=6, name="Brooklyn Heights Inn", location="New York", 
-                  description="Contemporary hotel with Brooklyn Bridge views", 
-                  price_per_night=280.0, available_rooms=14),
-]
-
-bookings_db = [
-    # Past booking for john.doe@gravitee.io
-    Booking(id=1, user_email="john.doe@gravitee.io",
-            hotel_name="The Grand Hotel London", room_number="305",
-            start_date=past_booking_start.replace(hour=14, minute=0, second=0, microsecond=0),
-            end_date=past_booking_end.replace(hour=11, minute=0, second=0, microsecond=0), 
-            price=2450.0),
-    # Future booking for john.doe@gravitee.io
-    Booking(id=2, user_email="john.doe@gravitee.io",
-            hotel_name="Le Château Paris", room_number="702",
-            start_date=future_booking_start.replace(hour=15, minute=0, second=0, microsecond=0),
-            end_date=future_booking_end.replace(hour=10, minute=0, second=0, microsecond=0), 
-            price=2940.0),
-    # Past booking for jane.doe@gravitee.io
-    Booking(id=3, user_email="jane.doe@gravitee.io",
-            hotel_name="Manhattan Grand Hotel", room_number="1205",
-            start_date=past_booking_start.replace(hour=16, minute=0, second=0, microsecond=0),
-            end_date=past_booking_end.replace(hour=12, minute=0, second=0, microsecond=0), 
-            price=3150.0),
-    # Future booking for jane.doe@gravitee.io
-    Booking(id=4, user_email="jane.doe@gravitee.io",
-            hotel_name="Riverside Inn London", room_number="201",
-            start_date=future_booking_start.replace(hour=14, minute=0, second=0, microsecond=0),
-            end_date=future_booking_end.replace(hour=11, minute=0, second=0, microsecond=0), 
-            price=1260.0),
-]
+accommodations_db = load_accommodations()
+bookings_db = load_bookings()
 
 # --- API Endpoints ---
 @app.get("/health")

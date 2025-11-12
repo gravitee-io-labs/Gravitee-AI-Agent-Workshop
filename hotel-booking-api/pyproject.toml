@@ -28,3 +28,7 @@ dev = [
 
 [tool.hatch.build.targets.wheel]
 packages = ["hotel_booking_api"]
+
+[tool.hatch.build.targets.wheel.force-include]
+"hotel_booking_api/accommodations.json" = "hotel_booking_api/accommodations.json"
+"hotel_booking_api/bookings.json" = "hotel_booking_api/bookings.json"

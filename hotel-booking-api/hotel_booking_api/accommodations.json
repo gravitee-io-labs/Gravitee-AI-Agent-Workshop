@@ -1,0 +1,50 @@
+[
+  {
+    "id": 1,
+    "name": "The Grand Hotel London",
+    "location": "London",
+    "description": "Luxury 5-star hotel in central London with exceptional service",
+    "price_per_night": 350.0,
+    "available_rooms": 15
+  },
+  {
+    "id": 2,
+    "name": "Riverside Inn London",
+    "location": "London",
+    "description": "Charming boutique hotel along the Thames",
+    "price_per_night": 180.0,
+    "available_rooms": 8
+  },
+  {
+    "id": 3,
+    "name": "Le Château Paris",
+    "location": "Paris",
+    "description": "Elegant hotel near the Eiffel Tower with stunning views",
+    "price_per_night": 420.0,
+    "available_rooms": 12
+  },
+  {
+    "id": 4,
+    "name": "Montmartre Boutique",
+    "location": "Paris",
+    "description": "Cozy hotel in the artistic Montmartre district",
+    "price_per_night": 210.0,
+    "available_rooms": 10
+  },
+  {
+    "id": 5,
+    "name": "Manhattan Grand Hotel",
+    "location": "New York",
+    "description": "Modern luxury hotel in the heart of Manhattan",
+    "price_per_night": 450.0,
+    "available_rooms": 20
+  },
+  {
+    "id": 6,
+    "name": "Brooklyn Heights Inn",
+    "location": "New York",
+    "description": "Contemporary hotel with Brooklyn Bridge views",
+    "price_per_night": 280.0,
+    "available_rooms": 14
+  }
+]
