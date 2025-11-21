@@ -32,6 +32,7 @@ class ApimInitializer:
         self.session.auth = (APIM_USERNAME, APIM_PASSWORD)
         self.session.headers.update({"Content-Type": "application/json"})
         self.imported_apis: List[str] = []
+        self.admin_user_id: Optional[str] = None
 
     def log(self, message: str):
         """Print log message with prefix"""
@@ -40,7 +41,7 @@ class ApimInitializer:
     def wait_for_apim_api(self) -> bool:
         """Wait for APIM Management API to be ready"""
         self.log("Waiting for API Management API to be ready...")
-        
+
         for attempt in range(1, MAX_RETRIES + 1):
             try:
                 response = self.session.get(
@@ -52,12 +53,39 @@ class ApimInitializer:
                     return True
             except requests.exceptions.RequestException as e:
                 self.log(f"Attempt {attempt}/{MAX_RETRIES}: APIM API not ready yet ({e})")
-            
+
             if attempt < MAX_RETRIES:
                 time.sleep(RETRY_DELAY)
-        
+
         self.log("ERROR: API Management API did not become ready in time")
         return False
+
+    def get_admin_user_id(self) -> Optional[str]:
+        """Get the admin user ID from the current user endpoint"""
+        self.log("Fetching admin user ID...")
+
+        try:
+            url = f"{APIM_BASE_URL}/management/organizations/{ORGANIZATION}/user"
+
+            response = self.session.get(url, timeout=10)
+            response.raise_for_status()
+
+            user_data = response.json()
+            user_id = user_data.get("id")
+
+            if user_id:
+                self.log(f"✓ Admin user ID: {user_id}")
+                self.admin_user_id = user_id
+                return user_id
+            else:
+                self.log("ERROR: Could not extract user ID from response")
+                return None
+
+        except requests.exceptions.RequestException as e:
+            self.log(f"ERROR: Failed to fetch admin user ID: {e}")
+            if hasattr(e, 'response') and hasattr(e.response, 'text'):
+                self.log(f"Response: {e.response.text}")
+            return None
 
     def enable_next_gen_portal(self) -> bool:
         """Enable the next generation portal"""
@@ -100,16 +128,16 @@ class ApimInitializer:
     def enable_custom_api_key(self) -> bool:
         """Enable custom API key for plans"""
         self.log("Enabling custom API key...")
-        
+
         try:
             url = f"{APIM_BASE_URL}/management/organizations/{ORGANIZATION}/environments/{ENVIRONMENT}/settings"
-            
+
             # First, GET the current settings
             get_response = self.session.get(url, timeout=10)
             get_response.raise_for_status()
-            
+
             settings = get_response.json()
-            
+
             # Update the plan.security.customApiKey.enabled setting to true
             if "plan" not in settings:
                 settings["plan"] = {}
@@ -117,20 +145,20 @@ class ApimInitializer:
                 settings["plan"]["security"] = {}
             if "customApiKey" not in settings["plan"]["security"]:
                 settings["plan"]["security"]["customApiKey"] = {}
-            
+
             settings["plan"]["security"]["customApiKey"]["enabled"] = True
-            
+
             # POST the updated settings back
             post_response = self.session.post(
                 url,
                 json=settings,
                 timeout=10
             )
-            
+
             post_response.raise_for_status()
             self.log("✓ Custom API key enabled successfully")
             return True
-            
+
         except requests.exceptions.RequestException as e:
             self.log(f"ERROR: Failed to enable custom API key: {e}")
             if hasattr(e, 'response') and hasattr(e.response, 'text'):
@@ -380,16 +408,24 @@ class ApimInitializer:
     def import_api_definition(self, definition_file: Path) -> bool:
         """Import a single API definition, then publish and start it"""
         self.log(f"Importing API definition from: {definition_file.name}")
-        
+
         try:
             # Read the API definition file
             with open(definition_file, 'r') as f:
                 api_definition = json.load(f)
-            
+
             # Extract API name for logging (from "api" object)
             api_data = api_definition.get("api", {})
             api_name = api_data.get("name", definition_file.stem)
-            
+
+            # Replace hardcoded primaryOwner ID with actual admin user ID
+            if self.admin_user_id and "api" in api_definition and "primaryOwner" in api_definition["api"]:
+                old_owner_id = api_definition["api"]["primaryOwner"].get("id")
+                api_definition["api"]["primaryOwner"]["id"] = self.admin_user_id
+                api_definition["api"]["primaryOwner"]["email"] = f"{APIM_USERNAME}@gravitee.io"
+                api_definition["api"]["primaryOwner"]["displayName"] = APIM_USERNAME.capitalize()
+                self.log(f"Replaced primaryOwner ID {old_owner_id} with {self.admin_user_id}")
+
             # Import the API
             url = f"{APIM_BASE_URL}/management/v2/environments/{ENVIRONMENT}/apis/_import/definition"
             
@@ -445,27 +481,31 @@ class ApimInitializer:
         """Run the APIM initialization process"""
         self.log("Starting Gravitee API Management initialization...")
         self.log("=" * 80)
-        
+
         # Wait for APIM API to be ready
         if not self.wait_for_apim_api():
             return False
-        
+
+        # Get admin user ID (needed for API imports)
+        if not self.get_admin_user_id():
+            self.log("ERROR: Failed to get admin user ID, cannot import APIs")
+            return False
+
         # Enable next generation portal
         if not self.enable_next_gen_portal():
             self.log("WARNING: Failed to enable next generation portal, but continuing...")
-        
-        # Enable custom API key
+# Enable custom API key
         if not self.enable_custom_api_key():
             self.log("WARNING: Failed to enable custom API key, but continuing...")
-        
+
         # Update portal homepage
         if not self.update_portal_homepage():
             self.log("WARNING: Failed to update portal homepage, but continuing...")
-        
+
         # Create portal menu link for App Creation
         if not self.create_portal_menu_link():
             self.log("WARNING: Failed to create portal menu link, but continuing...")
-        
+
         # Get all API definition files
         definition_files = self.get_api_definition_files()
         

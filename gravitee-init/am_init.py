@@ -4,6 +4,7 @@ Gravitee Initialization Script
 This script configures Gravitee Access Management (AM) with required settings.
 """
 
+import json
 import os
 import sys
 import time
@@ -25,17 +26,78 @@ APP_REDIRECT_URIS = [
     "http://localhost:8002/",
     "https://oauth.pstmn.io/v1/callback"
 ]
-APP_SCOPES = ["openid", "profile", "email"]
+APP_SCOPES = ["openid", "profile", "bookings"]
 
-# User configuration
-USER_FIRST_NAME = "John"
-USER_LAST_NAME = "Doe"
-USER_EMAIL = "john.doe@gravitee.io"
-USER_USERNAME = "john.doe@gravitee.io"
-USER_PASSWORD = "HelloWorld@123"
+# MCP Server configuration
+MCP_SERVER_NAME = "Hotel Booking MCP Server"
+MCP_SERVER_DESCRIPTION = "Exposes hotel booking API tools via MCP with OAuth2 protection"
+MCP_SERVER_RESOURCE_IDENTIFIERS = ["http://localhost:8082/hotels/mcp"]
+MCP_TOOLS = [
+    {
+        "key": "getAccommodations",
+        "description": "Search for available hotel accommodations by location",
+        "scopes": []  # Public endpoint, no scopes required
+    },
+    {
+        "key": "getBookings",
+        "description": "Retrieve user's hotel bookings",
+        "scopes": ["bookings"]
+    },
+    {
+        "key": "makeBooking",
+        "description": "Create a new hotel booking",
+        "scopes": ["bookings"]
+    },
+    {
+        "key": "deleteBooking",
+        "description": "Delete a hotel booking (admin only)",
+        "scopes": ["bookings"]
+    }
+]
+
+# Users configuration
+USERS = [
+    {
+        "first_name": "John",
+        "last_name": "Doe",
+        "email": "john.doe@gravitee.io",
+        "username": "john.doe@gravitee.io",
+        "password": "HelloWorld@123"
+    },
+    {
+        "first_name": "Tom",
+        "last_name": "Smith",
+        "email": "tom.smith@gravitee.io",
+        "username": "tom.smith@gravitee.io",
+        "password": "HelloWorld@123"
+    }
+]
 
 MAX_RETRIES = 30
 RETRY_DELAY = 5
+
+
+def get_bool_env(name: str, default: bool = False) -> bool:
+    """Return boolean value from env var."""
+    value = os.getenv(name)
+    if value is None:
+        return default
+    return value.strip().lower() in ("1", "true", "yes", "on")
+
+
+# OpenFGA Authorization Engine configuration
+ENABLE_OPENFGA_ENGINE = get_bool_env("ENABLE_OPENFGA_ENGINE", True)
+OPENFGA_ENGINE_NAME = os.getenv("OPENFGA_ENGINE_NAME", "OpenFGA Authorization Engine")
+OPENFGA_ENGINE_TYPE = os.getenv("OPENFGA_ENGINE_TYPE", "openfga")
+OPENFGA_CONNECTION_URI = os.getenv("OPENFGA_CONNECTION_URI", "http://openfga:8080")
+OPENFGA_STORE_ID = os.getenv("OPENFGA_STORE_ID")
+OPENFGA_STORE_ID_FILE = os.getenv("OPENFGA_STORE_ID_FILE", "/openfga/store_id")
+OPENFGA_AUTHORIZATION_MODEL_ID = os.getenv("OPENFGA_AUTHORIZATION_MODEL_ID")
+OPENFGA_API_TOKEN = os.getenv("OPENFGA_API_TOKEN")
+OPENFGA_TOKEN_ISSUER = os.getenv("OPENFGA_TOKEN_ISSUER")
+OPENFGA_API_AUDIENCE = os.getenv("OPENFGA_API_AUDIENCE")
+OPENFGA_CLIENT_ID = os.getenv("OPENFGA_CLIENT_ID")
+OPENFGA_CLIENT_SECRET = os.getenv("OPENFGA_CLIENT_SECRET")
 
 
 class GraviteeInitializer:
@@ -45,6 +107,12 @@ class GraviteeInitializer:
         self.access_token: Optional[str] = None
         self.domain_id: Optional[str] = None
         self.app_id: Optional[str] = None
+        self.mcp_server_id: Optional[str] = None
+        self.mcp_server_client_id: Optional[str] = None
+        self.mcp_server_client_secret: Optional[str] = None
+        self.openfga_engine_id: Optional[str] = None
+        self.openfga_store_id: Optional[str] = None
+        self.openfga_model_id: Optional[str] = None
         self.domain_already_enabled: bool = False
         self.session = requests.Session()
 
@@ -226,9 +294,9 @@ class GraviteeInitializer:
     def configure_dcr_settings(self) -> bool:
         """Configure DCR (Dynamic Client Registration) settings"""
         self.log("Configuring DCR settings...")
-        
+
         url = f"{AM_BASE_URL}/management/organizations/{ORGANIZATION}/environments/{ENVIRONMENT}/domains/{self.domain_id}"
-        
+
         payload = {
             "oidc": {
                 "clientRegistrationSettings": {
@@ -237,17 +305,268 @@ class GraviteeInitializer:
                 }
             }
         }
-        
+
         try:
             response = self.session.patch(url, json=payload, timeout=10)
             response.raise_for_status()
-            
+
             self.log("✓ DCR settings configured (localhost and HTTP redirect URIs allowed)")
             return True
-            
+
         except requests.exceptions.RequestException as e:
             self.log(f"ERROR: Failed to configure DCR settings: {e}")
             if hasattr(e.response, 'text'):
+                self.log(f"Response: {e.response.text}")
+            return False
+
+    def create_scopes(self) -> bool:
+        """Create custom OAuth2 scopes for MCP tools"""
+        self.log("Creating custom OAuth2 scopes...")
+
+        url = f"{AM_BASE_URL}/management/organizations/{ORGANIZATION}/environments/{ENVIRONMENT}/domains/{self.domain_id}/scopes"
+
+        # Extract unique scopes from MCP_TOOLS configuration
+        unique_scopes = set()
+        for tool in MCP_TOOLS:
+            unique_scopes.update(tool.get("scopes", []))
+
+        # Define custom scopes dynamically from MCP tools
+        # Note: 'accommodations' scope removed - GET /accommodations is now a public endpoint
+        scopes_to_create = [
+            {
+                "key": "bookings",
+                "name": "Bookings",
+                "description": "Access to manage hotel bookings (view, create, and delete)",
+                "discovery": True,
+                "parameterized": False
+            }
+        ]
+
+        created_scopes = []
+        for scope in scopes_to_create:
+            try:
+                response = self.session.post(url, json=scope, timeout=10)
+
+                # Check if scope already exists
+                if response.status_code == 400:
+                    error_data = response.json()
+                    error_message = str(error_data).lower()
+                    if "already exists" in error_message:
+                        self.log(f"  - Scope '{scope['key']}' already exists, skipping")
+                        created_scopes.append(scope['key'])
+                        continue
+
+                response.raise_for_status()
+                self.log(f"  - ✓ Created scope: {scope['key']}")
+                created_scopes.append(scope['key'])
+
+            except requests.exceptions.RequestException as e:
+                self.log(f"ERROR: Failed to create scope '{scope['key']}': {e}")
+                if hasattr(e, 'response') and hasattr(e.response, 'text'):
+                    self.log(f"Response: {e.response.text}")
+                return False
+
+        if len(created_scopes) == len(scopes_to_create):
+            self.log(f"✓ All custom scopes created/verified: {', '.join(created_scopes)}")
+            return True
+        else:
+            self.log(f"ERROR: Not all scopes were created successfully")
+            return False
+
+    def _read_openfga_store_id(self) -> Optional[str]:
+        """Load OpenFGA store ID from environment or mounted file."""
+        if OPENFGA_STORE_ID and OPENFGA_STORE_ID.strip():
+            return OPENFGA_STORE_ID.strip()
+
+        if OPENFGA_STORE_ID_FILE:
+            try:
+                with open(OPENFGA_STORE_ID_FILE, "r", encoding="utf-8") as f:
+                    store_id = f.read().strip()
+                    if store_id:
+                        return store_id
+                    self.log(f"ERROR: OpenFGA store ID file '{OPENFGA_STORE_ID_FILE}' is empty")
+            except FileNotFoundError:
+                self.log(f"ERROR: OpenFGA store ID file '{OPENFGA_STORE_ID_FILE}' not found")
+            except OSError as e:
+                self.log(f"ERROR: Unable to read OpenFGA store ID file '{OPENFGA_STORE_ID_FILE}': {e}")
+
+        return None
+
+    def _build_openfga_configuration(self, store_id: str, authorization_model_id: Optional[str]) -> Dict[str, Any]:
+        """Build configuration payload sent to AM."""
+        config: Dict[str, Any] = {
+            "connectionUri": OPENFGA_CONNECTION_URI,
+            "storeId": store_id
+        }
+
+        if authorization_model_id:
+            config["authorizationModelId"] = authorization_model_id
+
+        optional_fields = {
+            "apiToken": OPENFGA_API_TOKEN,
+            "tokenIssuer": OPENFGA_TOKEN_ISSUER,
+            "apiAudience": OPENFGA_API_AUDIENCE,
+            "clientId": OPENFGA_CLIENT_ID,
+            "clientSecret": OPENFGA_CLIENT_SECRET,
+        }
+
+        for key, value in optional_fields.items():
+            if value:
+                config[key] = value
+
+        return config
+
+    @staticmethod
+    def _normalize_openfga_config(config: Dict[str, Any]) -> Dict[str, Any]:
+        """Strip empty values for deterministic comparison."""
+        normalized = {}
+        for key, value in config.items():
+            if value in (None, "", []):
+                continue
+            normalized[key] = value
+        return normalized
+
+    def _list_authorization_engines(self) -> Optional[list]:
+        """Return existing authorization engines for the domain."""
+        url = f"{AM_BASE_URL}/management/organizations/{ORGANIZATION}/environments/{ENVIRONMENT}/domains/{self.domain_id}/authorization-engines"
+        try:
+            response = self.session.get(url, timeout=10)
+            response.raise_for_status()
+            engines = response.json()
+            if isinstance(engines, dict) and "data" in engines:
+                engines = engines["data"]
+            if not isinstance(engines, list):
+                engines = []
+            return engines
+        except requests.exceptions.RequestException as e:
+            self.log(f"ERROR: Failed to list authorization engines: {e}")
+            if hasattr(e, 'response') and hasattr(e.response, 'text'):
+                self.log(f"Response: {e.response.text}")
+            return None
+
+    def _fetch_openfga_authorization_model_id(self, store_id: str) -> Optional[str]:
+        """Query OpenFGA for the latest authorization model ID."""
+        base_url = OPENFGA_CONNECTION_URI.rstrip("/")
+        url = f"{base_url}/stores/{store_id}/authorization-models"
+        params = {"page_size": 1}
+        headers = {"Accept": "application/json"}
+        if OPENFGA_API_TOKEN:
+            headers["Authorization"] = f"Bearer {OPENFGA_API_TOKEN}"
+
+        try:
+            response = self.session.get(url, params=params, headers=headers, timeout=10)
+            response.raise_for_status()
+            data = response.json()
+            models = data.get("authorization_models") or data.get("authorizationModels") or []
+            if models:
+                model_id = models[0].get("id") or models[0].get("authorization_model_id")
+                if model_id:
+                    self.log(f"✓ Retrieved OpenFGA authorization model ID: {model_id}")
+                    return model_id
+            self.log("ERROR: OpenFGA returned no authorization models")
+        except requests.exceptions.RequestException as e:
+            self.log(f"ERROR: Failed to query OpenFGA authorization models: {e}")
+            if hasattr(e, 'response') and hasattr(e.response, 'text'):
+                self.log(f"Response: {e.response.text}")
+        except ValueError as e:
+            self.log(f"ERROR: Failed to parse OpenFGA authorization models response: {e}")
+        return None
+
+    def ensure_openfga_authorization_engine(self) -> bool:
+        """Create or update the OpenFGA Authorization Engine."""
+        if not ENABLE_OPENFGA_ENGINE:
+            self.log("OpenFGA Authorization Engine provisioning disabled via ENABLE_OPENFGA_ENGINE")
+            return True
+
+        if not self.domain_id:
+            self.log("ERROR: Domain ID is not set; cannot configure OpenFGA Authorization Engine")
+            return False
+
+        if not OPENFGA_CONNECTION_URI:
+            self.log("ERROR: OPENFGA_CONNECTION_URI is not configured")
+            return False
+
+        store_id = self._read_openfga_store_id()
+        if not store_id:
+            self.log("ERROR: Unable to determine OpenFGA store ID. Ensure openfga-bootstrap completed successfully.")
+            return False
+
+        authorization_model_id = OPENFGA_AUTHORIZATION_MODEL_ID
+        if not authorization_model_id:
+            authorization_model_id = self._fetch_openfga_authorization_model_id(store_id)
+            if not authorization_model_id:
+                self.log("ERROR: Unable to determine OpenFGA authorization model ID")
+                return False
+
+        config = self._build_openfga_configuration(store_id, authorization_model_id)
+        desired_config = self._normalize_openfga_config(config)
+
+        engines = self._list_authorization_engines()
+        if engines is None:
+            return False
+
+        existing_engine = next((engine for engine in engines if engine.get("type") == OPENFGA_ENGINE_TYPE), None)
+
+        payload_config = json.dumps(config)
+
+        if existing_engine:
+            engine_id = existing_engine.get("id")
+            current_name = existing_engine.get("name")
+            raw_config = existing_engine.get("configuration") or "{}"
+            try:
+                parsed_config = json.loads(raw_config) if isinstance(raw_config, str) else raw_config
+            except ValueError:
+                parsed_config = {}
+            normalized_existing = self._normalize_openfga_config(parsed_config if isinstance(parsed_config, dict) else {})
+
+            needs_update = normalized_existing != desired_config or current_name != OPENFGA_ENGINE_NAME
+            if not needs_update:
+                self.log("✓ OpenFGA Authorization Engine already configured")
+                self.openfga_engine_id = engine_id
+                self.openfga_store_id = store_id
+                self.openfga_model_id = authorization_model_id
+                return True
+
+            url = f"{AM_BASE_URL}/management/organizations/{ORGANIZATION}/environments/{ENVIRONMENT}/domains/{self.domain_id}/authorization-engines/{engine_id}"
+            update_payload = {
+                "name": OPENFGA_ENGINE_NAME,
+                "configuration": payload_config
+            }
+
+            try:
+                response = self.session.put(url, json=update_payload, timeout=10)
+                response.raise_for_status()
+                self.log("✓ Updated OpenFGA Authorization Engine configuration")
+                self.openfga_engine_id = engine_id
+                self.openfga_store_id = store_id
+                self.openfga_model_id = authorization_model_id
+                return True
+            except requests.exceptions.RequestException as e:
+                self.log(f"ERROR: Failed to update OpenFGA Authorization Engine: {e}")
+                if hasattr(e, 'response') and hasattr(e.response, 'text'):
+                    self.log(f"Response: {e.response.text}")
+                return False
+
+        # No existing engine, create a new one
+        url = f"{AM_BASE_URL}/management/organizations/{ORGANIZATION}/environments/{ENVIRONMENT}/domains/{self.domain_id}/authorization-engines"
+        create_payload = {
+            "type": OPENFGA_ENGINE_TYPE,
+            "name": OPENFGA_ENGINE_NAME,
+            "configuration": payload_config
+        }
+
+        try:
+            response = self.session.post(url, json=create_payload, timeout=10)
+            response.raise_for_status()
+            data = response.json()
+            self.openfga_engine_id = data.get("id")
+            self.openfga_store_id = store_id
+            self.openfga_model_id = authorization_model_id
+            self.log("✓ Created OpenFGA Authorization Engine")
+            return True
+        except requests.exceptions.RequestException as e:
+            self.log(f"ERROR: Failed to create OpenFGA Authorization Engine: {e}")
+            if hasattr(e, 'response') and hasattr(e.response, 'text'):
                 self.log(f"Response: {e.response.text}")
             return False
 
@@ -427,40 +746,204 @@ class GraviteeInitializer:
                 self.log(f"Response: {e.response.text}")
             return False
 
-    def create_user(self) -> bool:
-        """Create a user in the domain"""
-        self.log(f"Creating user '{USER_USERNAME}'...")
-        
-        url = f"{AM_BASE_URL}/management/organizations/{ORGANIZATION}/environments/{ENVIRONMENT}/domains/{self.domain_id}/users"
-        
+    def configure_token_claims(self) -> bool:
+        """Configure custom claims for access tokens and ID tokens"""
+        self.log("Configuring custom token claims (access token + ID token)...")
+
+        # PATCH only the settings we want to change
+        patch_url = f"{AM_BASE_URL}/management/organizations/{ORGANIZATION}/environments/{ENVIRONMENT}/domains/{self.domain_id}/applications/{self.app_id}"
+
         payload = {
-            "firstName": USER_FIRST_NAME,
-            "lastName": USER_LAST_NAME,
-            "email": USER_EMAIL,
-            "username": USER_USERNAME,
-            "password": USER_PASSWORD,
-            "forceResetPassword": False,
-            "preRegistration": False
+            "settings": {
+                "oauth": {
+                    "tokenCustomClaims": [
+                        # Access token claims
+                        {
+                            "tokenType": "ACCESS_TOKEN",
+                            "claimName": "user_email",
+                            "claimValue": "{#context.attributes['user']['email']}"
+                        },
+                        {
+                            "tokenType": "ACCESS_TOKEN",
+                            "claimName": "preferred_username",
+                            "claimValue": "{#context.attributes['user']['username']}"
+                        },
+                        # ID token claims for user display
+                        {
+                            "tokenType": "ID_TOKEN",
+                            "claimName": "preferred_username",
+                            "claimValue": "{#context.attributes['user']['username']}"
+                        },
+                        {
+                            "tokenType": "ID_TOKEN",
+                            "claimName": "given_name",
+                            "claimValue": "{#context.attributes['user']['firstName']}"
+                        },
+                        {
+                            "tokenType": "ID_TOKEN",
+                            "claimName": "family_name",
+                            "claimValue": "{#context.attributes['user']['lastName']}"
+                        }
+                    ]
+                }
+            }
         }
-        
+
+        try:
+            # Use PATCH to only update specific fields
+            update_response = self.session.patch(patch_url, json=payload, timeout=10)
+            update_response.raise_for_status()
+
+            self.log("✓ Custom token claims configured (user_email, preferred_username)")
+            return True
+
+        except requests.exceptions.RequestException as e:
+            self.log(f"ERROR: Failed to configure token claims: {e}")
+            if hasattr(e, 'response') and hasattr(e.response, 'text'):
+                self.log(f"Response: {e.response.text}")
+            return False
+
+    def create_users(self) -> bool:
+        """Create all users in the domain"""
+        self.log(f"Creating {len(USERS)} user(s)...")
+
+        url = f"{AM_BASE_URL}/management/organizations/{ORGANIZATION}/environments/{ENVIRONMENT}/domains/{self.domain_id}/users"
+
+        all_success = True
+        for user in USERS:
+            username = user["username"]
+            self.log(f"  Creating user '{username}'...")
+
+            payload = {
+                "firstName": user["first_name"],
+                "lastName": user["last_name"],
+                "email": user["email"],
+                "username": user["username"],
+                "password": user["password"],
+                "forceResetPassword": False,
+                "preRegistration": False
+            }
+
+            try:
+                response = self.session.post(url, json=payload, timeout=10)
+
+                # Check if user already exists
+                if response.status_code == 400:
+                    error_data = response.json()
+                    error_message = error_data.get("message", "")
+                    if "already exists" in error_message.lower():
+                        self.log(f"  ✓ User '{username}' already exists, skipping creation")
+                        continue
+
+                response.raise_for_status()
+
+                self.log(f"  ✓ User '{username}' created successfully")
+
+            except requests.exceptions.RequestException as e:
+                self.log(f"  ERROR: Failed to create user '{username}': {e}")
+                if hasattr(e, 'response') and hasattr(e.response, 'text'):
+                    self.log(f"  Response: {e.response.text}")
+                all_success = False
+
+        if all_success:
+            self.log(f"✓ All users created/verified")
+
+        return all_success
+
+    def register_mcp_server(self) -> bool:
+        """Register MCP Server as a Protected Resource"""
+        self.log(f"Registering MCP Server '{MCP_SERVER_NAME}'...")
+
+        url = f"{AM_BASE_URL}/management/organizations/{ORGANIZATION}/environments/{ENVIRONMENT}/domains/{self.domain_id}/protected-resources"
+
+        # Build MCP tools with proper structure
+        features = []
+        for tool in MCP_TOOLS:
+            features.append({
+                "type": "MCP_TOOL",
+                "key": tool["key"],
+                "description": tool["description"],
+                "scopes": tool["scopes"]
+            })
+
+        payload = {
+            "name": MCP_SERVER_NAME,
+            "description": MCP_SERVER_DESCRIPTION,
+            "type": "MCP_SERVER",
+            "resourceIdentifiers": MCP_SERVER_RESOURCE_IDENTIFIERS,
+            "features": features
+        }
+
         try:
             response = self.session.post(url, json=payload, timeout=10)
-            
-            # Check if user already exists
+
+            # Check if MCP server already exists
             if response.status_code == 400:
                 error_data = response.json()
-                error_message = error_data.get("message", "")
-                if "already exists" in error_message.lower():
-                    self.log(f"✓ User '{USER_USERNAME}' already exists, skipping creation")
-                    return True
-            
+                error_message = str(error_data).lower()
+                if "already exists" in error_message or "resource identifier" in error_message:
+                    self.log(f"MCP Server with resource identifiers {MCP_SERVER_RESOURCE_IDENTIFIERS} already exists, fetching it...")
+                    return self.get_existing_mcp_server()
+
             response.raise_for_status()
-            
-            self.log(f"✓ User '{USER_USERNAME}' created successfully")
+            data = response.json()
+
+            self.mcp_server_id = data.get("id")
+            self.mcp_server_client_id = data.get("clientId")
+            self.mcp_server_client_secret = data.get("clientSecret")
+
+            if not self.mcp_server_id or not self.mcp_server_client_id:
+                self.log("ERROR: Missing MCP server ID or client ID in response")
+                return False
+
+            self.log(f"✓ MCP Server registered successfully")
+            self.log(f"  - MCP Server ID: {self.mcp_server_id}")
+            self.log(f"  - Client ID: {self.mcp_server_client_id}")
+            if self.mcp_server_client_secret:
+                self.log(f"  - Client Secret: {self.mcp_server_client_secret[:10]}... (saved)")
+            self.log(f"  - Tools: {', '.join([tool['key'] for tool in MCP_TOOLS])}")
+
             return True
-            
+
         except requests.exceptions.RequestException as e:
-            self.log(f"ERROR: Failed to create user: {e}")
+            self.log(f"ERROR: Failed to register MCP server: {e}")
+            if hasattr(e, 'response') and hasattr(e.response, 'text'):
+                self.log(f"Response: {e.response.text}")
+            return False
+
+    def get_existing_mcp_server(self) -> bool:
+        """Get existing MCP server by resource identifier"""
+        url = f"{AM_BASE_URL}/management/organizations/{ORGANIZATION}/environments/{ENVIRONMENT}/domains/{self.domain_id}/protected-resources"
+        params = {"type": "MCP_SERVER"}
+
+        try:
+            response = self.session.get(url, params=params, timeout=10)
+            response.raise_for_status()
+
+            result = response.json()
+            mcp_servers = result.get("data", [])
+
+            # Find MCP server by resource identifier
+            for server in mcp_servers:
+                server_identifiers = server.get("resourceIdentifiers", [])
+                if any(identifier in MCP_SERVER_RESOURCE_IDENTIFIERS for identifier in server_identifiers):
+                    self.mcp_server_id = server.get("id")
+                    self.mcp_server_client_id = server.get("clientId")
+                    # Note: clientSecret is not returned for existing servers
+                    self.mcp_server_client_secret = None
+
+                    self.log(f"✓ Found existing MCP Server")
+                    self.log(f"  - MCP Server ID: {self.mcp_server_id}")
+                    self.log(f"  - Client ID: {self.mcp_server_client_id}")
+                    self.log(f"  - Client Secret: (not available for existing servers)")
+
+                    return True
+
+            self.log(f"ERROR: MCP Server with resource identifiers {MCP_SERVER_RESOURCE_IDENTIFIERS} not found")
+            return False
+
+        except requests.exceptions.RequestException as e:
+            self.log(f"ERROR: Failed to get MCP servers: {e}")
             if hasattr(e, 'response') and hasattr(e.response, 'text'):
                 self.log(f"Response: {e.response.text}")
             return False
@@ -489,36 +972,100 @@ class GraviteeInitializer:
         # Step 4: Configure DCR settings
         if not self.configure_dcr_settings():
             return False
-        
-        # Step 5: Create application
+
+        # Step 5: Create custom OAuth2 scopes
+        if not self.create_scopes():
+            return False
+
+        # Step 6: Configure OpenFGA Authorization Engine
+        if not self.ensure_openfga_authorization_engine():
+            return False
+
+        # Step 7: Create application
         if not self.create_application():
             return False
-        
-        # Step 6: Add scopes to application
+
+        # Step 8: Add scopes to application
         if not self.add_scopes_to_application():
             return False
-        
-        # Step 7: Add identity provider to application
+
+        # Step 9: Add identity provider to application
         if not self.add_identity_provider_to_application():
             return False
-        
-        # Step 8: Create user
-        if not self.create_user():
+
+        # Step 10: Configure custom token claims
+        if not self.configure_token_claims():
             return False
-        
+
+        # Step 11: Create users
+        if not self.create_users():
+            return False
+
+        # Step 12: Register MCP Server
+        if not self.register_mcp_server():
+            return False
+
         self.log("=" * 80)
         self.log("✓ Access Management initialization completed successfully!")
         self.log("")
         self.log("Summary:")
         self.log(f"  - Domain: {DOMAIN_NAME} (ID: {self.domain_id})")
+        if self.openfga_engine_id:
+            self.log(f"  - Authorization Engine: {OPENFGA_ENGINE_NAME} (ID: {self.openfga_engine_id})")
+            self.log(f"    - Connection URI: {OPENFGA_CONNECTION_URI}")
+            if self.openfga_store_id:
+                self.log(f"    - Store ID: {self.openfga_store_id}")
+            if self.openfga_model_id:
+                self.log(f"    - Authorization Model ID: {self.openfga_model_id}")
         self.log(f"  - Application: {APP_NAME} (ID: {self.app_id})")
-        self.log(f"  - Client ID: {APP_CLIENT_ID}")
-        self.log(f"  - Client Secret: {APP_CLIENT_SECRET}")
-        self.log(f"  - Redirect URIs: {', '.join(APP_REDIRECT_URIS)}")
-        self.log(f"  - Scopes: {', '.join(APP_SCOPES)}")
-        self.log(f"  - User: {USER_USERNAME}")
-        
+        self.log(f"    - Client ID: {APP_CLIENT_ID}")
+        self.log(f"    - Client Secret: {APP_CLIENT_SECRET}")
+        self.log(f"    - Redirect URIs: {', '.join(APP_REDIRECT_URIS)}")
+        self.log(f"    - Scopes: {', '.join(APP_SCOPES)}")
+        self.log(f"  - MCP Server: {MCP_SERVER_NAME} (ID: {self.mcp_server_id})")
+        self.log(f"    - Client ID: {self.mcp_server_client_id}")
+        if self.mcp_server_client_secret:
+            self.log(f"    - Client Secret: {self.mcp_server_client_secret}")
+        self.log(f"    - Resource URL: {MCP_SERVER_RESOURCE_IDENTIFIERS[0]}")
+        self.log(f"    - Tools: {', '.join([tool['key'] for tool in MCP_TOOLS])}")
+        self.log(f"  - Users:")
+        for user in USERS:
+            self.log(f"    - {user['email']}")
+
+        self.log("")
+        self.log("NOTE: Frontend is configured to use MCP Resource URL (RFC 8707):")
+        self.log(f"  MCP_SERVER_RESOURCE={MCP_SERVER_RESOURCE_IDENTIFIERS[0]}")
+
+        # Save MCP Server credentials to file for token introspection
+        self._save_mcp_credentials()
+
         return True
+
+    def _save_mcp_credentials(self):
+        """Save MCP Server credentials to file for use by hotel-booking-api"""
+        credentials_file = os.getenv("MCP_CREDENTIALS_FILE", "/mcp-credentials/credentials")
+
+        if not self.mcp_server_client_id:
+            self.log("WARNING: MCP Server client ID not available, skipping credentials file creation")
+            return
+
+        try:
+            os.makedirs(os.path.dirname(credentials_file), exist_ok=True)
+
+            with open(credentials_file, 'w') as f:
+                f.write(f"# MCP Server credentials for token introspection\n")
+                f.write(f"# Generated by gravitee-init on {time.strftime('%Y-%m-%d %H:%M:%S')}\n")
+                f.write(f"MCP_SERVER_CLIENT_ID={self.mcp_server_client_id}\n")
+                if self.mcp_server_client_secret:
+                    f.write(f"MCP_SERVER_CLIENT_SECRET={self.mcp_server_client_secret}\n")
+                else:
+                    f.write(f"# MCP_SERVER_CLIENT_SECRET=<not available for existing servers>\n")
+
+            self.log(f"✓ MCP Server credentials saved to {credentials_file}")
+            self.log("  NOTE: Source this file in your .env or export these variables for token introspection")
+
+        except Exception as e:
+            self.log(f"WARNING: Failed to save MCP credentials to file: {e}")
 
 
 def main():

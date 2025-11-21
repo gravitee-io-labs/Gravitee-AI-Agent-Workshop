@@ -110,7 +110,8 @@ def get_agent_logger(name: str) -> logging.Logger:
     return setup_logger(
         name=name,
         component_name="AI-AGENT",
-        component_color=ColoredFormatter.AGENT_COLOR
+        component_color=ColoredFormatter.AGENT_COLOR,
+        level=logging.DEBUG  # Enable DEBUG logging
     )
 
 
@@ -119,7 +120,8 @@ def get_llm_logger(name: str) -> logging.Logger:
     return setup_logger(
         name=name,
         component_name="LLM-CLIENT",
-        component_color=ColoredFormatter.LLM_COLOR
+        component_color=ColoredFormatter.LLM_COLOR,
+        level=logging.DEBUG  # Enable DEBUG logging
     )
 
 
@@ -128,5 +130,6 @@ def get_mcp_logger(name: str) -> logging.Logger:
     return setup_logger(
         name=name,
         component_name="MCP-CLIENT",
-        component_color=ColoredFormatter.MCP_COLOR
+        component_color=ColoredFormatter.MCP_COLOR,
+        level=logging.DEBUG  # Enable DEBUG logging
     )

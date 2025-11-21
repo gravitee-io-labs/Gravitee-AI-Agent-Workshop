@@ -85,6 +85,81 @@
                     "name": "getBookings",
                     "description": "Retrieves all existing bookings."
                   }
+                },
+                {
+                  "gatewayMapping": {
+                    "http": {
+                      "path": "/bookings",
+                      "method": "POST",
+                      "queryParams": [
+                        "hotel_name",
+                        "location",
+                        "start_date",
+                        "end_date"
+                      ]
+                    }
+                  },
+                  "toolDefinition": {
+                    "inputSchema": {
+                      "type": "object",
+                      "properties": {
+                        "hotel_name": {
+                          "description": "Name of the specific hotel to book (optional if location is provided)",
+                          "type": "string"
+                        },
+                        "location": {
+                          "description": "City/location where you want to book a hotel (optional if hotel_name is provided). System will automatically select an available hotel in this location.",
+                          "type": "string"
+                        },
+                        "start_date": {
+                          "description": "Check-in date in ISO 8601 format (e.g., 2025-08-01)",
+                          "type": "string"
+                        },
+                        "end_date": {
+                          "description": "Check-out date in ISO 8601 format (e.g., 2025-08-10)",
+                          "type": "string"
+                        }
+                      },
+                      "required": ["start_date", "end_date"]
+                    },
+                    "name": "makeBooking",
+                    "description": "Creates a new hotel booking. You can specify either a hotel name or a location (city). If only location is provided, the system will automatically select an available hotel. Room number and total price are calculated automatically."
+                  }
+                },
+                {
+                  "gatewayMapping": {
+                    "http": {
+                      "path": "/bookings",
+                      "method": "DELETE",
+                      "queryParams": [
+                        "hotel_name",
+                        "start_date",
+                        "end_date"
+                      ]
+                    }
+                  },
+                  "toolDefinition": {
+                    "inputSchema": {
+                      "type": "object",
+                      "properties": {
+                        "hotel_name": {
+                          "description": "Name of the hotel where the booking should be canceled",
+                          "type": "string"
+                        },
+                        "start_date": {
+                          "description": "Check-in date of the booking to cancel in ISO 8601 format (e.g., 2025-08-01). Optional - only required if multiple bookings exist at the same hotel.",
+                          "type": "string"
+                        },
+                        "end_date": {
+                          "description": "Check-out date of the booking to cancel in ISO 8601 format (e.g., 2025-08-10). Optional - only required if multiple bookings exist at the same hotel.",
+                          "type": "string"
+                        }
+                      },
+                      "required": ["hotel_name"]
+                    },
+                    "name": "deleteBooking",
+                    "description": "Cancels an existing hotel booking. Requires hotel name. If multiple bookings exist at the same hotel, start_date and end_date must also be provided to identify which booking to cancel. Admin users only."
+                  }
                 }
               ]
             }

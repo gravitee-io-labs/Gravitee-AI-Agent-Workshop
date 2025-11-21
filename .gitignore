@@ -27,3 +27,6 @@ venv.bak/
 .Trashes
 .VolumeIcon.icns
 .com.apple.timemachine.donotpresent
+
+# OpenFGA bootstrap output
+.openfga/

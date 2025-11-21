@@ -5,6 +5,7 @@ let config = {
     clientId: window.APP_CONFIG?.clientId || 'gravitee-hotels',
     clientSecret: window.APP_CONFIG?.clientSecret || 'gravitee-hotels',
     redirectUri: window.APP_CONFIG?.redirectUri || 'http://localhost:8002/',
+    mcpServerResource: window.APP_CONFIG?.mcpServerResource || 'http://localhost:8082/hotels/mcp',
     agentUrl: null,
     oidcConfig: null,
     isConnected: false,
@@ -731,11 +732,18 @@ async function login() {
             client_id: config.clientId,
             redirect_uri: config.redirectUri,
             response_type: 'code',
-            scope: 'openid profile email',
+            scope: 'openid profile bookings',
             code_challenge: codeChallenge,
             code_challenge_method: 'S256',
             state: sessionStorage.getItem('auth_state')
         });
+
+        // Add resource parameter for MCP Server (RFC 8707)
+        // The resource parameter MUST be the canonical URI of the MCP server
+        // DISABLED: Causes introspection issues in Gravitee AM when aud is set to resource instead of client_id
+        // if (config.mcpServerResource) {
+        //     authParams.append('resource', config.mcpServerResource);
+        // }
         
         const authUrl = `${config.oidcConfig.authorization_endpoint}?${authParams.toString()}`;
         console.log('Redirecting to:', authUrl);
@@ -789,6 +797,13 @@ async function handleOAuthCallback() {
             client_id: config.clientId,
             code_verifier: codeVerifier
         });
+
+        // Add resource parameter for MCP Server (RFC 8707)
+        // The resource parameter MUST be the canonical URI of the MCP server
+        // DISABLED: Causes introspection issues in Gravitee AM when aud is set to resource instead of client_id
+        // if (config.mcpServerResource) {
+        //     tokenParams.append('resource', config.mcpServerResource);
+        // }
         
         const tokenResponse = await fetch(config.oidcConfig.token_endpoint, {
             method: 'POST',
@@ -806,31 +821,26 @@ async function handleOAuthCallback() {
         const tokenData = await tokenResponse.json();
         config.accessToken = tokenData.access_token;
         const idToken = tokenData.id_token;
-        
-        // Fetch user info
-        const userInfoResponse = await fetch(config.oidcConfig.userinfo_endpoint, {
-            headers: {
-                'Authorization': `Bearer ${config.accessToken}`
-            }
-        });
-        
-        if (userInfoResponse.ok) {
-            const userInfo = await userInfoResponse.json();
+
+        // Extract user info from ID token (no need to call userinfo endpoint)
+        if (idToken) {
+            // Decode ID token (JWT) - we only need the payload
+            const idTokenPayload = JSON.parse(atob(idToken.split('.')[1]));
             config.userInfo = {
-                email: userInfo.preferred_username,
-                given_name: userInfo.given_name,
-                family_name: userInfo.family_name
+                email: idTokenPayload.preferred_username || idTokenPayload.email,
+                given_name: idTokenPayload.given_name,
+                family_name: idTokenPayload.family_name
             };
-            
+
             // Store in localStorage
             localStorage.setItem('access_token', config.accessToken);
-            if (idToken) {
-                localStorage.setItem('id_token', idToken);
-            }
+            localStorage.setItem('id_token', idToken);
             localStorage.setItem('user_info', JSON.stringify(config.userInfo));
-            
+
             updateUserDisplay();
             console.log('Successfully logged in:', config.userInfo);
+        } else {
+            throw new Error('No ID token received');
         }
         
         // Clean up

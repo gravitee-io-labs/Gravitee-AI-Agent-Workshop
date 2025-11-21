@@ -40,7 +40,7 @@ paths:
       summary: Retrieves all existing bookings.
       operationId: getBookings
       security:
-        - oauth2: [read:bookings]
+        - oauth2: [bookings]
         - bearerAuth: []
       responses:
         "200":
@@ -78,6 +78,101 @@ paths:
                     type: string
                     example: "Insufficient permissions to access this resource"
 
+    post:
+      tags: [Bookings]
+      summary: Creates a new booking for a hotel.
+      operationId: makeBooking
+      security:
+        - oauth2: [bookings]
+        - bearerAuth: []
+      parameters:
+        - name: hotel_name
+          in: query
+          required: false
+          schema:
+            type: string
+          description: Name of the specific hotel to book (optional if location is provided)
+          example: "The Grand Hotel London"
+        - name: location
+          in: query
+          required: false
+          schema:
+            type: string
+          description: City/location where you want to book a hotel (optional if hotel_name is provided). System will automatically select an available hotel in this location.
+          example: "Paris"
+        - name: start_date
+          in: query
+          required: true
+          schema:
+            type: string
+            format: date
+          description: Check-in date in ISO 8601 format (YYYY-MM-DD)
+          example: "2025-08-01"
+        - name: end_date
+          in: query
+          required: true
+          schema:
+            type: string
+            format: date
+          description: Check-out date in ISO 8601 format (YYYY-MM-DD)
+          example: "2025-08-10"
+      responses:
+        "201":
+          description: Booking created successfully
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Booking"
+        "400":
+          description: Invalid input - e.g., end date is before start date
+        "401":
+          description: Unauthorized - Missing or invalid authentication token
+        "404":
+          description: Hotel not found
+
+    delete:
+      tags: [Bookings]
+      summary: Deletes a booking. Requires hotel_name, and optionally start_date and end_date for disambiguation.
+      operationId: deleteBooking
+      security:
+        - oauth2: [bookings]
+        - bearerAuth: []
+      parameters:
+        - name: hotel_name
+          in: query
+          required: true
+          schema:
+            type: string
+          description: Name of the hotel for the booking to delete.
+          example: "The Grand Hotel London"
+        - name: start_date
+          in: query
+          required: false
+          schema:
+            type: string
+            format: date
+          description: Start date of the booking to delete (YYYY-MM-DD). Required if multiple bookings exist for the same hotel.
+          example: "2025-08-01"
+        - name: end_date
+          in: query
+          required: false
+          schema:
+            type: string
+            format: date
+          description: End date of the booking to delete (YYYY-MM-DD). Required if multiple bookings exist for the same hotel.
+          example: "2025-08-10"
+      responses:
+        "204":
+          description: Booking deleted successfully (no content)
+        "401":
+          description: Unauthorized - Missing or invalid authentication token
+        "403":
+          description: Forbidden - User doesn't have permissions to delete.
+        "404":
+          description: Booking not found.
+        "409":
+          description: Conflict - Multiple bookings found, requires disambiguation.
+
 components:
   securitySchemes:
     oauth2:
@@ -88,13 +183,7 @@ components:
           authorizationUrl: https://auth.example.com/oauth/authorize
           tokenUrl: https://auth.example.com/oauth/token
           scopes:
-            read:bookings: Read access to booking information
-            write:bookings: Write access to create or modify bookings
-        clientCredentials:
-          tokenUrl: https://auth.example.com/oauth/token
-          scopes:
-            read:bookings: Read access to booking information
-            write:bookings: Write access to create or modify bookings
+            bookings: Access to view, create, and delete hotel bookings
     bearerAuth:
       type: http
       scheme: bearer

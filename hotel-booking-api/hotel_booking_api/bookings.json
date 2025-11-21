@@ -1,46 +1,38 @@
 [
-  {
-    "id": 1,
-    "user_email": "john.doe@gravitee.io",
-    "hotel_name": "The Grand Hotel London",
-    "room_number": "305",
-    "start_date_offset_days": -15,
-    "start_date_time": "14:00:00",
-    "end_date_offset_days": -8,
-    "end_date_time": "11:00:00",
-    "price": 2450.0
-  },
-  {
-    "id": 2,
-    "user_email": "john.doe@gravitee.io",
-    "hotel_name": "Le Château Paris",
-    "room_number": "702",
-    "start_date_offset_days": 10,
-    "start_date_time": "15:00:00",
-    "end_date_offset_days": 17,
-    "end_date_time": "10:00:00",
-    "price": 2940.0
-  },
-  {
-    "id": 3,
-    "user_email": "jane.doe@gravitee.io",
-    "hotel_name": "Manhattan Grand Hotel",
-    "room_number": "1205",
-    "start_date_offset_days": -15,
-    "start_date_time": "16:00:00",
-    "end_date_offset_days": -8,
-    "end_date_time": "12:00:00",
-    "price": 3150.0
-  },
-  {
-    "id": 4,
-    "user_email": "jane.doe@gravitee.io",
-    "hotel_name": "Riverside Inn London",
-    "room_number": "201",
-    "start_date_offset_days": 10,
-    "start_date_time": "14:00:00",
-    "end_date_offset_days": 17,
-    "end_date_time": "11:00:00",
-    "price": 1260.0
-  }
+    {
+        "id": 1,
+        "user_email": "john.doe@gravitee.io",
+        "hotel_name": "The Grand Hotel London",
+        "room_number": "305",
+        "start_date": "2025-12-10",
+        "end_date": "2025-12-17",
+        "price": 2450.0
+    },
+    {
+        "id": 2,
+        "user_email": "john.doe@gravitee.io",
+        "hotel_name": "Le Château Paris",
+        "room_number": "702",
+        "start_date": "2026-01-15",
+        "end_date": "2026-01-22",
+        "price": 2940.0
+    },
+    {
+        "id": 3,
+        "user_email": "tom.smith@gravitee.io",
+        "hotel_name": "Manhattan Grand Hotel",
+        "room_number": "1205",
+        "start_date": "2025-12-10",
+        "end_date": "2025-12-17",
+        "price": 3150.0
+    },
+    {
+        "id": 4,
+        "user_email": "tom.smith@gravitee.io",
+        "hotel_name": "Riverside Inn London",
+        "room_number": "201",
+        "start_date": "2026-01-15",
+        "end_date": "2026-01-22",
+        "price": 1260.0
+    }
 ]
