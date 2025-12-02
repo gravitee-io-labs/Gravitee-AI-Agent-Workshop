@@ -97,6 +97,46 @@ class ApimInitializer:
                 self.log(f"Response: {e.response.text}")
             return False
 
+    def enable_custom_api_key(self) -> bool:
+        """Enable custom API key for plans"""
+        self.log("Enabling custom API key...")
+        
+        try:
+            url = f"{APIM_BASE_URL}/management/organizations/{ORGANIZATION}/environments/{ENVIRONMENT}/settings"
+            
+            # First, GET the current settings
+            get_response = self.session.get(url, timeout=10)
+            get_response.raise_for_status()
+            
+            settings = get_response.json()
+            
+            # Update the plan.security.customApiKey.enabled setting to true
+            if "plan" not in settings:
+                settings["plan"] = {}
+            if "security" not in settings["plan"]:
+                settings["plan"]["security"] = {}
+            if "customApiKey" not in settings["plan"]["security"]:
+                settings["plan"]["security"]["customApiKey"] = {}
+            
+            settings["plan"]["security"]["customApiKey"]["enabled"] = True
+            
+            # POST the updated settings back
+            post_response = self.session.post(
+                url,
+                json=settings,
+                timeout=10
+            )
+            
+            post_response.raise_for_status()
+            self.log("✓ Custom API key enabled successfully")
+            return True
+            
+        except requests.exceptions.RequestException as e:
+            self.log(f"ERROR: Failed to enable custom API key: {e}")
+            if hasattr(e, 'response') and hasattr(e.response, 'text'):
+                self.log(f"Response: {e.response.text}")
+            return False
+
     def update_portal_homepage(self) -> bool:
         """Update the Next Gen Dev Portal homepage to add /next prefix to links"""
         self.log("Updating Next Gen Dev Portal homepage...")
@@ -413,6 +453,10 @@ class ApimInitializer:
         # Enable next generation portal
         if not self.enable_next_gen_portal():
             self.log("WARNING: Failed to enable next generation portal, but continuing...")
+        
+        # Enable custom API key
+        if not self.enable_custom_api_key():
+            self.log("WARNING: Failed to enable custom API key, but continuing...")
         
         # Update portal homepage
         if not self.update_portal_homepage():
