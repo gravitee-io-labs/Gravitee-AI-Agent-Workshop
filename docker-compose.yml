@@ -219,12 +219,12 @@ services:
     container_name: gio-am-management-ui
     restart: always
     ports:
-      - "8081:8080"
+      - "8089:8080"
     depends_on:
       - am-management-api
     environment:
       - MGMT_API_URL=http://localhost:8093
-      - MGMT_UI_URL=http://localhost:8081
+      - MGMT_UI_URL=http://localhost:8089
     networks:
       - northbound
 
@@ -242,8 +242,12 @@ services:
         condition: service_started
       apim-management-api:
         condition: service_healthy
+      openfga-bootstrap:
+        condition: service_completed_successfully
     volumes:
       - ./apim-apis-definitions:/api-definitions:ro
+      - ./.openfga:/openfga:ro
+      - mcp-credentials:/mcp-credentials
     environment:
       # Access Management (AM) configuration
       - AM_BASE_URL=http://am-management-api:8093
@@ -257,6 +261,11 @@ services:
       # Common configuration
       - ORGANIZATION=DEFAULT
       - ENVIRONMENT=DEFAULT
+      # OpenFGA Authorization Engine bootstrap
+      - OPENFGA_CONNECTION_URI=http://openfga:8080
+      - OPENFGA_STORE_ID_FILE=/openfga/store_id
+      # MCP Server credentials output
+      - MCP_CREDENTIALS_FILE=/mcp-credentials/credentials
     networks:
       - southbound
 
@@ -274,32 +283,32 @@ services:
 
 # --- AI Agents Components ---
 
-  ### Ollama LLM Runtime
+  ## Ollama LLM Runtime
   ollama:
-    image: ollama/ollama:${OLLAMA_VERSION:-latest}
-    container_name: ollama-llm-runtime
-    restart: unless-stopped
-    # ports:
-    #   - "11434:11434" # Commented out to avoid conflicts if Ollama is already running on the host
-    volumes:
-      - ollama_data:/root/.ollama
-    environment:
-      - OLLAMA_HOST=0.0.0.0
-    healthcheck:
-      test: ["CMD", "/bin/sh", "-c", "ollama list | grep -q 'qwen3:0.6b'"]
-      interval: 5s
-      timeout: 10s
-      retries: 60 # Accomodate for qwen3:0.6b model download time (523MB)
-      start_period: 5s
-    entrypoint: ["/bin/sh", "-c"]
-    command: 
-      - |
-        ollama serve &
-        sleep 5
-        ollama pull qwen3:0.6b || true
-        wait
-    networks:
-      - southbound
+     image: ollama/ollama:${OLLAMA_VERSION:-latest}
+     container_name: ollama-llm-runtime
+     restart: unless-stopped
+     # ports:
+     #   - "11434:11434" # Commented out to avoid conflicts if Ollama is already running on the host
+     volumes:
+       - ollama_data:/root/.ollama
+     environment:
+       - OLLAMA_HOST=0.0.0.0
+     healthcheck:
+       test: ["CMD", "/bin/sh", "-c", "ollama list | grep -q 'qwen3:0.6b'"]
+       interval: 5s
+       timeout: 10s
+       retries: 60 # Accomodate for qwen3:0.6b model download time (523MB)
+       start_period: 5s
+     entrypoint: ["/bin/sh", "-c"]
+     command:
+       - |
+         ollama serve &
+         sleep 5
+         ollama pull qwen3:0.6b || true
+         wait
+     networks:
+       - southbound
 
   ### Hotel Booking Fake API
   hotel-booking-api:
@@ -308,8 +317,20 @@ services:
       dockerfile: Dockerfile
     container_name: hotel-booking-api
     restart: unless-stopped
+    depends_on:
+      gravitee-init:
+        condition: service_completed_successfully
     ports:
       - "8000:8000"
+    volumes:
+      - mcp-credentials:/mcp-credentials:ro
+    environment:
+      - TOKEN_INTROSPECTION_URL=http://am-gateway:8092/gravitee/oauth/introspect
+      - MCP_SERVER_CLIENT_ID=${MCP_SERVER_CLIENT_ID:-}
+      - MCP_SERVER_CLIENT_SECRET=${MCP_SERVER_CLIENT_SECRET:-}
+      - MCP_CREDENTIALS_FILE=/mcp-credentials/credentials
+      - EXPECTED_AUDIENCE=http://localhost:8082/hotels/mcp
+      - AUTHZEN_PDP_URL=http://am-gateway:8092/gravitee/access/v1/evaluation
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
       interval: 5s
@@ -334,6 +355,7 @@ services:
       - CLIENT_ID=gravitee-hotels
       - CLIENT_SECRET=gravitee-hotels
       - REDIRECT_URI=http://localhost:8002/
+      - MCP_SERVER_RESOURCE=http://localhost:8082/hotels/mcp
     networks:
       - northbound
 
@@ -345,7 +367,7 @@ services:
     container_name: hotel-booking-a2a-agent
     depends_on:
       ollama:
-        condition: service_healthy
+        condition: service_healthy  # Disabled: using local Ollama via host.docker.internal
       hotel-booking-api:
         condition: service_healthy
       apim-gateway:
@@ -361,6 +383,83 @@ services:
     ports:
       - "8001:8001"
     restart: unless-stopped
+    networks:
+      - southbound
+
+# --- Authorization Components ---
+
+  ### OpenFGA PostgreSQL
+  openfga-postgres:
+    image: postgres:17
+    container_name: openfga-postgres
+    restart: unless-stopped
+    environment:
+      - POSTGRES_DB=openfga
+      - POSTGRES_USER=openfga
+      - POSTGRES_PASSWORD=openfga
+    volumes:
+      - openfga_postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: [ "CMD-SHELL", "pg_isready -U openfga -d openfga" ]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    networks:
+      - southbound
+
+  ### OpenFGA migration
+  openfga-migrate:
+    image: openfga/openfga:latest
+    container_name: openfga-migrate
+    command: migrate
+    environment:
+      - OPENFGA_DATASTORE_ENGINE=postgres
+      - OPENFGA_DATASTORE_URI=postgres://openfga:openfga@openfga-postgres:5432/openfga?sslmode=disable
+    depends_on:
+      openfga-postgres:
+        condition: service_healthy
+    networks:
+      - southbound
+
+  ### OpenFGA server
+  openfga:
+    image: openfga/openfga:latest
+    container_name: openfga
+    command: run
+    environment:
+      - OPENFGA_DATASTORE_ENGINE=postgres
+      - OPENFGA_DATASTORE_URI=postgres://openfga:openfga@openfga-postgres:5432/openfga?sslmode=disable
+      - OPENFGA_LOG_FORMAT=json
+      - OPENFGA_AUTHN_METHOD=none
+    depends_on:
+      openfga-migrate:
+        condition: service_completed_successfully
+    ports:
+      - "8080:8080"
+      - "8081:8081"
+      - "3000:3000"
+    healthcheck:
+      test: [ "CMD", "curl", "-f", "http://localhost:8080/healthz" ]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    networks:
+      - southbound
+
+  ### Bootstrap OpenFGA store with Hotel Booking tools
+  openfga-bootstrap:
+    image: alpine:3.20
+    container_name: openfga-bootstrap
+    depends_on:
+      openfga:
+        condition: service_started
+    environment:
+      - FGA_API_URL=http://openfga:8080
+    volumes:
+      - ./openfga/openfgastore.yaml:/data/openfgastore.yaml:ro
+      - ./.openfga:/data/out
+      - ./openfga/scripts/bootstrap-openfga.sh:/bootstrap.sh:ro
+    entrypoint: ["/bin/sh","/bootstrap.sh"]
     networks:
       - southbound
 
@@ -400,6 +499,10 @@ volumes:
   data-elasticsearch:
     driver: local
   ollama_data:
+    driver: local
+  openfga_postgres_data:
+    driver: local
+  mcp-credentials:
     driver: local
 
 networks:

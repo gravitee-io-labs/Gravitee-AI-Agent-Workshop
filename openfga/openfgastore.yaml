@@ -1,0 +1,93 @@
+name: Hotel Booking MCP Tools
+model: |+
+  model
+    schema 1.1
+
+  type user
+
+  type role
+    relations
+      define member: [user]
+
+  type tool
+    relations
+      define can_access: [role#member]
+
+tuples:
+  # Users -> Roles
+  - user: user:john.doe@gravitee.io
+    relation: member
+    object: role:admin
+  - user: user:tom.smith@gravitee.io
+    relation: member
+    object: role:end_user
+  - user: user:admin@gravitee.io
+    relation: member
+    object: role:admin
+
+  # Role -> Tool permissions
+  # end_user: can view and make bookings (getBookings, makeBooking)
+  # Note: getAccommodations is now public, no OpenFGA check needed
+  - user: role:end_user#member
+    relation: can_access
+    object: tool:getBookings
+  - user: role:end_user#member
+    relation: can_access
+    object: tool:makeBooking
+
+  # Admin: full access (getBookings, makeBooking, deleteBooking)
+  - user: role:admin#member
+    relation: can_access
+    object: tool:getBookings
+  - user: role:admin#member
+    relation: can_access
+    object: tool:makeBooking
+  - user: role:admin#member
+    relation: can_access
+    object: tool:deleteBooking
+
+tests:
+  - name: John Doe (admin) can access all tools including deleteBooking
+    check:
+      - user: user:john.doe@gravitee.io
+        object: tool:getBookings
+        assertions:
+          can_access: true
+      - user: user:john.doe@gravitee.io
+        object: tool:makeBooking
+        assertions:
+          can_access: true
+      - user: user:john.doe@gravitee.io
+        object: tool:deleteBooking
+        assertions:
+          can_access: true
+
+  - name: Tom Smith (end_user) can view and create bookings, but NOT delete
+    check:
+      - user: user:tom.smith@gravitee.io
+        object: tool:getBookings
+        assertions:
+          can_access: true
+      - user: user:tom.smith@gravitee.io
+        object: tool:makeBooking
+        assertions:
+          can_access: true
+      - user: user:tom.smith@gravitee.io
+        object: tool:deleteBooking
+        assertions:
+          can_access: false
+
+  - name: Admin user can access everything including delete
+    check:
+      - user: user:admin@gravitee.io
+        object: tool:getBookings
+        assertions:
+          can_access: true
+      - user: user:admin@gravitee.io
+        object: tool:makeBooking
+        assertions:
+          can_access: true
+      - user: user:admin@gravitee.io
+        object: tool:deleteBooking
+        assertions:
+          can_access: true

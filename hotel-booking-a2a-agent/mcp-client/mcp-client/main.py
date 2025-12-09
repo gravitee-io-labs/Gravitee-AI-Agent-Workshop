@@ -192,20 +192,32 @@ class MCPClient:
                     # Try to parse response body
                     try:
                         response_text = response.text
-                        
+
                         if response.status_code == 200:
                             response_data = response.json()
-                            
+
                             if "error" in response_data:
                                 error_msg = response_data["error"].get("message", "Unknown error")
                                 logger.error(f"MCP returned error: {error_msg}")
                                 raise RuntimeError(f"MCP tool call failed: {error_msg}")
-                            
+
                             result = response_data.get("result", {})
-                            
+
                             # Log the result payload
                             logger.info(f"Tool result payload: {json.dumps(result, indent=2)}")
-                            
+
+                            return result, headers
+                        elif response.status_code == 204:
+                            # 204 No Content - successful deletion or operation with no response body
+                            logger.info("Tool executed successfully (204 No Content)")
+                            result = {
+                                "content": [
+                                    {
+                                        "type": "text",
+                                        "text": "Operation completed successfully"
+                                    }
+                                ]
+                            }
                             return result, headers
                         else:
                             logger.warning(f"HTTP call returned {response.status_code}: {response_text}")
@@ -219,8 +231,13 @@ class MCPClient:
         # Fallback to using MCP session (won't have headers)
         if result is None:
             result = await self.session.call_tool(tool_name, arguments)
-            logger.info(f"Tool result from MCP session: {json.dumps(result, indent=2)}")
-        
+            # Convert CallToolResult to dict for serialization
+            if hasattr(result, '__dict__'):
+                result_dict = result.__dict__
+                logger.info(f"Tool result from MCP session: {json.dumps(result_dict, indent=2, default=str)}")
+            else:
+                logger.info(f"Tool result from MCP session (non-serializable): {result}")
+
         return result, headers
 
     async def cleanup(self):

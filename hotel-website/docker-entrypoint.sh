@@ -8,7 +8,8 @@ window.APP_CONFIG = {
     oidcUrl: '${OIDC_URL:-http://localhost:8092/gravitee/oidc/.well-known/openid-configuration}',
     clientId: '${CLIENT_ID:-gravitee-hotels}',
     clientSecret: '${CLIENT_SECRET:-gravitee-hotels}',
-    redirectUri: '${REDIRECT_URI:-http://localhost:8002/}'
+    redirectUri: '${REDIRECT_URI:-http://localhost:8002/}',
+    mcpServerResource: '${MCP_SERVER_RESOURCE:-http://localhost:8082/hotels/mcp}'
 };
 EOF
 

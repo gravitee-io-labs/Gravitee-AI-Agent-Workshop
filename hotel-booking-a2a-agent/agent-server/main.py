@@ -64,6 +64,7 @@ class HotelBookingAgent:
 
     async def process_request(self, message: str, authorization_header: Optional[str] = None) -> str:
         """Process a hotel booking request using MCP tools and LLM."""
+        validated_access_token: Optional[str] = None
         try:
             logger.info("=" * 80)
             logger.info("Received new request")
@@ -89,48 +90,72 @@ class HotelBookingAgent:
                 tool_call = tool_calls[0]
                 tool_name = tool_call.get("function", {}).get("name")
                 tool_args = tool_call.get("function", {}).get("arguments")
-                
-                logger.info(f"Executing tool: {tool_name}")
-                
-                # Try calling the tool first
-                tool_result, response_headers = await self.mcp_client.call_tool(tool_name, tool_args)
-                
-                # Check if authentication is required via X-Gravitee-Endpoint-Status header
-                # HTTP headers are case-insensitive, so check both variations
-                endpoint_status = (
-                    response_headers.get('X-Gravitee-Endpoint-Status', '') or 
-                    response_headers.get('x-gravitee-endpoint-status', '')
-                ).strip()
-                
-                if endpoint_status == '401':
-                    logger.info(f"Tool {tool_name} requires authorization - retrying with auth")
-                    
-                    # Process authorization header and get internal JWT
-                    try:
-                        internal_jwt = await self.auth_service.process_authorization_for_tool(authorization_header)
-                        
-                        # Remove Authorization from tool_args if it was added there by mistake
-                        if isinstance(tool_args, dict) and "Authorization" in tool_args:
-                            del tool_args["Authorization"]
-                        
-                        # Retry the tool call with authorization header
-                        extra_headers = {
-                            "Authorization": f"Bearer {internal_jwt}"
-                        }
-                        logger.info(f"Retrying tool call with authorization...")
-                        tool_result, response_headers = await self.mcp_client.call_tool(tool_name, tool_args, extra_headers=extra_headers)
-                    except AuthenticationError as auth_error:
-                        logger.error(f"Authentication error: {auth_error}")
+
+                # Define which tools are public (don't require authentication)
+                PUBLIC_TOOLS = ["getAccommodations"]
+                tool_requires_auth = tool_name not in PUBLIC_TOOLS
+
+                # Validate the user's OAuth token before calling MCP tools (only for protected tools)
+                if tool_requires_auth:
+                    if not authorization_header:
+                        logger.error(f"Tool {tool_name} requires authentication but no Authorization header was provided")
                         return (
                             "You need to be signed in to complete this action. "
                             "Please sign in and try again."
                         )
 
+                    if validated_access_token is None:
+                        try:
+                            validated_access_token = await self.auth_service.process_authorization_for_tool(authorization_header)
+                            logger.info("Validated user authorization token for tool call")
+                        except AuthenticationError as auth_error:
+                            logger.warning(f"Authorization failure while processing tool {tool_name}: {auth_error}")
+                            return (
+                                "I couldn't verify your sign-in status. "
+                                "Please sign in again and then retry your request."
+                            )
+                else:
+                    logger.info(f"Tool {tool_name} is public, skipping authentication")
+
+                logger.info(f"Executing tool: {tool_name}")
+
+                # Only add Authorization header for protected tools
+                extra_headers = {}
+                if tool_requires_auth and validated_access_token:
+                    extra_headers["Authorization"] = f"Bearer {validated_access_token}"
+
+                # Call the tool
+                tool_result, response_headers = await self.mcp_client.call_tool(
+                    tool_name,
+                    tool_args,
+                    extra_headers=extra_headers if extra_headers else None
+                )
+
+                # Check if the tool result contains an authorization/permission error
+                tool_result_text = ""
+                if isinstance(tool_result, dict) and "content" in tool_result:
+                    for content_item in tool_result.get("content", []):
+                        if isinstance(content_item, dict) and content_item.get("type") == "text":
+                            tool_result_text += content_item.get("text", "")
+
+                # Check for permission/authorization errors
+                if any(error_indicator in tool_result_text.lower() for error_indicator in [
+                    "forbidden", "unauthorized", "permission denied", "access denied",
+                    "not authorized", "insufficient permissions", "authzen", "403", "401"
+                ]):
+                    logger.warning(f"Authorization denied for tool {tool_name}")
+                    return "You don't have permissions to do this."
+
+                # Check for invalid scope errors
+                if "invalid_scope" in tool_result_text.lower() or "scope" in tool_result_text.lower():
+                    logger.warning(f"Invalid scope for tool {tool_name}")
+                    return "You don't have permissions to do this."
+
                 # Get final response from LLM with tool result
                 logger.info("Generating final response from LLM with tool result...")
                 final_response = await self.llm_client.process_tool_result(
-                    message, 
-                    tool_call, 
+                    message,
+                    tool_call,
                     tool_result,
                     system_prompt=self.system_prompt
                 )
@@ -140,13 +165,20 @@ class HotelBookingAgent:
                 return final_response
 
             # Return initial response if no tools were called
-            logger.warning("No tools were called by LLM")
+            logger.info("LLM provided direct response without tool calls")
             logger.info("=" * 80)
-            return (
-                "I couldn't determine a clear action from your message. "
-                "Please rephrase or provide more details (for example: search for hotels in New York) "
-                "and I'll help you."
-            )
+            # If LLM returned content without tools, it's likely a clarifying question or greeting
+            if initial_content and initial_content.strip():
+                return initial_content
+            else:
+                return (
+                    "I'm here to help you with hotel bookings! I can:\n"
+                    "• Search for hotels in any city\n"
+                    "• Show your existing bookings\n"
+                    "• Make new reservations\n"
+                    "• Cancel bookings\n\n"
+                    "What would you like to do?"
+                )
             
         except Exception as e:
             logger.error(f"Error processing request: {e}", exc_info=True)
