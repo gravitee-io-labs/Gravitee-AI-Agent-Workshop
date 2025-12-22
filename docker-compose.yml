@@ -47,7 +47,7 @@ services:
 
   ### Gravitee API Management Gateway
   apim-gateway:
-    image: ${APIM_REGISTRY:-graviteeio}/apim-gateway:${APIM_VERSION_GATEWAY:-latest}
+    image: ${APIM_REGISTRY:-graviteeio}/apim-gateway:${APIM_VERSION:-latest}
     container_name: gio-apim-gateway
     restart: always
     ports:
@@ -68,14 +68,9 @@ services:
       interval: 2s
       timeout: 2s
       retries: 10
-    volumes:
-      - ./plugins-apim:/opt/graviteeio-gateway/plugins-ext
     environment:
       ### LICENSE
       - gravitee_license_key=${GRAVITEE_LICENSE}
-      ### PLUGINS
-      - gravitee_plugins_path_0=$${gravitee.home}/plugins
-      - gravitee_plugins_path_1=$${gravitee.home}/plugins-ext
       ### Internal API (Core Service)
       - gravitee_services_core_http_host=0.0.0.0
       - gravitee_services_metrics_enabled=true
@@ -89,6 +84,16 @@ services:
     networks:
       - southbound
       - northbound
+
+  mcp-server:
+    build:
+      context: docker/mcp-server
+      dockerfile: Dockerfile
+    container_name: gio_ai-workshop_mcp_server
+    ports:
+      - "8005:8000"
+    networks:
+      - southbound
 
   ### Gravitee API Management Management API
   apim-management-api:
