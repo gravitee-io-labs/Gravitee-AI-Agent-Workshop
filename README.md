@@ -354,6 +354,118 @@ This workshop evolves alongside the ecosystem it demonstrates:
 
 ---
 
+## Proxying an MCP server
+
+### Pre-requisite
+
+- define the GRAVITEE_LICENSE environment variable with a base64 encoded valid license.
+
+### Create a keyless MCP API
+
+Follow these steps to create a keyless MCP API:  
+APIs > + Add API > Create V4 API  
+Give it the name and the version you want.  
+AI Gateway > MCP Proxy  
+Context-path : you can give it the text you want, but for our example we will give it the value `/mcp-kl`.  
+MCP Server Backend URL : http://mcp-server:8000/mcp. You can leave the rest as it is.
+
+You can now try to call this MCP API from your VS Code tool.
+
+### Create an OAuth2 protected MCP API
+
+#### On the AM interface
+
+Go to the AM interface (http://localhost:8081).  
+Login with the following credentials: `admin` / `adminadmin`.  
+MCP Servers > +  
+Name: APIM MCP Server  
+MCP Resource Identifier: http://localhost:8082/mcp-am  
+Client ID: apim-mcp-server-client-id  
+Client Secret: apim-mcp-server-client-secret
+
+Enable the auto registration by doing the following:  
+Settings > Client Registration  
+Enable the following:
+- Dynamic Client Registration
+- Open Dynamic Client Registration
+- Dynamic Client Registration Templates
+
+#### On the APIM interface
+
+Go back to the APIM interface (http://localhost:8084).
+
+Follow these steps to create an OAuth2 protected MCP API:  
+APIs > + Add API > Create V4 API  
+Give it the name and the version you want.  
+AI Gateway > MCP Proxy  
+Context-path : you can give it the text you want, but for our example we will give it the value `/mcp-am`.  
+MCP Server Backend URL : http://mcp-server:8000/mcp. You can leave the rest as it is.
+
+> Given that we're in full docker mode, you need to add this line to your `/etc/hosts` file:  
+> `127.0.0.1       am-gateway`
+
+Configuration > Resources > + Add resource > Gravitee.io AM Authorization Server  
+Name: AM Auth Server  
+Server URL: http://am-gateway:8092  
+Security domain: gravitee  
+Client ID: apim-mcp-server-client-id  
+Client Secret: apim-mcp-server-client-secret
+
+Go to the Consumers part.  
+Close the Default Keyless plan.  
+\+ Add new plan > OAuth2  
+Name: OAuth2 - AM  
+Click Next
+Select your previously created OAuth2 resource.
+Click next and create it.
+Publish the plan and deploy your API.
+
+Now if you try to connect to your MCP API from VS Code, you should be asked to pass multiple authentication validation steps before being able to use your MCP API.  
+When asked to login, use the following credentials:  
+`john.doe@gravitee.io`  
+`HelloWorld@123`
+
+You can then for example ask the current bookings:
+
+![VS Code - Ask the current bookings](./assets/vs-code-mcp-ask-bookings.png)
+
+### Add MCP policies
+
+Without MCP policies, the user will have access to all the tools, resources, and prompts available.
+You can restrict these accesses with MCP policies.
+
+To create an MCP policy related to your API, follow these steps:  
+APIs > your API > Policies  
+Click on the + icon next to your OAuth2 plan.  
+Give a name to your flow.  
+If you want to apply your flow only to a specific type of MCP methods, choose the one you want to select.
+Otherwise the flow will be applied to all MCP methods. For our example we choose to apply it to all the MCP methods.  
+You can also add a condition to execute the flow, which supports Expression Language.
+
+Once your flow created, click on the + icon in the Request phase.  
+Type MCP in the search bar and select the MCP ACL policy.  
+You can add a description, a trigger condition (which supports also Expression Language), and your ACLs.  
+Let's start by creating a policy with all the fields like this, without any value.
+
+Save and deploy your API.
+
+Now if you try to reconnect to your MCP server through your MCP API, you should have access to 0 tool and 0 resource anymore.
+This is because an MCP ACL policy works as a whitelist, so you must explicitly specify the tools or resources you allow the user to access.
+
+To do this we can edit our current policy:  
+Click on the policy in the Request phase > Edit > ACLs > + Add  
+Features:
+- Select option: Tools
+- Tool methods: tools/list
+- Name Pattern Type: LITERAL
+- Name Pattern: get_bookings
+
+Save and deploy your API.
+
+Now if you try to reconnect to your MCP server through your MCP API, you should have access to 1 tool: get_bookings.
+
+---
+
 ## 🔧 Troubleshooting
 
 ### Request Timeout (30 seconds) on Gravitee Hotels Demo Website
