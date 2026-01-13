@@ -10,11 +10,10 @@ requires-python = ">=3.12"
 dependencies = [
   "a2a-sdk",
   "mcp",
-  "ollama",
+  "openai",
   "python-dotenv",
   "httpx",
   "uvicorn",
-  "pyjwt",
 ]
 [project.scripts]
 hotel-booking-a2a-agent = "agent_server.main:main"

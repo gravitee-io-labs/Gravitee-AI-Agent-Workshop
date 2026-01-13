@@ -5,10 +5,10 @@ build-backend = "hatchling.build"
 [project]
 name = "llm-client"
 version = "0.1.0"
-description = "LLM client for natural language processing with Ollama"
+description = "LLM client for natural language processing with OpenAI-compatible APIs"
 requires-python = ">=3.12"
 dependencies = [
-  "ollama",
+  "openai",
   "python-dotenv",
 ]
 

@@ -31,7 +31,8 @@ except ImportError:
     HAS_HTTPX = False
     logger.warning("httpx not available, response headers will not be captured")
 
-MCP_HTTP_URL_DEFAULT = os.getenv("MCP_HTTP_URL", "http://gio-apim-gateway:8082/hotels/mcp")
+# Support both single and multiple MCP server URLs
+MCP_HTTP_URLS_DEFAULT = os.getenv("MCP_HTTP_URLS", os.getenv("MCP_HTTP_URL", "http://gio-apim-gateway:8082/hotels/mcp"))
 MCP_RETRY_INTERVAL = int(os.getenv("MCP_RETRY_INTERVAL", "5"))  # seconds between retry attempts
 
 class MCPClient:
@@ -41,7 +42,7 @@ class MCPClient:
         self.session: Optional[ClientSession] = None
         self.exit_stack = AsyncExitStack()
         self.transport_mode: str = "http"
-        self.mcp_http_url: str = mcp_url or MCP_HTTP_URL_DEFAULT
+        self.mcp_http_url: str = mcp_url or MCP_HTTP_URLS_DEFAULT
         self.retry_interval: int = retry_interval
         self.is_connected: bool = False
         self.last_response_headers: Dict[str, str] = {}  # Store last response headers
@@ -231,6 +232,132 @@ class MCPClient:
             logger.info("MCP client cleaned up successfully")
         except Exception as e:
             logger.error(f"Error during cleanup: {e}")
+
+
+class MCPMultiClient:
+    """Manager for multiple MCP clients."""
+    
+    def __init__(self, mcp_urls: Optional[List[str]] = None, retry_interval: int = MCP_RETRY_INTERVAL):
+        """
+        Initialize multiple MCP clients.
+        
+        Args:
+            mcpx_urls: List of MCP server URLs or comma-separated string
+            retry_interval: Retry interval for connections
+        """
+        # Handle both list and comma-separated string
+        if mcp_urls is None:
+            mcp_urls_str = MCP_HTTP_URLS_DEFAULT
+            self.mcp_urls = [url.strip() for url in mcp_urls_str.split(',')]
+        elif isinstance(mcp_urls, str):
+            self.mcp_urls = [url.strip() for url in mcp_urls.split(',')]
+        else:
+            self.mcp_urls = mcp_urls
+        
+        self.clients: Dict[str, MCPClient] = {}
+        self.retry_interval = retry_interval
+        logger.info(f"Initialized MCPMultiClient with {len(self.mcp_urls)} server(s)")
+    
+    async def connect_all(self, max_retries: Optional[int] = None, connection_timeout: int = 30):
+        """
+        Connect to all MCP servers.
+        
+        Args:
+            max_retries: Maximum retry attempts per server (None = infinite)
+            connection_timeout: Timeout in seconds for each connection attempt
+        """
+        for url in self.mcp_urls:
+            client = MCPClient(mcp_url=url, retry_interval=self.retry_interval)
+            try:
+                # Add timeout to prevent hanging connections
+                await asyncio.wait_for(
+                    client.connect(max_retries=max_retries),
+                    timeout=connection_timeout
+                )
+                self.clients[url] = client
+                logger.info(f"Successfully connected to MCP server: {url}")
+            except asyncio.TimeoutError:
+                logger.error(f"Connection to {url} timed out after {connection_timeout}s")
+                try:
+                    await client.cleanup()
+                except Exception:
+                    pass
+                # Continue with other servers
+            except asyncio.CancelledError:
+                logger.warning(f"Connection to {url} was cancelled, cleaning up and continuing...")
+                try:
+                    await client.cleanup()
+                except Exception:
+                    pass
+                # Continue with other servers
+            except Exception as e:
+                logger.error(f"Failed to connect to MCP server {url}: {e}")
+                try:
+                    await client.cleanup()
+                except Exception:
+                    pass
+                # Continue with other servers even if one fails
+        
+        if not self.clients:
+            raise RuntimeError("Failed to connect to any MCP servers")
+        
+        logger.info(f"Successfully connected to {len(self.clients)} out of {len(self.mcp_urls)} MCP server(s)")
+    
+    async def list_all_tools(self) -> List[Dict[str, Any]]:
+        """List all available tools from all connected MCP servers."""
+        all_tools = []
+        for url, client in self.clients.items():
+            try:
+                tools = await client.list_tools()
+                logger.debug(f"Retrieved {len(tools)} tools from {url}")
+                all_tools.extend(tools)
+            except Exception as e:
+                logger.error(f"Failed to list tools from {url}: {e}")
+        
+        logger.info(f"Total tools available from all MCP servers: {len(all_tools)}")
+        return all_tools
+    
+    async def call_tool(self, tool_name: str, arguments: Dict[str, Any], extra_headers: Optional[Dict[str, str]] = None) -> tuple[Any, Dict[str, str]]:
+        """
+        Call a tool on the appropriate MCP server.
+        Tries all servers until one succeeds.
+        
+        Args:
+            tool_name: Name of the tool to call
+            arguments: Tool arguments
+            extra_headers: Additional HTTP headers
+        
+        Returns:
+            A tuple of (result, headers)
+        """
+        last_error = None
+        
+        for url, client in self.clients.items():
+            try:
+                result, headers = await client.call_tool(tool_name, arguments, extra_headers)
+                logger.debug(f"Tool {tool_name} executed successfully on {url}")
+                return result, headers
+            except Exception as e:
+                logger.debug(f"Tool {tool_name} failed on {url}: {e}")
+                last_error = e
+                continue
+        
+        # If we get here, all servers failed
+        error_msg = f"Tool {tool_name} failed on all MCP servers. Last error: {last_error}"
+        logger.error(error_msg)
+        raise RuntimeError(error_msg)
+    
+    async def cleanup(self):
+        """Clean up all client resources."""
+        for url, client in self.clients.items():
+            try:
+                await client.cleanup()
+                logger.debug(f"Cleaned up client for {url}")
+            except Exception as e:
+                logger.error(f"Error cleaning up client for {url}: {e}")
+        self.clients.clear()
+        logger.info("All MCP clients cleaned up")
+
 
 async def main_async():
     """Main async function for MCP Client."""

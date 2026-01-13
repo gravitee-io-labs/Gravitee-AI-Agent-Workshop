@@ -1,9 +1,8 @@
 """Authentication service for handling JWT and OIDC operations."""
+import base64
 import logging
-from typing import Dict, Any, Optional
-import jwt
+from typing import Dict, Any, Optional, Tuple
 import httpx
-from datetime import datetime, timedelta
 
 from agent_server.colored_logger import get_agent_logger
 
@@ -18,16 +17,20 @@ class AuthenticationError(Exception):
 class AuthService:
     """Service for handling OAuth2/OIDC authentication and JWT operations."""
     
-    def __init__(self, oidc_discovery_url: str, jwt_secret: str):
+    def __init__(self, oidc_discovery_url: str, am_token_url: str, am_client_id: str, am_client_secret: str, ):
         """
         Initialize the AuthService.
         
         Args:
             oidc_discovery_url: URL to the OIDC discovery endpoint (.well-known/openid-configuration)
-            jwt_secret: Secret key for signing JWT tokens
+            am_token_url: URL to the Gravitee AM token endpoint
+            am_client_id: Client ID for Gravitee AM
+            am_client_secret: Client secret for Gravitee AM
         """
         self.oidc_discovery_url = oidc_discovery_url
-        self.jwt_secret = jwt_secret
+        self.am_token_url = am_token_url
+        self.am_client_id = am_client_id
+        self.am_client_secret = am_client_secret
         self.userinfo_endpoint: Optional[str] = None
         self._http_client = httpx.AsyncClient(timeout=30.0)
     
@@ -95,45 +98,61 @@ class AuthService:
             logger.error(f"Error retrieving user email: {e}")
             raise AuthenticationError(f"Failed to retrieve user email: {e}")
     
-    def create_internal_jwt(self, email: str, expiration_seconds: int = 60) -> str:
+    async def get_am_access_token(self, email: str) -> str:
         """
-        Create an internal JWT token with user email.
-        
-        Args:
-            email: The user's email to include in the token
-            expiration_seconds: Token expiration time in seconds (default: 60)
+        Get an access token from Gravitee Access Management using client credentials.
         
         Returns:
-            The signed JWT token
+            The access token from Gravitee AM
+            
+        Raises:
+            AuthenticationError: If token retrieval fails
         """
         try:
-            now = datetime.utcnow()
-            expiration = now + timedelta(seconds=expiration_seconds)
+            logger.debug(f"Requesting access token from Gravitee AM: {self.am_token_url}")
             
-            payload = {
-                "sub-email": email,
-                "iat": int(now.timestamp()),
-                "exp": int(expiration.timestamp())
+            # OAuth2 client credentials grant with Basic Auth
+            credentials = f"{self.am_client_id}:{self.am_client_secret}"
+            basic_auth = base64.b64encode(credentials.encode()).decode()
+            
+            data = {
+                "grant_type": "client_credentials"
             }
             
-            token = jwt.encode(payload, self.jwt_secret, algorithm="HS256")
-            logger.debug(f"Created internal JWT token for email: {email} (expires in {expiration_seconds}s)")
+            headers = {
+                "sub-email": email,
+                "Content-Type": "application/x-www-form-urlencoded",
+                "Authorization": f"Basic {basic_auth}"
+            }
             
-            return token
+            response = await self._http_client.post(self.am_token_url, data=data, headers=headers)
+            response.raise_for_status()
             
+            token_response = response.json()
+            access_token = token_response.get("access_token")
+            
+            if not access_token:
+                raise AuthenticationError("No access_token in AM response")
+            
+            logger.debug("Successfully obtained access token from Gravitee AM")
+            return access_token
+            
+        except httpx.HTTPStatusError as e:
+            logger.error(f"HTTP error getting AM token: {e.response.status_code} - {e.response.text}")
+            raise AuthenticationError(f"Failed to get AM token: {e}")
         except Exception as e:
-            logger.error(f"Error creating internal JWT: {e}")
-            raise AuthenticationError(f"Failed to create internal JWT: {e}")
+            logger.error(f"Error getting AM access token: {e}")
+            raise AuthenticationError(f"Failed to get AM access token: {e}")
     
-    async def process_authorization_for_tool(self, authorization_header: Optional[str]) -> str:
+    async def process_authorization_for_tool(self, authorization_header: Optional[str]) -> Tuple[str, str]:
         """
-        Process authorization header and create internal JWT for tool call.
+        Process authorization header and get AM token for tool call.
         
         Args:
             authorization_header: The Authorization header value (e.g., "Bearer <token>")
         
         Returns:
-            The internal JWT token to use for tool call
+            A tuple of (access_token, user_email) to use for tool call
             
         Raises:
             AuthenticationError: If authorization fails (401)
@@ -153,10 +172,10 @@ class AuthService:
         # Get user email from the access token
         email = await self.get_user_email_from_token(access_token)
         
-        # Create internal JWT with the email
-        internal_jwt = self.create_internal_jwt(email)
+        # Get access token from Gravitee AM
+        am_token = await self.get_am_access_token(email)
         
-        return internal_jwt
+        return am_token, email
     
     async def cleanup(self):
         """Clean up resources."""

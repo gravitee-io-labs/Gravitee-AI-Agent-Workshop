@@ -11,7 +11,7 @@ from dotenv import load_dotenv
 sys.path.insert(0, '/app/hotel-booking-a2a-agent/mcp-client')
 sys.path.insert(0, '/app/hotel-booking-a2a-agent/llm-client')
 
-from mcp_client.main import MCPClient
+from mcp_client.main import MCPMultiClient
 from llm_client.main import LLMClient
 from agent_server.auth_service import AuthService, AuthenticationError
 from agent_server.colored_logger import get_agent_logger
@@ -25,9 +25,14 @@ load_dotenv()
 
 # Configuration
 AGENT_SERVER_PORT = int(os.getenv("AGENT_SERVER_PORT", "8080"))
-MCP_HTTP_URL = os.getenv("MCP_HTTP_URL", "http://gio-apim-gateway:8082/hotels/mcp")
+# Support both single URL (backward compatibility) and multiple URLs
+MCP_HTTP_URLS = os.getenv("MCP_HTTP_URLS", os.getenv("MCP_HTTP_URL", "http://gio-apim-gateway:8082/hotels/mcp"))
 OIDC_DISCOVERY_URL = os.getenv("OIDC_DISCOVERY_URL", "http://am-gateway:8092/gravitee/oidc/.well-known/openid-configuration")
-JWT_SECRET = os.getenv("JWT_SECRET", "my-example-secret")
+
+# Gravitee Access Management configuration
+AM_TOKEN_URL = os.getenv("AM_TOKEN_URL", "http://gio-am-gateway:8092/gravitee/oauth/token")
+AM_CLIENT_ID = os.getenv("AM_CLIENT_ID", "hotel-booking-agent")
+AM_CLIENT_SECRET = os.getenv("AM_CLIENT_SECRET", "hotel-booking-agent")
 
 logger = get_agent_logger(__name__)
 
@@ -42,19 +47,22 @@ class HotelBookingAgent:
     """Hotel Booking Agent that uses MCP tools via LLM."""
     
     def __init__(self):
-        self.mcp_client = MCPClient(mcp_url=MCP_HTTP_URL)
+        self.mcp_client = MCPMultiClient(mcp_urls=MCP_HTTP_URLS)
         self.llm_client = LLMClient()
         self.auth_service = AuthService(
             oidc_discovery_url=OIDC_DISCOVERY_URL,
-            jwt_secret=JWT_SECRET
+            am_token_url=AM_TOKEN_URL,
+            am_client_id=AM_CLIENT_ID,
+            am_client_secret=AM_CLIENT_SECRET
         )
         self.system_prompt = HOTEL_BOOKING_SYSTEM_PROMPT
         self._initialized = False
         
     async def initialize(self):
-        """Initialize the agent by connecting to MCP server and auth service."""
+        """Initialize the agent by connecting to MCP servers and auth service."""
         try:
-            await self.mcp_client.connect()
+            # Connect with limited retries during startup to fail fast
+            await self.mcp_client.connect_all(max_retries=3, connection_timeout=15)
             await self.auth_service.initialize()
             self._initialized = True
             logger.info("Agent initialized successfully")
@@ -72,9 +80,9 @@ class HotelBookingAgent:
                 logger.debug("Authorization header present (masked for security)")
             logger.info("=" * 80)
             
-            # Get available tools from MCP
-            available_tools = await self.mcp_client.list_tools()
-            logger.info(f"Retrieved {len(available_tools)} available tools from MCP")
+            # Get available tools from all MCP servers
+            available_tools = await self.mcp_client.list_all_tools()
+            logger.info(f"Retrieved {len(available_tools)} available tools from all MCP servers")
 
             # Get LLM response with potential tool calls
             logger.info("Querying LLM to determine action...")
@@ -95,27 +103,28 @@ class HotelBookingAgent:
                 # Try calling the tool first
                 tool_result, response_headers = await self.mcp_client.call_tool(tool_name, tool_args)
                 
-                # Check if authentication is required via X-Gravitee-Endpoint-Status header
-                # HTTP headers are case-insensitive, so check both variations
-                endpoint_status = (
-                    response_headers.get('X-Gravitee-Endpoint-Status', '') or 
-                    response_headers.get('x-gravitee-endpoint-status', '')
-                ).strip()
+                # Check if authentication is required via isError in the result body
+                is_error = False
+                if isinstance(tool_result, dict):
+                    is_error = tool_result.get('isError', False)
+                elif hasattr(tool_result, 'isError'):
+                    is_error = tool_result.isError
                 
-                if endpoint_status == '401':
+                if is_error:
                     logger.info(f"Tool {tool_name} requires authorization - retrying with auth")
                     
-                    # Process authorization header and get internal JWT
+                    # Process authorization header and get AM token + user email
                     try:
-                        internal_jwt = await self.auth_service.process_authorization_for_tool(authorization_header)
+                        am_token, user_email = await self.auth_service.process_authorization_for_tool(authorization_header)
                         
                         # Remove Authorization from tool_args if it was added there by mistake
                         if isinstance(tool_args, dict) and "Authorization" in tool_args:
                             del tool_args["Authorization"]
                         
-                        # Retry the tool call with authorization header
+                        # Retry the tool call with authorization header and sub-email header
                         extra_headers = {
-                            "Authorization": f"Bearer {internal_jwt}"
+                            "Authorization": f"Bearer {am_token}",
+                            "sub-email": user_email
                         }
                         logger.info(f"Retrying tool call with authorization...")
                         tool_result, response_headers = await self.mcp_client.call_tool(tool_name, tool_args, extra_headers=extra_headers)
