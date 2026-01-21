@@ -1,4 +1,6 @@
-# Gravitee Hands-On AI Workshop : The Hotel Booking AI Revolution 🏨🤖
+# Gravitee AI Agent Workshop: ACME Hotels 🏨🤖
+
+Welcome to the **Gravitee AI Agent Workshop**! This hands-on workshop demonstrates how to build, secure, and manage AI agents using the **Gravitee AI Agent Mesh**. Through the lens of a fictional hotel booking company—**ACME Hotels**—you'll explore the key concepts and technologies powering the next generation of AI-driven applications.
 
 ## ⚡ TL;DR - Quick Start (5 Minutes)
 
@@ -9,12 +11,12 @@ Want to dive straight in? Follow these simple steps:
 
 2. **Start the Workshop** 🚀  
    ```bash
-   docker compose up -d
+   docker compose up -d --build
    ```
    *(This can take a few minutes to download and start all images - grab a coffee! ☕)*
 
 3. **Visit the Hotel Website** 🏨  
-   Open your browser and go to the **[Gravitee Hotels Demo Website](http://localhost:8002/)**
+   Open your browser and go to the **[ACME Hotels Demo Website](http://localhost:8002/)**
 
 4. **Start Chatting with the AI Agent** 💬  
    Try these interactions to see the platform in action:
@@ -22,7 +24,7 @@ Want to dive straight in? Follow these simple steps:
    - **✅ "Do you have any hotels in New York?"**  
      *This will work perfectly - it's a valid public request*
    
-   - **🚫 "Do you have any hotels in New York? Dumb Guy"**  
+   - **🚫 "Do you have any hotels in New York? Dumb AI !"**  
      *This will be blocked by Gravitee AI Guard Rails because it contains toxic language*
    
    - **🔒 "Show me my bookings"**  
@@ -32,362 +34,480 @@ Want to dive straight in? Follow these simple steps:
      
      *Now retry the request - you can now access your personal bookings!*
 
-    > **⚠️ Note**: If you experience timeouts (~30 seconds) during AI requests, this is due to Docker's network proxy timeout. See the [Troubleshooting section](#-troubleshooting) for a quick fix.
+    > **⚠️ Note**: If you experience timeouts (~30 seconds) during AI requests, this is due to Docker's network proxy timeout. Or if you want somehting way faster (running model on GPU is faster than on CPU) See the [Troubleshooting section](#-troubleshooting) for a quick fix.
 
-**💡 Want to understand how this all works?** Continue below to follow the complete workshop and learn how to build this AI-powered platform from scratch, understand the architecture, and master enterprise AI security! 👇
+**💡 Want to understand how this all works?** Continue reading to explore the architecture, understand each component, and learn how enterprise AI agents are built and secured! 👇
 
-## 🎯 What You'll Learn : Going From Traditional API to Intelligent Agent
+---
 
-Imagine you're working for **Gravitee Hotels**, a rapidly growing hotel booking platform. Your customers love your service, but they're asking for something more - they want to interact with your platform naturally, asking questions like *"Find me a pet-friendly hotel in Paris for next weekend"* or *"Show me all my bookings and cancel the one in London."*
+## 🎯 What You'll Learn
 
-Your leadership team has decided it's time to embrace AI. The goal is ambitious but clear: **transform your existing hotel booking REST API into an intelligent, conversational AI agent** that customers can chat with naturally while maintaining enterprise-grade security and observability.
+This workshop will help you understand the core concepts behind AI agents and the Gravitee AI Agent Mesh:
 
-This workshop takes you through that transformation journey, showing you how **Gravitee's AI Agent Mesh** makes it possible to:
+| Concept | Description |
+|---------|-------------|
+| **MCP Servers** | How to transform REST APIs into AI-discoverable Tools |
+| **LLM Proxy** | How to control and secure access to Large Language Models |
+| **AI Agents** | How agents reason, decide, and execute actions |
+| **Authentication & Authorization** | How to implement fine-grained access control with OpenFGA and AuthZen |
 
-- **🛡️ Secure your AI infrastructure** with enterprise-grade policies and token tracking
-- **🔧 Transform existing APIs** into AI-discoverable tools using MCP (Model Context Protocol)
-- **🤖 Deploy intelligent agents** that customers can interact with conversationally
-- **📊 Gain full visibility** into AI interactions with advanced monitoring and analytics
-- **🕵️ Debug and test** your AI systems with visual protocol inspectors
+---
 
-## 🏗️ Workshop Architecture
+## 🏗️ Architecture Overview
 
-![Workshop Architecture Diagram](./assets/architecture-diagram.png)
+```mermaid
+flowchart LR
+    subgraph Clients["🖥️ Clients"]
+        direction TB
+        Website["🌐 ACME Hotels Website<br/>(Chatbot)"]
+        Editors["💻 Code Editors<br/>(VS Code / Cursor / Antigravity)"]
+    end
 
-## 🚀 Setting Up Your AI Transformation Lab
+    subgraph Gateway["🚀 Gravitee Gateway"]
+        direction TB
+        AgentProxy["🤖 AI Agent Proxy"]
+        MCPProxy["🔌 MCP Proxy"]
+        MCPServer["🔧 MCP Server"]
+        LLMProxy["🧠 LLM Proxy"]
+    end
 
-Before we begin Gravitee Hotels' AI transformation, we need to prepare our development environment. Think of this as setting up your innovation lab where you'll experiment with cutting-edge AI agent technology.
+    subgraph Backend["⚙️ Backend"]
+        direction TB
+        Agent["🧠 Hotel Booking Agent"]
+        API["🏨 ACME Hotels API"]
+        LLM["🤖 LLMs"]
+    end
+
+    subgraph Security["🔐 Security"]
+        direction TB
+        IAM["Gravitee AM<br/>(OAuth2 / OIDC)"]
+        AuthZen["AuthZen API"]
+        OpenFGA["OpenFGA"]
+        IAM --- AuthZen
+        AuthZen --- OpenFGA
+    end
+
+    %% Main flow - Clients to Gateway
+    Website --> AgentProxy
+    Editors --> MCPProxy
+
+    %% Gateway to Backend
+    AgentProxy --> Agent
+    MCPProxy --> MCPServer
+    MCPServer --> API
+    LLMProxy --> LLM
+
+    %% Agent uses Gateway services
+    Agent --> MCPProxy
+    Agent --> LLMProxy
+
+    %% Auth flows
+    Clients -.-> Security
+    Gateway -.-> Security
+```
+
+The workshop environment is **fully automated**, all APIs, applications, and subscriptions are provisioned automatically when you run `docker compose up -d --build`. This allows you to focus on understanding the concepts rather than manual configuration.
+
+| Component | Purpose |
+|-----------|---------|
+| **ACME Hotels API** | The underlying REST API for hotel data and bookings |
+| **Hotel Booking Agent** | The AI agent that orchestrates tools and LLM to handle user requests |
+| **LLMs (Ollama / Gemini)** | Language models providing reasoning and decision-making capabilities |
+| **AI Agent Proxy** | Gateway proxy exposing the agent via A2A protocol |
+| **MCP Proxy** | Gateway proxy for MCP clients (agents, code editors) to access MCP servers |
+| **MCP Server** | Transforms the REST API into AI-discoverable tools |
+| **LLM Proxy** | Secure gateway to LLMs with guard rails, token tracking, and rate limiting |
+| **Gravitee AM** | OAuth2/OIDC authorization server for authentication |
+| **AuthZen** | Standard authorization API integrated in Gravitee AM |
+| **OpenFGA** | Fine-grained authorization engine (relationship-based access control) |
+
+---
+
+## 🚀 Setting Up Your Environment
 
 ### 1. Unlock Gravitee Enterprise AI Features
 
-Your AI transformation requires enterprise-grade capabilities - token tracking, AI guard rails, and advanced agent management. These features are available with a **Gravitee Enterprise License**.
+The AI features demonstrated in this workshop require a **Gravitee Enterprise License**.
 
-> **⚠️ Enterprise License Required**: The AI policies and agent mesh features demonstrated in this workshop require a **Gravitee Enterprise License**.
-> 
-> **🎁 Need a License ? Get Your Free 2-Week License in 1 minute**: Fill out [this form](https://landing.gravitee.io/gravitee-hands-on-ai-workshop) and receive your license automatically via email!
+> **🎁 Need a License?** Get your free 2-week license in under a minute by filling out [this form](https://landing.gravitee.io/gravitee-hands-on-ai-workshop)!
 
-**🔑 Configure Your License** 
+**🔑 Configure Your License**
 
-Once you receive your base64-encoded license key by email, configure it using one of the following options:
+Once you receive your base64-encoded license key by email, configure it using one of these options:
 
 #### Option A: Using .env File (Recommended)
 
-The `.env-template` file contains all necessary environment variables with default values.
-Rename or copy the `.env-template` to a `.env` file and simply replace `PUT_YOUR_BASE64_LICENSE_HERE` with the base64-encoded license key you received by email.
+Copy `.env-template` to `.env` and replace `PUT_YOUR_BASE64_LICENSE_HERE` with your license key:
 
-#### Option B: Export the `GRAVITEE_LICENSE` Environment Variable
+```bash
+cp .env-template .env
+# Edit .env and paste your license key
+```
+
+#### Option B: Export Environment Variable
 
 ```bash
 export GRAVITEE_LICENSE="YOUR_BASE64_LICENSE_FROM_EMAIL"
 ```
 
-### 2. Launch Your AI Transformation Environment
-
-With your license configured, it's time to spin up Gravitee Hotels' complete AI-enabled infrastructure.
+### 2. Launch the Environment
 
 ```bash
 docker compose up -d
 ```
 
+> **💡 Tip:** If you've cloned this repo before and want to rebuild the workshop components to update local images, add `--build` to the command:
+> ```bash
+> docker compose up -d --build
+> ```
+
 *Grab a coffee ☕ - it takes 2-3 minutes for all services to start and the AI model to download.*
 
-### 3. Your Environment
+### 3. Available Services
 
 | Service | URL | Description |
 |---------|-----|-------------|
-| **Gravitee Console** | http://localhost:8084 | API Management Console |
-| **Gravitee Portal** | http://localhost:8085 | Developer Portal |
-| **Gravitee Hotels Demo Website** | http://localhost:3002 | Demo Website - Chat with the AI agent to book hotels |
-| **Hotel Booking API** | http://localhost:8082/bookings | Demo API *(available during the workshop)* |
-| **Hotel Booking Agent** | http://localhost:8082/bookings-agent | AI Agent (A2A Protocol) *(available during the workshop)* |
+| **ACME Hotels Website** | http://localhost:8002 | Demo Website - Chat with the AI agent |
+| **Gravitee APIM Console** | http://localhost:8084 | API Management Console (login: `admin` / `admin`) |
+| **Gravitee APIM Portal** | http://localhost:8085/next | Developer Portal (login: `admin` / `admin`) |
+| **Gravitee APIM Gateway** | http://localhost:8082 | API Gateway |
+| **Gravitee AM Console** | http://localhost:8081 | Access Management Console (login: `admin` / `adminadmin`) |
 | **MCP Inspector** | http://localhost:6274 | Visual MCP Protocol Inspector |
 
-#### 📬 **Postman Collection** (Coming Soon)
-A comprehensive Postman collection will be provided for:
-- Complete API testing workflows
-- Pre-configured requests for all endpoints
-- Example payloads and responses
-- Integration testing scenarios
+---
 
-## 📖 Gravitee Hotels AI Transformation Workshop
+## 📖 Understanding the Workshop Components
 
-Your journey unfolds across three critical phases, each building upon the last to create a complete AI-powered hotel booking experience.
+### **Part 1: Making APIs AI-Agent Ready with MCP 🔧**
 
-### **Part 1: Making Your API AI-Ready 🔧**
+#### The Challenge
 
-*The Challenge: Your existing hotel booking REST API is perfect for traditional applications, but AI agents can't discover or understand how to use it. You need to bridge this gap.*
+Traditional REST APIs are designed for developers who read documentation and write code. AI agents, however, need a way to **dynamically discover** what an API can do and **understand** how to use it—without human intervention.
 
-**Your Mission**: Transform your conventional REST API into an AI-discoverable service using the Model Context Protocol (MCP). This will allow AI agents to automatically discover and understand what your API can do and how to interact with it.
+#### The Solution: Model Context Protocol (MCP)
 
-> **💡 Shortcut:** You can import the preconfigured API definition from [`Hotel-Booking-API-1-0.json`](./apim-apis-definitions/Hotel-Booking-API-1-0.json) directly into Gravitee to save time.  
-> - In the Gravitee Console, go to **APIs → Import** and select the JSON file.
-> - This will set up the Hotel Booking API with the MCP entrypoint and tool mappings automatically.
+The **Model Context Protocol (MCP)** is an open standard that allows AI agents to discover and interact with external Tools. Think of it as a "universal adapter" that makes any API understandable to an AI agent.
 
-**🛠️ Technical Implementation:**
+**How it works:**
 
-1. **Create Your AI-Ready API Gateway**: Set up a new V4 API named `Hotel Booking API` (Version `1.0`) as an HTTP Proxy
-2. **Configure the Bridge**: Point your entrypoint (`/hotels`) to your existing service (`http://hotel-booking-api:8000/hotels`)
-3. **Enable MCP Magic**: 
-   - Navigate to the "MCP Entrypoint" tab and enable it on the `/mcp` path
-   - Import your OpenAPI specification from [`hotel-booking-1-0.yaml`](./hotel-booking-api/hotel-booking-1-0.yaml)
-   - *This is where the magic happens - Gravitee automatically converts your REST API into MCP tools!*
-4. **Add Response Status Tracking**: Configure the **Transform Headers Policy** to capture backend response status:
-   - Add a new **Transform Headers** policy in the response flow
-   - Set/replace header: `X-Gravitee-Endpoint-Status` with value `{#response.status}`
-   - *This header helps detect authentication errors (401) and other backend issues during the workshop*
+```mermaid
+flowchart LR
+    A["🔌 REST API<br/>(OpenAPI spec)"] --> B["🔧 MCP Server<br/>(Tool format)"]
+    B --> C["🤖 AI Agent<br/>(Discovers & uses tools)"]
+```
 
-**🕵️ Test Your Transformation:**
+#### What Gravitee Does
 
-Open the **MCP Inspector** at http://localhost:6274 to see your API through an AI agent's eyes:
-- Select "Streamable HTTP" protocol
-- Connect to your new MCP server: `http://apim-gateway:8082/hotels/mcp`
-- Watch as your booking operations appear as discoverable "tools"
-- Test tool calls interactively - this is exactly how an AI agent would interact with your API!
+Gravitee's **MCP Entrypoint** automatically transforms your REST API into an MCP server:
+
+1. **Import** your existing OpenAPI specification
+2. **Enable** the MCP Entrypoint on your API
+3. **Done!** Your API operations become discoverable `Tools`
+
+You can see and configure this in the API **"Internal ACME Hotels API MCP Server"**, section **"Entrypoints"**, tab **"MCP Entrypoint"**, as shown in the screenshot below.
+
+![MCP Entrypoint in Gravitee UI](./assets/mcp-entrypoint.png)
+
+#### 🔍 Explore with the MCP Inspector
+
+Open the **MCP Inspector** at http://localhost:6274 to see how an AI agent perceives your API:
+
+1. Select **"Streamable HTTP"** as the transport
+2. Enter the MCP server URL: `http://apim-gateway:8082/hotels/mcp`
+3. Click **Connect**
+
+You'll see your hotel booking operations exposed as tools:
+- `getAccommodation` - Get details of a specific hotel
+- `getBookings` - View bookings (requires authentication)
 
 ![MCP Inspector Interface](./assets/mcp-inspector.png)
 
-*🎉 **Success Milestone**: Your traditional REST API can now be discovered and used by any AI agent that speaks MCP!*
+> **💡 Key Insight:** The MCP server doesn't change your API—it provides a **new interface** that AI agents can understand, while the underlying REST API remains unchanged.
 
-### **Part 2: Building Your Secure AI Brain 🧠🔒**
+---
 
-*The Challenge: Raw LLMs are powerful but can be misused. Users might send unwanted or sensitive requests, such as attempting to extract PII, submitting irrelevant queries, or otherwise interacting in ways that are not desired. Costs can spiral out of control, and you have no visibility into usage patterns. You need enterprise-grade AI security and monitoring.*
+### **Part 2: Controlling the AI Brain with LLM Proxy 🧠**
 
-**Your Mission**: Create a secure, monitored gateway to your AI model that tracks token usage, blocks harmful content, and provides full observability into AI interactions.
+#### The Challenge
 
-> **💡 Shortcut:** You can import the preconfigured API definition from [`LLM-Ollama-1-0.json`](./apim-apis-definitions/LLM-Ollama-1-0.json) directly into Gravitee to save time.  
-> - In the Gravitee Console, go to **APIs → Import** and select the JSON file.
-> - This will set up the LLM - Ollama API with AI security policies automatically.
+Large Language Models (LLMs) are the "brain" of AI agents, they enable reasoning and decision-making. However, raw access to LLMs introduces several risks:
 
-**🛠️ Technical Implementation:**
+- **Cost explosion** — No visibility into token usage
+- **Security risks** — Users might try to extract sensitive data or inject harmful prompts
+- **Lack of governance** — No way to enforce policies or audit usage
 
-1. **Create Your Secure LLM Gateway**: Set up a V4 API named `LLM - Ollama` (Version `1.0`) as an HTTP Proxy
-2. **Connect to Your AI Model**: Point entrypoint `/llm` to `http://ollama:11434` 
-3. **Add Cost Tracking**: Configure **AI Prompt Token Tracking Policy**:
-   - Track every token used for cost analysis and chargeback
-   - Parse token counts from Ollama's response format
-   - Monitor model usage patterns across your organization
-   
-4. **Deploy AI Safety**: Add **AI Model Text Classification** resource and **Guard Rails Policy**:
-   - Use Gravitee's pre-trained toxicity detection model
-   - Automatically block harmful prompts before they reach your expensive LLM
-   - Set sensitivity thresholds that match your company's content policy
+#### The Solution: LLM Proxy
 
-**🧪 Validate Your AI Security:**
+Gravitee's **LLM Proxy** acts as a secure gateway to your language models, providing:
 
-*Time to test your defenses! Try both safe and potentially harmful prompts to see your security policies in action:*
+| Capability | Description |
+|------------|-------------|
+| **Unified Access** | Single entry point for multiple LLM providers (OpenAI compatible, Gemini, Bedrock, Ollama, etc.) |
+| **LLMs Routing** | Route requests to specific models and providers based on plans, subscriptions, or custom conditions |
+| **Token Tracking** | Monitor usage for cost analysis and chargeback |
+| **Guard Rails** | Block PII, Payment information, toxic, and any kind of inappropriate prompts before they reach the LLM |
+| **Token based Rate Limiting and Quota** | Control consumption with token-based limits |
+| **Observability** | Full visibility into AI interactions |
 
-   **✅ Legitimate Customer Query** (should work perfectly):
-   ```bash
-   curl -X POST http://localhost:8082/llm/api/generate \
-     -H "Content-Type: application/json" \
-     -d '{
-       "model": "qwen3:0.6b",
-       "prompt": "Why is the sky blue?",
-       "stream": false,
-       "think": false,
-       "options": {
-         "temperature": 0
-       }
-     }'
-   ```
+#### LLMs Routing
 
-   **🚫 Problematic Content** (should be blocked by guard rails):
-   ```bash
-   curl -X POST http://localhost:8082/llm/api/generate \
-     -H "Content-Type: application/json" \
-     -d '{
-       "model": "qwen3:0.6b",
-       "prompt": "Why is the sky blue? Dumb Guy !",
-       "stream": false,
-       "think": false,
-       "options": {
-         "temperature": 0
-       }
-     }'
-   ```
-   
-*💡 **Watch Your Policies Work**: The toxic language triggers an immediate block with a `400 AI prompt validation detected. Reason: [toxic]` response - protecting both your brand and your LLM costs!*
+With LLMs Routing, you can control which models and providers are accessible based on:
 
-*🎉 **Success Milestone**: Your LLM is now enterprise-ready with cost tracking and content filtering!*
+- **API Plans** — Free tier users get access to lightweight models (e.g., qwen3:0.6b), while premium users can access advanced models (e.g., Opus 4.5, Gemini 3 Pro)
+- **Subscriptions** — Different applications or teams can be entitled to different model sets
+- **Custom Conditions** — Route based on user roles, request content, geography, or any business logic
 
-### **Part 3: Bringing Your AI Agent to Life 🤖✨**
+This enables fine-grained control over your AI infrastructure: restrict expensive models to authorized users, ensure compliance by routing to approved providers, and optimize costs by directing requests to the most appropriate model.
 
-*The Final Challenge: You have a secure LLM and AI-discoverable APIs, but customers can't talk to them naturally. You need to create an intelligent agent that understands customer intent, uses your APIs automatically, and provides a conversational interface.*
+#### Architecture
 
-**Your Mission**: Deploy Gravitee Hotels' intelligent hotel booking agent that customers can chat with naturally. The agent will automatically discover and use your hotel booking tools while being fully monitored and secured.
+```mermaid
+flowchart LR
+    A["🤖 Agent"] --> B
+    subgraph B["Gravitee LLM Proxy"]
+        direction TB
+        B1["🛡️ Guard Rails"]
+        B2["📊 Token Tracking"]
+        B3["⏱️ Rate Limit"]
+        B4["🔀 LLMs Routing"]
+    end
+    B --> C1
+    B --> C2
+    B --> C3
+    subgraph C1["Ollama"]
+        C1a["qwen3:0.6b"]
+        C1b["llama3"]
+    end
+    subgraph C2["Google Gemini"]
+        C2a["gemini-3.0-flash"]
+        C2b["gemini-3.0-pro"]
+    end
+    subgraph C3["AWS Bedrock"]
+        C3a["claude-4.5-opus"]
+    end
+```
 
-> **💡 Shortcut:** You can import the preconfigured API definition from [`Hotel-Booking-AI-Agent-1-0.json`](./apim-apis-definitions/Hotel-Booking-AI-Agent-1-0.json) directly into Gravitee to save time.  
-> - In the Gravitee Console, go to **APIs → Import** and select the JSON file.
-> - This will set up the Hotel Booking AI Agent API automatically.
+#### 🧪 Test the LLM Rate Limits and Guard Rails
 
-**🛠️ Technical Implementation:**
+You can explore the **"ACME Hotels LLMs"** API in the Gravitee APIM Console to see how policies are applied. Navigate to the API's **Policies** section to observe:
+- **Guard Rails** policy protecting against toxic, PII, and inappropriate prompts
+- **Token Rate Limit** policy controlling token consumption per application
 
-1. **Deploy Your Intelligent Agent**: Create a V4 API named `Hotel Booking AI Agent` (Version `1.0`) using the **Agent Proxy** type
-2. **Connect Agent to Gateway**: Point entrypoint `/bookings-agent` to `http://hotel-booking-a2a-agent:8001`
-3. **Agent Goes Live**: Your agent is now running and ready to help customers!
+![LLM Proxy in Gravitee UI](./assets/llm-proxy-api.png)
 
-**🌐 Experience the Magic with Gravitee Hotels:**
+The screenshot below shows a chatbot conversation demonstrating the Guard Rails and Rate Limit in action. When a user sends a toxic request, the Guard Rails policy detects it and blocks the request before it reaches the LLM.
 
-Visit http://localhost:3002 to interact with your AI-powered booking platform through a beautiful, production-like ready interface:
+![Guard Rails and Rate Limit triggered in chatbot](./assets/llm-proxy-chatbot.png)
 
-> **⚠️ Note**: If you experience timeouts (~30 seconds) during AI requests, this is due to Docker's network proxy timeout. See the [Troubleshooting section](#-troubleshooting) for a quick fix.
+> **💡 Key Insight:** The LLM Proxy protects your AI infrastructure without modifying your agent code. Policies are applied at the gateway level.
 
-1. **Natural Language Booking**: Use the chat window to communicate with the AI agent and book hotels
-2. **Smart Conversations**: Try queries like:
-   - *"Show me available hotels in Paris"* - This is a public request that works without authentication
-   - *"Show me my current bookings"* - This requires authentication to access your personal data
-   - *"Dumb AI, you're useless"* (should trigger Guard Rails)
-3. **Real-Time AI Responses**: Watch as the agent understands your intent and interacts with your booking APIs automatically
-4. **Production-Like Ready UX**: Experience how your customers would interact with the AI-powered platform
+---
 
-**🔐 Understanding Authentication Requirements:**
+### **Part 3: The AI Agent Architecture 🤖**
 
-Notice the difference between public and private operations:
-- **Public Operations** (*"Show me available hotels in Paris"*): Work immediately - no authentication needed.
-- **Private Operations** (*"Show me my current bookings"*): The AI agent will inform you that authentication is required to access your personal booking information.
-  > **🎥 Setting Up Authentication (Coming Soon)**: To enable full authentication and access private booking data, you'll need to create an Application and a User in **Gravitee Access Management**. Due to the multiple operations required, we're preparing a comprehensive video tutorial to guide you through this process step-by-step. Stay tuned!
+Now that we have:
+- ✅ **Data access** via MCP Server (tools the agent can use)
+- ✅ **Reasoning capability** via LLM Proxy (the agent's brain)
 
-![Gravitee Hotels Demo Website](./assets/demo-website.png)
+We can build the **AI Agent** itself—the orchestrator that brings everything together.
 
-> **💡 Advanced Debugging**: For developers who want to see the underlying A2A protocol messages, the inspector is still available at http://localhost:8004
+#### Agent Structure
 
-*🎉 **Success Milestone**: Gravitee Hotels customers can now chat naturally with AI to book hotels - your transformation is complete!*
+The ACME Hotels booking agent consists of three main components:
+
+```mermaid
+flowchart TB
+    subgraph Agent["🏨 Hotel Booking Agent"]
+        direction LR
+        MCP["🔌 MCP Client<br/>• Discover tools<br/>• Execute tools"]
+        Core["⚙️ Agent Core<br/>• Orchestrate<br/>• Manage state<br/>• Handle auth"]
+        LLM["🧠 LLM Client<br/>• Send prompts<br/>• Parse responses"]
+    end
+    
+    MCP --> MCPServer["🔧 MCP Server<br/>(via Gateway)"]
+    LLM --> LLMProxy["🤖 LLM Proxy<br/>(via Gateway)"]
+    Core --> User["👤 User<br/>(via A2A)"]
+```
+
+#### The Agent Loop: Discover → Decide → Execute → Reflect
+
+Every AI agent follows a fundamental reasoning loop:
+
+```mermaid
+flowchart LR
+    A["🔍 DISCOVER<br/><small>Query MCP for<br/>available tools</small>"] --> B["🤔 DECIDE<br/><small>Ask LLM to choose<br/>the right tool</small>"]
+    B --> C["⚡ EXECUTE<br/><small>Call the selected<br/>tool via MCP</small>"]
+    C --> D["💭 REFLECT<br/><small>Process result and<br/>formulate response</small>"]
+    D -.->|"Loop if needed"| A
+```
+
+| Phase | What Happens | Component Used |
+|-------|--------------|----------------|
+| **1. Discover** | Agent queries MCP server for available tools | MCP Client |
+| **2. Decide** | Agent sends user query + tools to LLM, which decides what to do | LLM Client |
+| **3. Execute** | Agent calls the selected tool with parameters from LLM | MCP Client |
+| **4. Reflect** | Agent sends tool result to LLM to generate final response | LLM Client |
+
+#### Example Flow
+
+When a user asks *"Show me hotels in Paris"*:
+
+1. **Discover:** Agent fetches tools from MCP → finds `listAccommodations`
+2. **Decide:** LLM receives query + tools → decides to call `listAccommodations(city="Paris")`
+3. **Execute:** Agent calls the tool → receives hotel data
+4. **Reflect:** LLM formats the data into a friendly response
+
+#### Why Expose the Agent Through the Gateway?
+
+The agent itself is exposed through the Gravitee Gateway as an **A2A (Agent-to-Agent) Proxy**. This provides:
+
+- **Security:** Authentication and authorization at the gateway level
+- **Observability:** Full logging and monitoring of agent interactions
+- **Control:** Apply policies, rate limits, and quotas to agent access
+
+---
+
+### **Part 4: Authentication & Fine-Grained Authorization 🔐**
+
+#### The Challenge
+
+AI agents often need to access user-specific data. In our hotel booking scenario:
+- *"Show me hotels in Paris"* → Public data, no authentication needed
+- *"Show me my bookings"* → Private data, requires knowing who "me" is
+
+Beyond authentication (who are you?), we need **authorization** (what can you do?):
+- Can this user view bookings?
+- Can this user create bookings?
+- Can this user view *other users'* bookings?
+
+#### The Solution: Gravitee AM + OpenFGA
+
+The workshop uses two complementary systems in Gravitee Access Management :
+
+| System | Purpose |
+|--------|---------|
+| **OAuth2.1 Authorization Server** | Handle authentication (OAuth2/OIDC) and identity |
+| **Fine-Grained Authorization Engine** | Handle fine-grained authorization (relationship-based access control) through OpenFGA and the AuthZen Authorization API integrated in Gravitee AM |
+
+#### Authentication Flow
+
+```mermaid
+sequenceDiagram
+    participant Agent as AI Agent 🤖
+    participant MCP as Gravitee API Management 🌐 (MCP Server and FGA PEP)
+    participant Auth as Gravitee Access Management 🔐 (AS and FGA PDP)
+
+    Agent->>MCP: Connect
+    MCP-->>Agent: Advertise auth requirements and capabilities
+
+    Agent->>Auth: Exhchange user's access JWT token
+    Auth-->>Agent: Return token (includes identity & context claims)
+
+    Agent->>MCP: Call tool with token
+    MCP->>MCP: Validate token
+
+    opt Introspect JWT
+    MCP->>Auth: Validate token
+    end
+
+    MCP->>Auth: Can this agent execute this tool on this resource?
+    Auth-->>MCP: Authorization decision
+
+    alt Authorized
+        MCP-->>Agent: Tool executed
+    else Denied
+        MCP-->>Agent: Request denied
+    end
+```
+
+#### Fine-Grained Authorization with OpenFGA
+
+OpenFGA uses a **relationship-based model** to define who can do what:
+
+```
+# Example authorization model
+user:john can view booking:123
+user:admin can view all bookings
+```
+
+You can explore the **Fine-Grained Authorization** configuration in the [Gravitee AM Console](http://localhost:8081). The screenshot below shows the **OpenFGA Authorization Model**, which defines the relationships structure between entities (users, resources, permissions).
+
+![OpenFGA Authorization Model in Gravitee AM](./assets/am-openfga-model.png)
+
+The following screenshot shows the **Authorization Tuples**, which represent the actual authorization data following the model—defining who can do what. For example, `user:john` can `view` `booking:123`.
+
+![OpenFGA Authorization Tuples](./assets/am-openfga-tuples.png)
+
+#### Try It Out
+
+1. **Without authentication:** Ask *"Show me hotels in Paris"* → Works! (public data)
+2. **Without authentication:** Ask *"Show me my bookings"* → Fails! (needs identity)
+3. **With authentication:** Log in as `john.doe@gravitee.io` / `HelloWorld@123`
+4. **After authentication:** Ask *"Show me my bookings"* → Works! (identity and permissions verified)
+
+> **💡 Key Insight:** The agent doesn't hardcode authorization logic. It relies on Gravitee AM for identity and permissions, making the security model flexible and auditable.
+
+---
 
 ## 🏁 Wrapping Up
 
-When you're done exploring Gravitee Hotels' new AI-powered future:
+When you're done exploring:
 
 ```bash
 docker compose down
 ```
 
-## 🎓 What You've Accomplished
-
-**Congratulations! 🎉** You've just completed a complete AI transformation journey. Here's what Gravitee Hotels (and you) now have:
-
-### **🚀 Your AI-Powered Hotel Booking Platform**
-- **✅ Intelligent Conversations**: Customers can now chat naturally with your booking system
-- **✅ Enterprise Security**: AI interactions are protected with toxicity filters and usage tracking
-- **✅ Full Observability**: Every AI conversation and API call is monitored and logged
-- **✅ Cost Management**: Token tracking provides visibility for chargeback and cost optimization
-- **✅ Future-Ready Architecture**: Your APIs are now AI-discoverable for any future agents
-
-### **🔧 Technical Mastery Gained**
-- **✅ MCP Integration**: Transform any REST API into AI-discoverable tools
-- **✅ AI Security Policies**: Implement enterprise-grade AI safety measures
-- **✅ Agent Deployment**: Deploy conversational AI agents with full lifecycle management
-- **✅ Protocol Debugging**: Use visual inspectors to understand AI agent communications
-- **✅ AI Gateway Management**: Secure and monitor AI infrastructure through Gravitee
-
-## 🌟 The Transformation Technologies You've Mastered
-
-### **🛡️ Enterprise AI Security**
-Your AI infrastructure is now bulletproof with:
-- **Smart Cost Tracking**: Every token is counted and can be charged back to business units
-- **AI Content Filtering**: Toxic prompts are blocked before reaching your expensive LLM
-- **Full API Governance**: All AI interactions flow through your secure API gateway
-
-### **🔍 AI Discovery & Orchestration**
-Your agents are intelligent and autonomous:
-- **Agent Cards (A2A Protocol)**: Self-describing agents that advertise their capabilities
-- **MCP Tool Discovery**: Agents automatically find and learn to use your APIs
-- **Visual Protocol Debugging**: See exactly how your agents think and communicate
-
-### **⚡ Future-Proof Architecture**  
-You've built a platform that scales:
-- **Any API → AI Tool**: Transform existing services into agent-discoverable tools
-- **Plug-and-Play Agents**: Add new AI capabilities without changing existing systems
-- **Enterprise Monitoring**: Full observability into your AI ecosystem
-
 ---
 
-**The future of customer experience is conversational, and you're now ready to build it! 🌟**
+## 🎓 Key Takeaways
 
-*Ready to revolutionize how your customers interact with your platform? The tools are in your hands!* 🛠️✨
-
----
-
-## 🗺️ Roadmap
-
-We're continuously improving this workshop to showcase the latest in AI agent technology. Here's what's coming next:
-
-### **🔜 Upcoming Enhancements**
-
-#### **Enhanced MCP Security** 🔐
-- **Target Date**: November 25th, 2025
-- **Description**: The next version of the Model Context Protocol specification will include metadata capabilities to describe security requirements for Tools
-- **Impact**: This will enable more granular control over which agents can access specific tools, with clear security policies defined at the protocol level
-- **Workshop Update**: We'll enhance Part 1 to demonstrate how to define security metadata for your hotel booking tools, showing best practices for secure tool discovery
-
-#### **Multi-Agent Communication** 🤝
-- **Coming Soon**
-- **Description**: Add a second A2A Agent to demonstrate proper Agent-to-Agent communications
-- **Impact**: Experience how multiple specialized agents can collaborate to handle complex customer requests
-- **Use Case**: Imagine a customer asking to "Book a hotel in Paris and arrange airport transportation" - watch as the Hotel Booking Agent coordinates with a Transportation Agent to fulfill the complete request
-- **Workshop Update**: Part 3 will expand to show agent orchestration patterns and cross-agent security policies
-
-#### **Advanced Authentication with Gravitee AM** 🔑
-- **Coming Soon**
-- **Description**: Gravitee Access Management may include proper Token Exchange and On-Behalf-Of (OBO) flows
-- **Impact**: Enable secure delegation scenarios where agents can act on behalf of users while maintaining proper audit trails
-- **Use Case**: Allow the booking agent to access user-specific data and make reservations using delegated credentials, with full traceability
-- **Workshop Update**: Add authentication and authorization patterns showing how agents securely represent users across multiple services
-
-#### **GPU-Accelerated LLM Performance** ⚡
-- **Status**: Available for systems with GPU access
-- **Description**: Option to use faster LLM models when Docker has access to host GPU
-- **Impact**: Dramatically reduced response times for AI interactions, enabling real-time conversational experiences
-- **Requirements**: NVIDIA GPU with Docker GPU support enabled
-- **Workshop Update**: Alternative docker-compose configuration for GPU-enabled deployments with performance benchmarks
-
----
-
-### **📢 Continuous Evolution**
-
-This workshop evolves alongside the ecosystem it demonstrates:
-- **Gravitee Platform Updates**: New features and capabilities from Gravitee APIM and AM releases
-- **MCP Specification**: Following the Model Context Protocol specification as it matures
-- **A2A Protocol**: Adapting to Agent-to-Agent communication protocol enhancements
-- **Industry Best Practices**: Incorporating emerging patterns in AI agent security and orchestration
-
-**Stay tuned for these exciting updates!** ⭐
+| Concept | What You Learned |
+|---------|------------------|
+| **MCP Servers** | Transform any REST API into AI-discoverable tools without changing the underlying API |
+| **LLM Proxy** | Secure, monitor, and control access to language models through a unified gateway |
+| **Agent Architecture** | Agents follow a Discover → Decide → Execute → Reflect loop |
+| **Authorization** | Combine OAuth2/OIDC for identity with OpenFGA for fine-grained permissions |
 
 ---
 
 ## 🔧 Troubleshooting
 
-### Request Timeout (30 seconds) on Gravitee Hotels Demo Website
+### Request Timeout (30 seconds) on macOS
 
-**Problem**: Requests to the AI agent timeout after ~30 seconds, especially on the [Gravitee Hotels Demo Website](http://localhost:8002/).
+**Problem:** Requests to the AI agent timeout after ~30 seconds.
 
-**Cause**: This is a **known issue with macOS Docker Desktop**. The LLM running in Docker (CPU-only mode) can take longer than 30 seconds to process requests. Docker Desktop's network proxy has a hardcoded timeout that cuts off these long-running connections.
+**Cause:** Docker Desktop on macOS has a hardcoded network proxy timeout. The LLM running in CPU-only mode can exceed this limit.
 
-**⚠️ Important**: There is **no real workaround** for this Docker Desktop limitation. Attempts to modify `vpnKitMaxPortIdleTime` or other settings do not reliably solve this issue.
+**💡 Recommended Solution:** Run Ollama locally on your Mac:
 
-**💡 Recommended Solution for macOS Users**: Run Ollama locally on your Mac for significantly better performance (GPU acceleration) and no timeout issues!
-
-**Alternative Solution**: Use **[Colima](https://github.com/abiosoft/colima)** or another Docker Desktop alternative that doesn't have this timeout limitation.
-
-### macOS: Use Local Ollama (Recommended ⚡)
-
-Running Ollama locally on macOS provides much faster responses and avoids timeout issues entirely by leveraging your Mac's GPU.
-
-**Setup Steps**:
-
-1. **Install Ollama** on your Mac (if not already installed):
+1. **Install Ollama:**
    ```bash
-   # Download from https://ollama.ai or use Homebrew:
    brew install ollama
    ```
 
-2. **Start Ollama** and pull the required model:
+2. **Start Ollama and pull the model:**
    ```bash
-   ollama serve  # Start Ollama (or launch the Ollama.app)
-   ollama run qwen3:0.6b  # Download and test the model
+   ollama serve
+   ollama pull qwen3:0.6b
    ```
 
-3. **Update the Gravitee API configuration**: Update the `LLM - Ollama` API definition to point to `http://host.docker.internal:11434`, which allows containers to connect to services running on your Mac.
+3. **Update the API `ACME Hotels LLMs` endpoint URL configuration** in Gravitee Console to point to `http://host.docker.internal:11434` instead of `http://ollama:11434`
 
-**✅ Benefits**:
-- ⚡ **Much faster responses** (GPU acceleration)
-- 🚫 **No timeout issues**
+**Benefits:**
+- ⚡ Much faster responses (GPU acceleration)
+- 🚫 No timeout issues
+
+**Alternative:** Use [Colima](https://github.com/abiosoft/colima) instead of Docker Desktop.
+
+---
+
+## 📚 Learn More
+
+- [Model Context Protocol (MCP) Specification](https://modelcontextprotocol.io/)
+- [A2A Protocol Documentation](https://google.github.io/A2A/)
+- [OpenFGA Documentation](https://openfga.dev/)
+- [Gravitee AI Agent Mesh](https://www.gravitee.io/)
+
+---
+
+**Happy learning! 🚀**
