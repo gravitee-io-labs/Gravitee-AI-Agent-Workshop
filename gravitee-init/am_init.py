@@ -38,7 +38,7 @@ RETRY_DELAY = 5
 # OpenFGA Configuration
 FGA_BASE_URL = os.getenv("FGA_BASE_URL", "http://openfga:8080")
 FGA_STORE_NAME = "Hotel Booking Authorization"
-FGA_CONFIG_FILE = os.getenv("FGA_CONFIG_FILE", "/app/openfgastore.yaml")
+FGA_CONFIG_FILE = os.getenv("FGA_CONFIG_FILE", "/app/openfga/openfgastore.yaml")
 
 # OpenFGA Authorization Engine Configuration for AM
 OPENFGA_SERVER_URL = os.getenv("OPENFGA_SERVER_URL", "http://openfga:8080")
