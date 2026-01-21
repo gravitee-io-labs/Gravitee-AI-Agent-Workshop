@@ -1,7 +1,7 @@
 {
   "export": {
-    "date": "2025-11-10T17:25:54.718514422Z",
-    "apimVersion": "4.9.2"
+    "date": "2026-01-21T14:43:53.259788045Z",
+    "apimVersion": "4.10.0"
   },
   "api": {
     "definitionVersion": "V4",
@@ -101,12 +101,12 @@
     },
     "flows": [],
     "id": "53e1e903-080d-453f-a1e9-03080d153f76",
-    "name": "Hotel Booking AI Agent",
-    "description": "Hotel Booking AI Agent",
+    "name": "ACME Hotels AI Agent",
+    "description": "ACME Hotels AI Agent",
     "apiVersion": "1.0",
-    "deployedAt": "2025-11-02T13:07:42.671Z",
-    "createdAt": "2025-09-25T16:38:21.653Z",
-    "updatedAt": "2025-11-06T16:39:39.534Z",
+    "deployedAt": "2026-01-12T13:22:31.094Z",
+    "createdAt": "2025-12-18T08:44:08.836Z",
+    "updatedAt": "2026-01-16T03:39:19.234Z",
     "disableMembershipNotifications": false,
     "groups": [],
     "state": "STARTED",
@@ -117,7 +117,7 @@
     "lifecycleState": "PUBLISHED",
     "tags": [],
     "primaryOwner": {
-      "id": "a8fbc6e4-f4c9-4729-bbc6-e4f4c9f7299e",
+      "id": "1f89bd40-77be-4f8f-89bd-4077be1f8fd0",
       "email": "dorian.blanc@graviteesource.com",
       "displayName": "Dorian Blanc",
       "type": "USER"
@@ -127,17 +127,40 @@
       "origin": "MANAGEMENT"
     },
     "responseTemplates": {},
-    "resources": [],
+    "resources": [
+      {
+        "name": "Hotel Booking IAM",
+        "type": "oauth2-am-resource",
+        "configuration": "{\"serverURL\":\"http://gio-am-gateway:9092\",\"version\":\"V3_X\",\"securityDomain\":\"gravitee\",\"clientId\":\"apim-gateway\",\"clientSecret\":\"apim-gateway\",\"userClaim\":\"sub\",\"http\":{\"version\":\"HTTP_1_1\",\"keepAlive\":true,\"keepAliveTimeout\":30000,\"connectTimeout\":3000,\"pipelining\":false,\"readTimeout\":10000,\"useCompression\":true,\"propagateClientHost\":false,\"idleTimeout\":0,\"followRedirects\":false,\"maxConcurrentConnections\":20},\"proxy\":{\"enabled\":false,\"useSystemProxy\":false},\"ssl\":{\"hostnameVerifier\":true,\"trustAll\":false,\"trustStore\":{\"type\":\"\"},\"keyStore\":{\"type\":\"\"}}}",
+        "enabled": true
+      }
+    ],
     "properties": []
   },
-  "pages": [],
+  "pages": [
+    {
+      "id": "a6cea882-2a09-47e7-8ea8-822a0927e7c6",
+      "name": "Aside",
+      "type": "SYSTEM_FOLDER",
+      "order": 0,
+      "published": true,
+      "visibility": "PUBLIC",
+      "updatedAt": "2025-12-18T08:44:09.061Z",
+      "configuration": {},
+      "homepage": false,
+      "excludedAccessControls": false,
+      "accessControls": [],
+      "attachedMedia": [],
+      "metadata": {}
+    }
+  ],
   "plans": [
     {
       "definitionVersion": "V4",
       "flows": [],
-      "id": "d1aff8ec-f1db-40ab-aff8-ecf1db30ab09",
+      "id": "e722dfc3-a30a-4963-a2df-c3a30ab96351",
       "name": "Open",
-      "description": "Open",
+      "description": "Open Plan",
       "apiId": "53e1e903-080d-453f-a1e9-03080d153f76",
       "security": {
         "type": "KEY_LESS",
@@ -147,15 +170,15 @@
       "characteristics": [],
       "commentMessage": "",
       "commentRequired": false,
-      "createdAt": "2025-10-05T18:12:13.643Z",
+      "createdAt": "2026-01-08T19:23:00.451Z",
       "excludedGroups": [],
       "generalConditions": "",
       "order": 1,
-      "publishedAt": "2025-10-05T18:12:15.43Z",
+      "publishedAt": "2026-01-08T19:23:02.79Z",
       "status": "PUBLISHED",
       "tags": [],
       "type": "API",
-      "updatedAt": "2025-11-04T23:35:32.215Z",
+      "updatedAt": "2026-01-08T19:23:02.79Z",
       "validation": "MANUAL"
     }
   ],

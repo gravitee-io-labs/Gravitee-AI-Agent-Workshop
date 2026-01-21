@@ -1,0 +1,11 @@
+# Hotel Booking AI Agent Application Configuration for APIM
+# This application is used by the AI Agent to subscribe to APIM APIs
+
+name: "Hotel Booking AI Agent"
+description: "Hotel Booking AI Agent App"
+
+# Application settings - SIMPLE type with OAuth/JWT client_id
+settings:
+  app:
+    type: "SIMPLE"
+    client_id: "hotel-booking-agent"

@@ -1,0 +1,22 @@
+# Hotel Booking AI Agent Application Configuration
+# This is a service application for the AI booking agent
+
+name: "Hotel Booking AI Agent"
+description: "Hotel Booking AI Agent"
+type: "SERVICE"
+
+# OAuth2/OIDC Settings
+clientId: "hotel-booking-agent"
+clientSecret: "hotel-booking-agent"
+
+# Service applications typically don't need redirect URIs
+redirectUris: []
+
+# Service applications typically use client_credentials grant, fewer scopes needed
+scopes: []
+
+# Custom token claims
+tokenCustomClaims:
+  - tokenType: "ACCESS_TOKEN"
+    claimName: "sub-email"
+    claimValue: "{#request.headers['sub-email'][0]}"

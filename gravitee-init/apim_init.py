@@ -1,7 +1,8 @@
 #!/usr/bin/env python3
 """
 Gravitee API Management (APIM) Initialization Script
-This script imports API definitions into Gravitee API Management.
+This script imports API definitions, creates Applications, and manages Subscriptions
+in Gravitee API Management.
 """
 
 import os
@@ -9,8 +10,9 @@ import sys
 import json
 import time
 import requests
+import yaml
 from pathlib import Path
-from typing import Optional, List
+from typing import Optional, List, Dict, Any
 
 # Configuration
 APIM_BASE_URL = os.getenv("APIM_BASE_URL", "http://localhost:8083")
@@ -18,7 +20,11 @@ APIM_USERNAME = os.getenv("APIM_USERNAME", "admin")
 APIM_PASSWORD = os.getenv("APIM_PASSWORD", "admin")
 ORGANIZATION = os.getenv("ORGANIZATION", "DEFAULT")
 ENVIRONMENT = os.getenv("ENVIRONMENT", "DEFAULT")
-API_DEFINITIONS_DIR = os.getenv("API_DEFINITIONS_DIR", "/api-definitions")
+API_DEFINITIONS_DIR = os.getenv("API_DEFINITIONS_DIR", "/app/apim-apis")
+
+# Directories for Applications and Subscriptions configurations
+APIM_APPS_CONFIG_DIR = os.getenv("APIM_APPS_CONFIG_DIR", "/app/apim-apps")
+APIM_SUBSCRIPTIONS_CONFIG_DIR = os.getenv("APIM_SUBSCRIPTIONS_CONFIG_DIR", "/app/apim-subscriptions")
 
 MAX_RETRIES = 30
 RETRY_DELAY = 5
@@ -32,6 +38,8 @@ class ApimInitializer:
         self.session.auth = (APIM_USERNAME, APIM_PASSWORD)
         self.session.headers.update({"Content-Type": "application/json"})
         self.imported_apis: List[str] = []
+        self.created_applications: List[str] = []
+        self.created_subscriptions: List[str] = []
 
     def log(self, message: str):
         """Print log message with prefix"""
@@ -441,6 +449,366 @@ class ApimInitializer:
             self.log(f"ERROR: Unexpected error importing {definition_file.name}: {e}")
             return False
 
+    # ==================== Application Management ====================
+
+    def get_application_config_files(self) -> List[Path]:
+        """Get all application configuration YAML files"""
+        self.log(f"Looking for application configurations in: {APIM_APPS_CONFIG_DIR}")
+        
+        config_path = Path(APIM_APPS_CONFIG_DIR)
+        if not config_path.exists():
+            self.log(f"WARNING: Applications config directory not found: {APIM_APPS_CONFIG_DIR}")
+            return []
+        
+        yaml_files = list(config_path.glob("*.yaml")) + list(config_path.glob("*.yml"))
+        
+        if not yaml_files:
+            self.log(f"WARNING: No YAML files found in {APIM_APPS_CONFIG_DIR}")
+            return []
+        
+        self.log(f"Found {len(yaml_files)} application configuration file(s)")
+        return sorted(yaml_files)
+
+    def get_application_by_name(self, app_name: str) -> Optional[Dict[str, Any]]:
+        """Get an application by its name"""
+        try:
+            url = f"{APIM_BASE_URL}/management/organizations/{ORGANIZATION}/environments/{ENVIRONMENT}/applications"
+            
+            response = self.session.get(url, params={"query": app_name}, timeout=10)
+            response.raise_for_status()
+            
+            apps = response.json()
+            for app in apps:
+                if app.get("name") == app_name:
+                    return app
+            
+            return None
+            
+        except requests.exceptions.RequestException as e:
+            self.log(f"ERROR: Failed to search for application '{app_name}': {e}")
+            return None
+
+    def create_application(self, config_file: Path) -> Optional[str]:
+        """Create an application from a YAML configuration file"""
+        self.log(f"Processing application config from: {config_file.name}")
+        
+        try:
+            # Read the YAML configuration
+            with open(config_file, 'r') as f:
+                app_config = yaml.safe_load(f)
+            
+            app_name = app_config.get("name")
+            if not app_name:
+                self.log(f"ERROR: No 'name' field in {config_file.name}")
+                return None
+            
+            # Check if application already exists
+            existing_app = self.get_application_by_name(app_name)
+            if existing_app:
+                app_id = existing_app.get("id")
+                self.log(f"✓ Application '{app_name}' already exists (ID: {app_id})")
+                
+                # Check if we need to update the client_id
+                settings = app_config.get("settings", {})
+                app_settings = settings.get("app", {})
+                client_id = app_settings.get("client_id") or app_settings.get("clientId")
+                
+                if client_id:
+                    existing_settings = existing_app.get("settings", {}).get("app", {})
+                    existing_client_id = existing_settings.get("client_id")
+                    
+                    if existing_client_id != client_id:
+                        # Update the application with the client_id
+                        self.log(f"  Updating application with client_id: {client_id}")
+                        self.update_application_client_id(app_id, app_name, app_config)
+                
+                self.created_applications.append(app_name)
+                return app_id
+            
+            # Prepare the payload for application creation
+            # Using the Management API v1 for Applications
+            url = f"{APIM_BASE_URL}/management/organizations/{ORGANIZATION}/environments/{ENVIRONMENT}/applications"
+            
+            settings = app_config.get("settings", {"app": {"type": "SIMPLE"}})
+            
+            payload = {
+                "name": app_name,
+                "description": app_config.get("description", ""),
+                "settings": settings
+            }
+            
+            response = self.session.post(
+                url,
+                json=payload,
+                timeout=10
+            )
+            
+            response.raise_for_status()
+            result = response.json()
+            app_id = result.get("id")
+            
+            self.log(f"✓ Application '{app_name}' created successfully (ID: {app_id})")
+            self.created_applications.append(app_name)
+            return app_id
+            
+        except yaml.YAMLError as e:
+            self.log(f"ERROR: Failed to parse YAML from {config_file.name}: {e}")
+            return None
+        except requests.exceptions.RequestException as e:
+            self.log(f"ERROR: Failed to create application from {config_file.name}: {e}")
+            if hasattr(e, 'response') and hasattr(e.response, 'text'):
+                self.log(f"Response: {e.response.text}")
+            return None
+        except Exception as e:
+            self.log(f"ERROR: Unexpected error creating application from {config_file.name}: {e}")
+            return None
+
+    def update_application_client_id(self, app_id: str, app_name: str, app_config: Dict[str, Any]) -> bool:
+        """Update an application to set/update the client_id"""
+        try:
+            url = f"{APIM_BASE_URL}/management/organizations/{ORGANIZATION}/environments/{ENVIRONMENT}/applications/{app_id}"
+            
+            # Get the settings from the config
+            settings = app_config.get("settings", {"app": {"type": "SIMPLE"}})
+            
+            payload = {
+                "name": app_name,
+                "description": app_config.get("description", ""),
+                "settings": settings
+            }
+            
+            response = self.session.put(
+                url,
+                json=payload,
+                timeout=10
+            )
+            
+            response.raise_for_status()
+            self.log(f"  ✓ Application '{app_name}' updated with client_id")
+            return True
+            
+        except requests.exceptions.RequestException as e:
+            self.log(f"ERROR: Failed to update application '{app_name}': {e}")
+            if hasattr(e, 'response') and hasattr(e.response, 'text'):
+                self.log(f"Response: {e.response.text}")
+            return False
+
+    # ==================== Subscription Management ====================
+
+    def get_subscription_config_files(self) -> List[Path]:
+        """Get all subscription configuration YAML files"""
+        self.log(f"Looking for subscription configurations in: {APIM_SUBSCRIPTIONS_CONFIG_DIR}")
+        
+        config_path = Path(APIM_SUBSCRIPTIONS_CONFIG_DIR)
+        if not config_path.exists():
+            self.log(f"WARNING: Subscriptions config directory not found: {APIM_SUBSCRIPTIONS_CONFIG_DIR}")
+            return []
+        
+        yaml_files = list(config_path.glob("*.yaml")) + list(config_path.glob("*.yml"))
+        
+        if not yaml_files:
+            self.log(f"WARNING: No YAML files found in {APIM_SUBSCRIPTIONS_CONFIG_DIR}")
+            return []
+        
+        self.log(f"Found {len(yaml_files)} subscription configuration file(s)")
+        return sorted(yaml_files)
+
+    def get_api_by_name(self, api_name: str) -> Optional[Dict[str, Any]]:
+        """Get an API by its name"""
+        try:
+            url = f"{APIM_BASE_URL}/management/v2/environments/{ENVIRONMENT}/apis"
+            
+            response = self.session.get(url, timeout=10)
+            response.raise_for_status()
+            
+            apis_data = response.json()
+            apis = apis_data.get("data", [])
+            
+            for api in apis:
+                if api.get("name") == api_name:
+                    return api
+            
+            return None
+            
+        except requests.exceptions.RequestException as e:
+            self.log(f"ERROR: Failed to search for API '{api_name}': {e}")
+            return None
+
+    def get_plan_by_name(self, api_id: str, plan_name: str) -> Optional[Dict[str, Any]]:
+        """Get a plan by its name for a specific API"""
+        try:
+            url = f"{APIM_BASE_URL}/management/v2/environments/{ENVIRONMENT}/apis/{api_id}/plans"
+            
+            response = self.session.get(url, timeout=10)
+            response.raise_for_status()
+            
+            plans_data = response.json()
+            plans = plans_data.get("data", [])
+            
+            for plan in plans:
+                if plan.get("name") == plan_name:
+                    return plan
+            
+            return None
+            
+        except requests.exceptions.RequestException as e:
+            self.log(f"ERROR: Failed to get plans for API '{api_id}': {e}")
+            return None
+
+    def check_subscription_exists(self, api_id: str, application_id: str, plan_id: str) -> bool:
+        """Check if a subscription already exists"""
+        try:
+            url = f"{APIM_BASE_URL}/management/v2/environments/{ENVIRONMENT}/apis/{api_id}/subscriptions"
+            
+            response = self.session.get(
+                url,
+                params={
+                    "applicationIds": application_id,
+                    "planIds": plan_id,
+                    "statuses": ["ACCEPTED", "PENDING", "PAUSED"]
+                },
+                timeout=10
+            )
+            response.raise_for_status()
+            
+            subscriptions_data = response.json()
+            subscriptions = subscriptions_data.get("data", [])
+            
+            return len(subscriptions) > 0
+            
+        except requests.exceptions.RequestException as e:
+            self.log(f"ERROR: Failed to check existing subscriptions: {e}")
+            return False
+
+    def create_subscription(self, api_id: str, application_id: str, plan_id: str, 
+                          api_name: str, app_name: str, plan_name: str) -> bool:
+        """Create a subscription for an application to an API plan"""
+        self.log(f"Creating subscription: '{app_name}' -> '{api_name}' (Plan: '{plan_name}')...")
+        
+        # Check if subscription already exists
+        if self.check_subscription_exists(api_id, application_id, plan_id):
+            self.log(f"✓ Subscription already exists: '{app_name}' -> '{api_name}' (Plan: '{plan_name}')")
+            self.created_subscriptions.append(f"{app_name} -> {api_name} ({plan_name})")
+            return True
+        
+        try:
+            # Create subscription using V2 API
+            url = f"{APIM_BASE_URL}/management/v2/environments/{ENVIRONMENT}/apis/{api_id}/subscriptions"
+            
+            payload = {
+                "applicationId": application_id,
+                "planId": plan_id
+            }
+            
+            response = self.session.post(
+                url,
+                json=payload,
+                timeout=10
+            )
+            
+            response.raise_for_status()
+            result = response.json()
+            subscription_id = result.get("id")
+            subscription_status = result.get("status")
+            
+            self.log(f"✓ Subscription created (ID: {subscription_id}, Status: {subscription_status})")
+            
+            # If the subscription is pending (manual validation required), accept it
+            if subscription_status == "PENDING":
+                self.accept_subscription(api_id, subscription_id)
+            
+            self.created_subscriptions.append(f"{app_name} -> {api_name} ({plan_name})")
+            return True
+            
+        except requests.exceptions.RequestException as e:
+            self.log(f"ERROR: Failed to create subscription: {e}")
+            if hasattr(e, 'response') and hasattr(e.response, 'text'):
+                self.log(f"Response: {e.response.text}")
+            return False
+
+    def accept_subscription(self, api_id: str, subscription_id: str) -> bool:
+        """Accept a pending subscription"""
+        self.log(f"Accepting subscription '{subscription_id}'...")
+        
+        try:
+            url = f"{APIM_BASE_URL}/management/v2/environments/{ENVIRONMENT}/apis/{api_id}/subscriptions/{subscription_id}/_accept"
+            
+            response = self.session.post(
+                url,
+                json={},
+                timeout=10
+            )
+            
+            response.raise_for_status()
+            self.log(f"✓ Subscription accepted")
+            return True
+            
+        except requests.exceptions.RequestException as e:
+            self.log(f"ERROR: Failed to accept subscription: {e}")
+            if hasattr(e, 'response') and hasattr(e.response, 'text'):
+                self.log(f"Response: {e.response.text}")
+            return False
+
+    def process_subscriptions(self, config_file: Path) -> int:
+        """Process subscriptions from a YAML configuration file"""
+        self.log(f"Processing subscriptions from: {config_file.name}")
+        
+        success_count = 0
+        
+        try:
+            # Read the YAML configuration
+            with open(config_file, 'r') as f:
+                config = yaml.safe_load(f)
+            
+            subscriptions = config.get("subscriptions", [])
+            
+            if not subscriptions:
+                self.log(f"WARNING: No subscriptions defined in {config_file.name}")
+                return 0
+            
+            for sub in subscriptions:
+                app_name = sub.get("application")
+                api_name = sub.get("api")
+                plan_name = sub.get("plan")
+                
+                if not all([app_name, api_name, plan_name]):
+                    self.log(f"ERROR: Subscription missing required fields (application, api, plan)")
+                    continue
+                
+                # Get application ID
+                app = self.get_application_by_name(app_name)
+                if not app:
+                    self.log(f"ERROR: Application '{app_name}' not found")
+                    continue
+                application_id = app.get("id")
+                
+                # Get API ID
+                api = self.get_api_by_name(api_name)
+                if not api:
+                    self.log(f"ERROR: API '{api_name}' not found")
+                    continue
+                api_id = api.get("id")
+                
+                # Get Plan ID
+                plan = self.get_plan_by_name(api_id, plan_name)
+                if not plan:
+                    self.log(f"ERROR: Plan '{plan_name}' not found for API '{api_name}'")
+                    continue
+                plan_id = plan.get("id")
+                
+                # Create subscription
+                if self.create_subscription(api_id, application_id, plan_id, api_name, app_name, plan_name):
+                    success_count += 1
+            
+            return success_count
+            
+        except yaml.YAMLError as e:
+            self.log(f"ERROR: Failed to parse YAML from {config_file.name}: {e}")
+            return 0
+        except Exception as e:
+            self.log(f"ERROR: Unexpected error processing subscriptions from {config_file.name}: {e}")
+            return 0
+
     def run(self) -> bool:
         """Run the APIM initialization process"""
         self.log("Starting Gravitee API Management initialization...")
@@ -471,35 +839,78 @@ class ApimInitializer:
         
         if not definition_files:
             self.log("WARNING: No API definitions to import")
-            return True
+        else:
+            # Import each API definition
+            api_success_count = 0
+            api_failure_count = 0
+            
+            for definition_file in definition_files:
+                if self.import_api_definition(definition_file):
+                    api_success_count += 1
+                else:
+                    api_failure_count += 1
+            
+            self.log(f"API Import: {api_success_count} successful, {api_failure_count} failed")
         
-        # Import each API definition
-        success_count = 0
-        failure_count = 0
+        self.log("-" * 80)
         
-        for definition_file in definition_files:
-            if self.import_api_definition(definition_file):
-                success_count += 1
+        # ==================== Application Creation ====================
+        self.log("Processing Applications...")
+        app_config_files = self.get_application_config_files()
+        
+        app_success_count = 0
+        app_failure_count = 0
+        
+        for config_file in app_config_files:
+            if self.create_application(config_file):
+                app_success_count += 1
             else:
-                failure_count += 1
+                app_failure_count += 1
+        
+        if app_config_files:
+            self.log(f"Applications: {app_success_count} successful, {app_failure_count} failed")
+        
+        self.log("-" * 80)
+        
+        # ==================== Subscription Creation ====================
+        self.log("Processing Subscriptions...")
+        sub_config_files = self.get_subscription_config_files()
+        
+        total_sub_success = 0
+        
+        for config_file in sub_config_files:
+            success_count = self.process_subscriptions(config_file)
+            total_sub_success += success_count
+        
+        if sub_config_files:
+            self.log(f"Subscriptions: {total_sub_success} created/verified")
         
         self.log("=" * 80)
         
-        if failure_count == 0:
-            self.log("✓ API Management initialization completed successfully!")
-        else:
-            self.log(f"⚠ API Management initialization completed with {failure_count} error(s)")
+        # Final Summary
+        total_failures = 0
+        if definition_files:
+            total_failures += len(definition_files) - len([f for f in definition_files if self.import_api_definition])
         
         self.log("")
         self.log("Summary:")
-        self.log(f"  - Total API definitions: {len(definition_files)}")
-        self.log(f"  - Successfully processed: {success_count}")
-        self.log(f"  - Failed: {failure_count}")
-        
+        self.log(f"  - APIs processed: {len(self.imported_apis)}")
         if self.imported_apis:
-            self.log(f"  - Processed APIs (imported, published, started): {', '.join(self.imported_apis)}")
+            self.log(f"    APIs: {', '.join(self.imported_apis)}")
         
-        return failure_count == 0
+        self.log(f"  - Applications processed: {len(self.created_applications)}")
+        if self.created_applications:
+            self.log(f"    Applications: {', '.join(self.created_applications)}")
+        
+        self.log(f"  - Subscriptions processed: {len(self.created_subscriptions)}")
+        if self.created_subscriptions:
+            for sub in self.created_subscriptions:
+                self.log(f"    - {sub}")
+        
+        self.log("")
+        self.log("✓ API Management initialization completed!")
+        
+        return True
 
 
 def main():

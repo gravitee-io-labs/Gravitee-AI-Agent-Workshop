@@ -1,0 +1,25 @@
+# Gravitee Hotels Application Configuration
+# This is a browser-based application for the Gravitee Hotels demo
+
+name: "Gravitee Hotels"
+description: "Gravitee Hotels application"
+type: "BROWSER"
+
+# OAuth2/OIDC Settings
+clientId: "gravitee-hotels"
+clientSecret: "gravitee-hotels"
+
+redirectUris:
+  - "http://localhost:8002/"
+  - "https://oauth.pstmn.io/v1/callback"
+
+scopes:
+  - "openid"
+  - "profile"
+  - "email"
+
+# Custom token claims (optional)
+# tokenCustomClaims:
+#   - tokenType: "ACCESS_TOKEN"
+#     claimName: "custom-claim"
+#     claimValue: "custom-value"

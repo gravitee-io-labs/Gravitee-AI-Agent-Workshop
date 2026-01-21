@@ -1,26 +1,28 @@
 {
   "export": {
-    "date": "2025-11-10T17:33:04.592958052Z",
-    "apimVersion": "4.9.3"
+    "date": "2026-01-21T14:43:59.632685506Z",
+    "apimVersion": "4.10.0"
   },
   "api": {
     "definitionVersion": "V4",
-    "type": "PROXY",
+    "type": "LLM_PROXY",
     "listeners": [
       {
         "type": "HTTP",
         "paths": [
           {
-            "path": "/llm/",
+            "path": "/llm-proxy/",
             "overrideAccess": false
           }
         ],
         "pathMappings": [],
         "entrypoints": [
           {
-            "type": "http-proxy",
-            "qos": "AUTO",
-            "configuration": {}
+            "type": "llm-proxy",
+            "qos": "NONE",
+            "configuration": {
+              "enforceUsage": true
+            }
           }
         ],
         "servers": []
@@ -28,22 +30,70 @@
     ],
     "endpointGroups": [
       {
-        "name": "Default HTTP proxy group",
-        "type": "http-proxy",
+        "name": "ollama",
+        "type": "llm-proxy",
         "loadBalancer": {
           "type": "ROUND_ROBIN"
         },
-        "sharedConfiguration": "{\"proxy\":{\"useSystemProxy\":false,\"enabled\":false},\"http\":{\"keepAliveTimeout\":10000,\"keepAlive\":true,\"propagateClientHost\":false,\"followRedirects\":false,\"readTimeout\":60000,\"idleTimeout\":60000,\"connectTimeout\":3000,\"useCompression\":true,\"maxConcurrentConnections\":20,\"version\":\"HTTP_1_1\",\"pipelining\":false},\"ssl\":{\"keyStore\":{\"type\":\"\"},\"hostnameVerifier\":true,\"trustStore\":{\"type\":\"\"},\"trustAll\":false}}",
+        "sharedConfiguration": "{\"proxy\":{\"useSystemProxy\":false,\"enabled\":false},\"http\":{\"keepAliveTimeout\":30000,\"keepAlive\":true,\"propagateClientHost\":false,\"followRedirects\":false,\"readTimeout\":10000,\"idleTimeout\":0,\"connectTimeout\":3000,\"useCompression\":true,\"maxConcurrentConnections\":20,\"version\":\"HTTP_1_1\",\"pipelining\":false},\"ssl\":{\"keyStore\":{\"type\":\"\"},\"hostnameVerifier\":true,\"trustStore\":{\"type\":\"\"},\"trustAll\":false}}",
         "endpoints": [
           {
-            "name": "Default HTTP proxy",
-            "type": "http-proxy",
+            "name": "ollama default endpoint",
+            "type": "llm-proxy",
             "weight": 1,
             "inheritConfiguration": true,
             "configuration": {
-              "target": "http://ollama:11434"
+              "models": [
+                {
+                  "outputPrice": 1,
+                  "name": "qwen3:0.6b",
+                  "inputPrice": 0.1
+                }
+              ],
+              "provider": "OPEN_AI_COMPATIBLE",
+              "target": "http://host.docker.internal:11434/v1",
+              "authentication": {
+                "type": "NONE"
+              }
             },
-            "sharedConfigurationOverride": "{}",
+            "sharedConfigurationOverride": "{\"http\":{\"version\":\"HTTP_1_1\",\"keepAlive\":true,\"keepAliveTimeout\":30000,\"connectTimeout\":3000,\"pipelining\":false,\"readTimeout\":10000,\"useCompression\":true,\"propagateClientHost\":false,\"idleTimeout\":0,\"followRedirects\":false,\"maxConcurrentConnections\":20},\"proxy\":{\"enabled\":false,\"useSystemProxy\":false},\"ssl\":{\"hostnameVerifier\":true,\"trustAll\":false,\"trustStore\":{\"type\":\"\"},\"keyStore\":{\"type\":\"\"}}}",
+            "services": {},
+            "secondary": false,
+            "tenants": []
+          }
+        ],
+        "services": {}
+      },
+      {
+        "name": "gemini",
+        "type": "llm-proxy",
+        "loadBalancer": {
+          "type": "ROUND_ROBIN"
+        },
+        "sharedConfiguration": "{\"proxy\":{\"useSystemProxy\":false,\"enabled\":false},\"http\":{\"keepAliveTimeout\":30000,\"keepAlive\":true,\"propagateClientHost\":false,\"followRedirects\":false,\"readTimeout\":10000,\"idleTimeout\":0,\"connectTimeout\":3000,\"useCompression\":true,\"maxConcurrentConnections\":20,\"version\":\"HTTP_1_1\",\"pipelining\":false},\"ssl\":{\"keyStore\":{\"type\":\"\"},\"hostnameVerifier\":true,\"trustStore\":{\"type\":\"\"},\"trustAll\":false}}",
+        "endpoints": [
+          {
+            "name": "gemini default endpoint",
+            "type": "llm-proxy",
+            "weight": 1,
+            "inheritConfiguration": true,
+            "configuration": {
+              "models": [
+                {
+                  "outputPrice": 3,
+                  "name": "gemini-3-flash-preview",
+                  "inputPrice": 0.5
+                }
+              ],
+              "provider": "GEMINI",
+              "target": "https://generativelanguage.googleapis.com/v1beta",
+              "authentication": {
+                "headerName": "X-goog-api-key",
+                "apiKey": "AIzaSyB1mW5zvhxQYd4cpOxroXATNNNZxo2d-G4",
+                "type": "API_KEY"
+              }
+            },
+            "sharedConfigurationOverride": "{\"http\":{\"version\":\"HTTP_1_1\",\"keepAlive\":true,\"keepAliveTimeout\":30000,\"connectTimeout\":3000,\"pipelining\":false,\"readTimeout\":10000,\"useCompression\":true,\"propagateClientHost\":false,\"idleTimeout\":0,\"followRedirects\":false,\"maxConcurrentConnections\":20},\"proxy\":{\"enabled\":false,\"useSystemProxy\":false},\"ssl\":{\"hostnameVerifier\":true,\"trustAll\":false,\"trustStore\":{\"type\":\"\"},\"keyStore\":{\"type\":\"\"}}}",
             "services": {},
             "secondary": false,
             "tenants": []
@@ -80,25 +130,120 @@
       "mode": "DEFAULT",
       "matchRequired": false
     },
-    "flows": [],
-    "id": "ae35e359-c327-48c6-b5e3-59c32798c69f",
-    "name": "LLM - Ollama",
-    "description": "LLM - Ollama.\nUsed by the agent to decide which tool to use.",
+    "flows": [
+      {
+        "id": "ddeba02b-bc61-49ad-aba0-2bbc6119ad49",
+        "enabled": true,
+        "selectors": [
+          {
+            "type": "HTTP",
+            "path": "/chat/completions",
+            "pathOperator": "EQUALS",
+            "methods": [
+              "POST"
+            ]
+          }
+        ],
+        "request": [
+          {
+            "name": "AI - Prompt Guard Rails",
+            "description": "Block Toxic Requests",
+            "enabled": true,
+            "policy": "ai-prompt-guard-rails",
+            "configuration": {
+              "sensitivityThreshold": 0.2,
+              "resourceName": "toxicity-classifier",
+              "contentChecks": "toxic",
+              "promptLocation": "{#jsonPath(#request.content, '$.messages[?(@.role==\"user\")].content')}",
+              "requestPolicy": "BLOCK_REQUEST"
+            }
+          },
+          {
+            "name": "Token Rate Limit",
+            "enabled": true,
+            "policy": "token-ratelimit",
+            "configuration": {
+              "addHeaders": true,
+              "rate": {
+                "useKeyOnly": false,
+                "periodTime": 10,
+                "limit": 400,
+                "periodTimeUnit": "SECONDS",
+                "key": ""
+              },
+              "strategy": "ASYNC_MODE"
+            }
+          }
+        ],
+        "response": [],
+        "subscribe": [],
+        "publish": [],
+        "connect": [],
+        "interact": [],
+        "tags": []
+      },
+      {
+        "id": "f6578874-a1ac-4399-9788-74a1ac03992e",
+        "enabled": true,
+        "selectors": [
+          {
+            "type": "HTTP",
+            "path": "/models",
+            "pathOperator": "EQUALS",
+            "methods": [
+              "GET"
+            ]
+          }
+        ],
+        "request": [],
+        "response": [],
+        "subscribe": [],
+        "publish": [],
+        "connect": [],
+        "interact": [],
+        "tags": []
+      },
+      {
+        "id": "bdf209e3-c5b6-4927-b209-e3c5b6b92711",
+        "enabled": true,
+        "selectors": [
+          {
+            "type": "HTTP",
+            "path": "/embeddings",
+            "pathOperator": "EQUALS",
+            "methods": [
+              "POST"
+            ]
+          }
+        ],
+        "request": [],
+        "response": [],
+        "subscribe": [],
+        "publish": [],
+        "connect": [],
+        "interact": [],
+        "tags": []
+      }
+    ],
+    "id": "c667b02d-b946-487c-a7b0-2db946387ce3",
+    "name": "ACME Hotels LLMs",
+    "description": "ACME Hotels LLMs",
     "apiVersion": "1.0",
-    "deployedAt": "2025-11-10T17:32:57.359Z",
-    "createdAt": "2025-09-25T16:41:01.216Z",
-    "updatedAt": "2025-11-10T17:32:57.359Z",
+    "deployedAt": "2026-01-13T12:49:51.672Z",
+    "createdAt": "2025-12-19T17:07:25.682Z",
+    "updatedAt": "2026-01-16T03:39:20.274Z",
     "disableMembershipNotifications": false,
     "groups": [],
     "state": "STARTED",
     "visibility": "PRIVATE",
     "labels": [
-      "llm"
+      "llm-proxy",
+      "unified access to LLMs"
     ],
     "lifecycleState": "PUBLISHED",
     "tags": [],
     "primaryOwner": {
-      "id": "a8fbc6e4-f4c9-4729-bbc6-e4f4c9f7299e",
+      "id": "1f89bd40-77be-4f8f-89bd-4077be1f8fd0",
       "email": "dorian.blanc@graviteesource.com",
       "displayName": "Dorian Blanc",
       "type": "USER"
@@ -110,7 +255,7 @@
     "responseTemplates": {},
     "resources": [
       {
-        "name": "model",
+        "name": "toxicity-classifier",
         "type": "ai-model-text-classification",
         "configuration": "{\"model\":{\"type\":\"GRAVITEE_IO_DISTILBERT_MULTILINGUAL_TOXICITY_CLASSIFIER\"}}",
         "enabled": true
@@ -122,122 +267,11 @@
   "plans": [
     {
       "definitionVersion": "V4",
-      "flows": [
-        {
-          "id": "4e5bbda1-2e07-41dc-9bbd-a12e0741dca4",
-          "name": "Generate",
-          "enabled": true,
-          "selectors": [
-            {
-              "type": "HTTP",
-              "path": "/api/generate",
-              "pathOperator": "STARTS_WITH",
-              "methods": [
-                "POST"
-              ]
-            }
-          ],
-          "request": [
-            {
-              "name": "AI - Prompt Guard Rails",
-              "description": "Block Toxic Requests",
-              "enabled": true,
-              "policy": "ai-prompt-guard-rails",
-              "configuration": {
-                "sensitivityThreshold": 0.5,
-                "resourceName": "model",
-                "contentChecks": "toxic",
-                "promptLocation": "{#jsonPath(#request.content, '$.prompt')}",
-                "requestPolicy": "BLOCK_REQUEST"
-              }
-            }
-          ],
-          "response": [
-            {
-              "name": "AI - Prompt Token Tracking",
-              "description": "Track Token Usage",
-              "enabled": true,
-              "policy": "ai-prompt-token-tracking",
-              "configuration": {
-                "extraction": {
-                  "outputTokenPointer": "{#jsonPath(#response.content, '$.eval_count')}",
-                  "modelPointer": "{#jsonPath(#response.content, '$.model')}",
-                  "type": "CUSTOM",
-                  "inputTokenPointer": "{#jsonPath(#response.content, '$.prompt_eval_count')}"
-                },
-                "pricing": {
-                  "type": "none"
-                }
-              },
-              "condition": "{#response.status == 200}"
-            }
-          ],
-          "subscribe": [],
-          "publish": [],
-          "connect": [],
-          "interact": [],
-          "tags": []
-        },
-        {
-          "id": "7ab53692-9f82-4923-b536-929f82d92388",
-          "name": "Chat",
-          "enabled": true,
-          "selectors": [
-            {
-              "type": "HTTP",
-              "path": "/api/chat",
-              "pathOperator": "STARTS_WITH",
-              "methods": [
-                "POST"
-              ]
-            }
-          ],
-          "request": [
-            {
-              "name": "AI - Prompt Guard Rails",
-              "description": "Block Toxic Requests",
-              "enabled": true,
-              "policy": "ai-prompt-guard-rails",
-              "configuration": {
-                "sensitivityThreshold": 0.5,
-                "resourceName": "model",
-                "contentChecks": "toxic",
-                "promptLocation": "{#jsonPath(#request.content, \"$.messages[?(@.role=='user')].content\")[0]}",
-                "requestPolicy": "BLOCK_REQUEST"
-              }
-            }
-          ],
-          "response": [
-            {
-              "name": "AI - Prompt Token Tracking",
-              "description": "Track Token Usage",
-              "enabled": true,
-              "policy": "ai-prompt-token-tracking",
-              "configuration": {
-                "extraction": {
-                  "outputTokenPointer": "{#jsonPath(#response.content, '$.eval_count')}",
-                  "modelPointer": "{#jsonPath(#response.content, '$.model')}",
-                  "type": "CUSTOM",
-                  "inputTokenPointer": "{#jsonPath(#response.content, '$.prompt_eval_count')}"
-                },
-                "pricing": {
-                  "type": "none"
-                }
-              },
-              "condition": "{#response.status == 200}"
-            }
-          ],
-          "subscribe": [],
-          "publish": [],
-          "connect": [],
-          "interact": [],
-          "tags": []
-        }
-      ],
-      "id": "79e57058-8724-4c13-a570-588724cc1383",
+      "flows": [],
+      "id": "ddb12659-1c34-4a6b-b126-591c343a6b68",
       "name": "Open",
       "description": "Default unsecured plan",
-      "apiId": "ae35e359-c327-48c6-b5e3-59c32798c69f",
+      "apiId": "c667b02d-b946-487c-a7b0-2db946387ce3",
       "security": {
         "type": "KEY_LESS",
         "configuration": {}
@@ -245,14 +279,14 @@
       "mode": "STANDARD",
       "characteristics": [],
       "commentRequired": false,
-      "createdAt": "2025-09-25T16:41:01.319Z",
+      "createdAt": "2025-12-19T17:07:25.824Z",
       "excludedGroups": [],
       "order": 1,
-      "publishedAt": "2025-09-25T16:41:01.342Z",
+      "publishedAt": "2025-12-19T17:07:25.853Z",
       "status": "PUBLISHED",
       "tags": [],
       "type": "API",
-      "updatedAt": "2025-11-04T23:35:54.153Z",
+      "updatedAt": "2025-12-19T17:07:25.853Z",
       "validation": "MANUAL"
     }
   ],

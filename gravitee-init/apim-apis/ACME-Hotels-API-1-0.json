@@ -1,0 +1,467 @@
+{
+  "export": {
+    "date": "2026-01-21T14:43:56.504776463Z",
+    "apimVersion": "4.10.0"
+  },
+  "api": {
+    "definitionVersion": "V4",
+    "type": "PROXY",
+    "listeners": [
+      {
+        "type": "HTTP",
+        "paths": [
+          {
+            "path": "/hotels/",
+            "overrideAccess": false
+          }
+        ],
+        "pathMappings": [],
+        "cors": {
+          "allowCredentials": false,
+          "allowHeaders": [
+            "*"
+          ],
+          "allowMethods": [
+            "*"
+          ],
+          "allowOrigin": [
+            "*"
+          ],
+          "enabled": true,
+          "exposeHeaders": [],
+          "maxAge": -1,
+          "runPolicies": false
+        },
+        "entrypoints": [
+          {
+            "type": "http-proxy",
+            "qos": "AUTO",
+            "configuration": {}
+          }
+        ],
+        "servers": []
+      }
+    ],
+    "endpointGroups": [
+      {
+        "name": "Hotel Booking Backend Group",
+        "type": "http-proxy",
+        "loadBalancer": {
+          "type": "ROUND_ROBIN"
+        },
+        "sharedConfiguration": "{\"proxy\":{\"useSystemProxy\":false,\"enabled\":false},\"http\":{\"keepAliveTimeout\":30000,\"keepAlive\":true,\"propagateClientHost\":false,\"followRedirects\":false,\"readTimeout\":10000,\"idleTimeout\":60000,\"connectTimeout\":3000,\"useCompression\":true,\"maxConcurrentConnections\":20,\"version\":\"HTTP_1_1\",\"pipelining\":false},\"ssl\":{\"keyStore\":{\"type\":\"\"},\"hostnameVerifier\":true,\"trustStore\":{\"type\":\"\"},\"trustAll\":false}}",
+        "endpoints": [
+          {
+            "name": "hotel-booking-backend",
+            "type": "http-proxy",
+            "weight": 1,
+            "inheritConfiguration": true,
+            "configuration": {
+              "target": "http://hotel-booking-api:8000"
+            },
+            "sharedConfigurationOverride": "{}",
+            "services": {},
+            "secondary": false,
+            "tenants": []
+          }
+        ],
+        "services": {}
+      },
+      {
+        "name": "Hotel Bookings MCP Server Group",
+        "type": "http-proxy",
+        "loadBalancer": {
+          "type": "ROUND_ROBIN"
+        },
+        "sharedConfiguration": "{\"proxy\":{\"useSystemProxy\":false,\"enabled\":false},\"http\":{\"keepAliveTimeout\":30000,\"keepAlive\":true,\"propagateClientHost\":false,\"followRedirects\":false,\"readTimeout\":10000,\"idleTimeout\":0,\"connectTimeout\":3000,\"useCompression\":true,\"maxConcurrentConnections\":20,\"version\":\"HTTP_1_1\",\"pipelining\":false},\"ssl\":{\"keyStore\":{\"type\":\"\"},\"hostnameVerifier\":true,\"trustStore\":{\"type\":\"\"},\"trustAll\":false}}",
+        "endpoints": [
+          {
+            "name": "hotel-booking-mcp-server",
+            "type": "http-proxy",
+            "weight": 1,
+            "inheritConfiguration": true,
+            "configuration": {
+              "target": "http://localhost:8082/hotels-mcp"
+            },
+            "sharedConfigurationOverride": "{}",
+            "services": {},
+            "secondary": false,
+            "tenants": []
+          }
+        ],
+        "services": {}
+      }
+    ],
+    "analytics": {
+      "enabled": true,
+      "logging": {
+        "content": {
+          "headers": true,
+          "messageHeaders": false,
+          "payload": true,
+          "messagePayload": false,
+          "messageMetadata": false
+        },
+        "phase": {
+          "request": true,
+          "response": true
+        },
+        "mode": {
+          "endpoint": true,
+          "entrypoint": true
+        }
+      },
+      "tracing": {
+        "enabled": false,
+        "verbose": false
+      }
+    },
+    "flowExecution": {
+      "mode": "DEFAULT",
+      "matchRequired": false
+    },
+    "flows": [
+      {
+        "id": "2c72bc17-624a-4173-b2bc-17624a1173e4",
+        "name": "MCP Server",
+        "enabled": true,
+        "selectors": [
+          {
+            "type": "HTTP",
+            "path": "/mcp",
+            "pathOperator": "EQUALS",
+            "methods": [
+              "POST"
+            ]
+          }
+        ],
+        "request": [
+          {
+            "name": "Dynamic Routing",
+            "description": "Route traffic to the Gravitee MCP Tool Server",
+            "enabled": true,
+            "policy": "dynamic-routing",
+            "configuration": {
+              "rules": [
+                {
+                  "pattern": "/(.*)",
+                  "url": "{#endpoints['hotel-booking-mcp-server']}/{#group[0]}"
+                }
+              ]
+            }
+          }
+        ],
+        "response": [
+          {
+            "name": "JSON to JSON Transformation",
+            "description": "Properly send an error when backends send an error",
+            "enabled": true,
+            "policy": "json-to-json",
+            "configuration": {
+              "overrideContentType": true,
+              "scope": "REQUEST",
+              "specification": "[\n  {\n    \"operation\": \"shift\",\n    \"spec\": {\n      \"jsonrpc\": \"jsonrpc\",\n      \"id\": \"id\",\n      \"result\": {\n        \"content\": \"result.content\",\n        \"error\": {\n          \"#true\": \"result.isError\"\n        }\n      }\n    }\n  },\n  {\n    \"operation\": \"modify-overwrite-beta\",\n    \"spec\": {\n      \"result\": {\n        \"isError\": \"=toBoolean\"\n      }\n    }\n  }\n]"
+            },
+            "condition": "{#response.headers['X-Gravitee-Endpoint-Status'][0] != '200'}"
+          },
+          {
+            "name": "Transform Headers",
+            "description": "Remove X-Gravitee-Endpoint-Status header",
+            "enabled": true,
+            "policy": "transform-headers",
+            "configuration": {
+              "whitelistHeaders": [],
+              "scope": "REQUEST",
+              "removeHeaders": [
+                "X-Gravitee-Endpoint-Status"
+              ]
+            }
+          }
+        ],
+        "subscribe": [],
+        "publish": [],
+        "connect": [],
+        "interact": [],
+        "tags": []
+      }
+    ],
+    "id": "fbdadc8b-13e0-4638-9adc-8b13e0e638fa",
+    "name": "ACME Hotels API",
+    "description": "ACME Hotels API",
+    "apiVersion": "1.0",
+    "deployedAt": "2026-01-13T12:35:07.845Z",
+    "createdAt": "2026-01-12T22:55:52.975Z",
+    "updatedAt": "2026-01-16T03:39:19.789Z",
+    "disableMembershipNotifications": false,
+    "groups": [],
+    "state": "STARTED",
+    "visibility": "PRIVATE",
+    "labels": [
+      "hotels"
+    ],
+    "lifecycleState": "PUBLISHED",
+    "tags": [],
+    "primaryOwner": {
+      "id": "1f89bd40-77be-4f8f-89bd-4077be1f8fd0",
+      "email": "dorian.blanc@graviteesource.com",
+      "displayName": "Dorian Blanc",
+      "type": "USER"
+    },
+    "categories": [],
+    "originContext": {
+      "origin": "MANAGEMENT"
+    },
+    "responseTemplates": {},
+    "resources": [],
+    "properties": []
+  },
+  "pages": [
+    {
+      "id": "17613053-52bb-472c-a130-5352bb572c43",
+      "name": "OpenAPI",
+      "type": "SWAGGER",
+      "content": "openapi: 3.0.3\ninfo:\n  title: ACME Hotel API\n  version: \"1.0\"\n  description: Acme Hotel API to manage Accommodations and Bookings\nservers:\n  - url: http://localhost:8082/hotels\ntags:\n  - name: Accommodations\n    description: Browse available accommodations\n  - name: Bookings\n    description: Manage hotel bookings\n\npaths:\n  /accommodations:\n    get:\n      tags: [Accommodations]\n      summary: Retrieves a list of available accommodations. Optionally filter by location.\n      operationId: getAccommodations\n      parameters:\n        - name: location\n          in: query\n          required: false\n          schema:\n            type: string\n          description: Filter by city name (e.g., London, Paris, New York)\n      responses:\n        \"200\":\n          description: List of accommodations\n          content:\n            application/json:\n              schema:\n                type: array\n                items:\n                  $ref: \"#/components/schemas/Accommodation\"\n\n  /bookings:\n    get:\n      tags: [Bookings]\n      summary: Retrieves all existing bookings.\n      operationId: getBookings\n      security:\n        - oauth2: [read:bookings]\n        - bearerAuth: []\n      responses:\n        \"200\":\n          description: List of bookings for a specific user\n          content:\n            application/json:\n              schema:\n                type: array\n                items:\n                  $ref: \"#/components/schemas/Booking\"\n        \"401\":\n          description: Unauthorized - Missing or invalid authentication token\n          content:\n            application/json:\n              schema:\n                type: object\n                properties:\n                  error:\n                    type: string\n                    example: \"Unauthorized\"\n                  message:\n                    type: string\n                    example: \"Valid authentication token is required\"\n        \"403\":\n          description: Forbidden - Insufficient permissions\n          content:\n            application/json:\n              schema:\n                type: object\n                properties:\n                  error:\n                    type: string\n                    example: \"Forbidden\"\n                  message:\n                    type: string\n                    example: \"Insufficient permissions to access this resource\"\n\ncomponents:\n  securitySchemes:\n    oauth2:\n      type: oauth2\n      description: OAuth2 authentication with authorization code flow\n      flows:\n        authorizationCode:\n          authorizationUrl: http://localhost:8092/gravitee/oauth/authorize\n          tokenUrl: http://localhost:8092/gravitee/oauth/token\n          scopes:\n            read:bookings: Read access to booking information\n            write:bookings: Write access to create or modify bookings\n        clientCredentials:\n          tokenUrl: http://localhost:8092/gravitee/oauth/token\n          scopes:\n            read:bookings: Read access to booking information\n            write:bookings: Write access to create or modify bookings\n    bearerAuth:\n      type: http\n      scheme: bearer\n      bearerFormat: JWT\n      description: JWT Bearer token authentication\n\n  schemas:\n    Accommodation:\n      type: object\n      properties:\n        id:\n          type: integer\n          example: 1\n        name:\n          type: string\n          example: The Grand Hotel London\n        location:\n          type: string\n          example: London\n        description:\n          type: string\n          example: Luxury 5-star hotel in central London with exceptional service\n        price_per_night:\n          type: number\n          format: float\n          example: 350.0\n        available_rooms:\n          type: integer\n          example: 15\n      required:\n        - id\n        - name\n        - location\n        - description\n        - price_per_night\n        - available_rooms\n\n    Booking:\n      type: object\n      properties:\n        id:\n          type: integer\n          example: 1\n        user_email:\n          type: string\n          format: email\n          description: Email address of the booking owner\n          example: john.doe@gravitee.io\n        hotel_name:\n          type: string\n          example: The Grand Hotel London\n        room_number:\n          type: string\n          example: \"305\"\n        start_date:\n          type: string\n          format: date-time\n          example: \"2025-10-17T14:00:00\"\n        end_date:\n          type: string\n          format: date-time\n          example: \"2025-10-24T11:00:00\"\n        price:\n          type: number\n          format: float\n          example: 2450.0\n      required:\n        - id\n        - user_email\n        - hotel_name\n        - room_number\n        - start_date\n        - end_date\n        - price\n",
+      "order": 0,
+      "published": true,
+      "visibility": "PUBLIC",
+      "updatedAt": "2026-01-13T12:00:58.843Z",
+      "configuration": {
+        "viewer": "Swagger",
+        "entrypointAsBasePath": "false",
+        "entrypointsAsServers": "false",
+        "tryItURL": "",
+        "tryIt": "true",
+        "disableSyntaxHighlight": "false",
+        "tryItAnonymous": "false",
+        "showURL": "false",
+        "displayOperationId": "false",
+        "usePkce": "false",
+        "docExpansion": "none",
+        "enableFiltering": "false",
+        "showExtensions": "false",
+        "showCommonExtensions": "false",
+        "maxDisplayedTags": "-1"
+      },
+      "homepage": false,
+      "excludedAccessControls": false,
+      "accessControls": [],
+      "attachedMedia": [],
+      "metadata": {}
+    },
+    {
+      "id": "8edec398-c055-423f-9ec3-98c055a23f3b",
+      "name": "Aside",
+      "type": "SYSTEM_FOLDER",
+      "order": 0,
+      "published": true,
+      "visibility": "PUBLIC",
+      "updatedAt": "2026-01-12T22:55:53.039Z",
+      "configuration": {},
+      "homepage": false,
+      "excludedAccessControls": false,
+      "accessControls": [],
+      "attachedMedia": [],
+      "metadata": {}
+    },
+    {
+      "id": "7ddd1907-922e-4ed5-9d19-07922e2ed5ba",
+      "name": "Homepage",
+      "type": "MARKDOWN",
+      "content": "# 🏨 Hotel API\n\nThe **Hotel API** provides a modern, secure interface for discovering hotel accommodations and managing bookings.  \nIt is designed for partners, agencies, and internal applications that require authenticated access to booking data.\n\n---\n\n## 🌐 Overview\n\nThis API enables seamless integration with hotel reservation systems.  \nIt supports both **public data retrieval** (accommodation browsing) and **protected operations** (booking management).\n\nAuthentication is enforced via **OAuth2** or **JWT Bearer tokens**, ensuring sensitive information such as booking details remains secure.\n\n---\n\n## 🔐 Authentication\n\nThe API uses standard authentication mechanisms for maximum flexibility and security.\n\n### OAuth2 Authentication\nSupports both the **Authorization Code** and **Client Credentials** flows for delegated and machine-to-machine access.\n\n**Endpoints:**\n- Authorization URL: `https://auth.example.com/oauth/authorize`\n- Token URL: `https://auth.example.com/oauth/token`\n\n**Scopes:**\n- `read:bookings` – Read access to booking data  \n- `write:bookings` – Create or modify bookings\n\n### Bearer Token (JWT)\nApplications can also use JWT Bearer tokens for quick access.\n\nHeader example:\n```\nAuthorization: Bearer <your_jwt_token>\n```\n\n---\n\n## 💡 Key Features\n\n- 🔎 **Browse Accommodations:** Search for available hotels by location.  \n- 🛎️ **Manage Bookings:** View or manage confirmed reservations (requires authentication).  \n- 🧭 **Flexible Security:** Compatible with OAuth2 and JWT-based authentication.  \n- 💬 **Rich Metadata:** Each accommodation includes detailed descriptions, pricing, and room availability.  \n- ⚙️ **Standardized Model:** Follows OpenAPI 3.0.3 specifications for easy integration.  \n\n---\n\n## 📦 Data Models\n\n### Accommodation\nDescribes a hotel listing, including pricing and availability.\n\n| Field | Type | Description |\n|--------|------|-------------|\n| `id` | integer | Unique accommodation identifier |\n| `name` | string | Name of the hotel |\n| `location` | string | City or region where the hotel is located |\n| `description` | string | Hotel summary or key features |\n| `price_per_night` | number | Price per night (in USD) |\n| `available_rooms` | integer | Number of available rooms |\n\n### Booking\nRepresents a confirmed reservation made by an authenticated user.\n\n| Field | Type | Description |\n|--------|------|-------------|\n| `id` | integer | Unique booking identifier |\n| `user_email` | string | Email of the booking owner |\n| `hotel_name` | string | Name of the booked hotel |\n| `room_number` | string | Room number assigned |\n| `start_date` | date-time | Start date/time of the stay |\n| `end_date` | date-time | End date/time of the stay |\n| `price` | number | Total cost of the booking |\n\n## 📖 API Reference\n\nThe full OpenAPI specification is available in the documentation pages.\n\n---\n\n© 2025 Gravitee – Hotel API\n",
+      "order": 1,
+      "published": true,
+      "visibility": "PUBLIC",
+      "updatedAt": "2026-01-13T12:00:22.096Z",
+      "configuration": {},
+      "homepage": true,
+      "excludedAccessControls": false,
+      "accessControls": [],
+      "attachedMedia": [],
+      "metadata": {}
+    }
+  ],
+  "plans": [
+    {
+      "definitionVersion": "V4",
+      "flows": [
+        {
+          "id": "e732c9c7-1f1b-44da-b2c9-c71f1b14da26",
+          "name": "Default",
+          "enabled": true,
+          "selectors": [
+            {
+              "type": "HTTP",
+              "path": "/",
+              "pathOperator": "STARTS_WITH",
+              "methods": []
+            }
+          ],
+          "request": [
+            {
+              "name": "HTTP Callout",
+              "description": "Fine-Grained Authorization (FGA) PEP",
+              "enabled": true,
+              "policy": "policy-http-callout",
+              "configuration": {
+                "headers": [
+                  {
+                    "name": "Authorization",
+                    "value": "Basic aG90ZWwtYm9va2luZ3MtbWNwOmhvdGVsLWJvb2tpbmdzLW1jcA=="
+                  }
+                ],
+                "variables": [],
+                "method": "POST",
+                "errorContent": "{ \"reason\": \"This user is not authorized to proceed with this resource.\" }",
+                "fireAndForget": false,
+                "scope": "REQUEST",
+                "errorStatusCode": "403",
+                "body": "{ \"subject\": { \"type\": \"user\", \"id\": \"{#context.attributes['jwt.claims']['sub-email']}\"}, \"resource\": { \"type\": \"booking\", \"id\": \"booking-001\" }, \"action\": { \"name\": \"can_view\" } }",
+                "errorCondition": "{#jsonPath(#calloutResponse.content, '$.decision') == false}",
+                "url": "http://gio-am-gateway:8092/gravitee/access/v1/evaluation",
+                "exitOnError": true
+              },
+              "condition": "{#request.path == '/hotels/bookings'}"
+            }
+          ],
+          "response": [],
+          "subscribe": [],
+          "publish": [],
+          "connect": [],
+          "interact": [],
+          "tags": []
+        }
+      ],
+      "id": "f9ad85b7-758b-49ad-ad85-b7758b39ad36",
+      "name": "Bookings Management",
+      "description": "Restricted access, for bookings management.",
+      "apiId": "fbdadc8b-13e0-4638-9adc-8b13e0e638fa",
+      "security": {
+        "type": "JWT",
+        "configuration": {
+          "signature": "RSA_RS256",
+          "publicKeyResolver": "JWKS_URL",
+          "resolverParameter": "http://gio-am-gateway:8092/gravitee/oidc/.well-known/jwks.json",
+          "connectTimeout": 2000,
+          "requestTimeout": 2000,
+          "followRedirects": false,
+          "useSystemProxy": false,
+          "extractClaims": true,
+          "propagateAuthHeader": true,
+          "userClaim": "sub",
+          "confirmationMethodValidation": {
+            "ignoreMissing": false,
+            "certificateBoundThumbprint": {
+              "enabled": false,
+              "extractCertificateFromHeader": false,
+              "headerName": "ssl-client-cert"
+            }
+          },
+          "tokenTypValidation": {
+            "enabled": false,
+            "ignoreMissing": false,
+            "expectedValues": [
+              "JWT"
+            ],
+            "ignoreCase": false
+          },
+          "revocationCheck": {
+            "enabled": false,
+            "revocationClaim": "jti",
+            "refreshInterval": 300,
+            "connectTimeout": 2000,
+            "requestTimeout": 2000,
+            "followRedirects": false,
+            "useSystemProxy": false,
+            "auth": {
+              "type": "none"
+            }
+          }
+        }
+      },
+      "mode": "STANDARD",
+      "characteristics": [],
+      "commentMessage": "",
+      "commentRequired": false,
+      "createdAt": "2026-01-12T22:55:53.098Z",
+      "excludedGroups": [],
+      "generalConditions": "",
+      "order": 2,
+      "publishedAt": "2026-01-12T22:55:53.098Z",
+      "selectionRule": "",
+      "status": "PUBLISHED",
+      "tags": [],
+      "type": "API",
+      "updatedAt": "2026-01-13T12:35:06.291Z",
+      "validation": "MANUAL"
+    },
+    {
+      "definitionVersion": "V4",
+      "flows": [
+        {
+          "id": "42cd198d-eab5-46f8-8d19-8deab5e6f805",
+          "name": "Only Allow GET Accommodations",
+          "enabled": true,
+          "selectors": [
+            {
+              "type": "HTTP",
+              "path": "/",
+              "pathOperator": "STARTS_WITH",
+              "methods": []
+            },
+            {
+              "type": "CONDITION",
+              "condition": "{#request.path != '/hotels/mcp'}"
+            }
+          ],
+          "request": [
+            {
+              "name": "Resource Filtering",
+              "description": "Only Allow GET /accommodations",
+              "enabled": true,
+              "policy": "resource-filtering",
+              "configuration": {
+                "blacklist": [],
+                "whitelist": [
+                  {
+                    "methods": [
+                      "GET"
+                    ],
+                    "pattern": "/accommodations"
+                  }
+                ]
+              }
+            }
+          ],
+          "response": [],
+          "subscribe": [],
+          "publish": [],
+          "connect": [],
+          "interact": [],
+          "tags": []
+        }
+      ],
+      "id": "a9813101-1464-48bf-8131-01146408bf89",
+      "name": "Accommodation Availability",
+      "description": "Unrestricted access to list of publicly available accommodation",
+      "apiId": "fbdadc8b-13e0-4638-9adc-8b13e0e638fa",
+      "security": {
+        "type": "KEY_LESS",
+        "configuration": {}
+      },
+      "mode": "STANDARD",
+      "characteristics": [],
+      "commentRequired": false,
+      "createdAt": "2026-01-12T22:55:53.091Z",
+      "excludedGroups": [],
+      "order": 1,
+      "publishedAt": "2026-01-12T22:55:53.091Z",
+      "status": "PUBLISHED",
+      "tags": [],
+      "type": "API",
+      "updatedAt": "2026-01-12T22:55:53.091Z",
+      "validation": "MANUAL"
+    }
+  ],
+  "apiPicture": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAMgAAADOCAYAAAB7AU2DAAAAAXNSR0IArs4c6QAAADhlWElmTU0AKgAAAAgAAYdpAAQAAAABAAAAGgAAAAAAAqACAAQAAAABAAAAyKADAAQAAAABAAAAzgAAAAA30+oPAAAd5ElEQVR4Ae2dd9AVNffHg6KIAmJDRURABERFLFgYFcSGfzAqYEFBHSwjOvbeZ7DNi30soIiOqGPBOooFRLA3FBUUHFRQHCtFUbH7/vjk955rWPbeZ0v2Pnfvnszs3b3Z5OTkm/PdZJNs0uS/y51RpwgoAqEIrBLqq56KgCJgEVCCqCEoAhUQUIJUAEdvKQJKELUBRaACAkqQCuDoLUVACaI2oAhUQEAJUgEcvaUIKEHUBhSBCggoQSqAo7cUASWI2oAiUAEBJUgFcPSWIqAEURtQBCogoASpAI7eUgSUIGoDikAFBJQgFcDRW4qAEkRtQBGogIASpAI4eksRUIKoDSgCFRBQglQAR28pAkoQtQFFoAICSpAK4OgtRUAJojagCFRAoGmFe3pLEWgQgeCqUU2aNGkwTp4CaA2Sp9JSXauOgBKk6pDXV4L1VmMES6cumlj//POPuffee82LL75ouK73QgsWYmP8X2WVVUzfvn3N4YcfbrgONrUaQ6cs0mxSD0uPPvnkk7ag1lhjjbotqCwKP6lMHkAQ4vfffzd33323GThwYAn3ens41UUN8vrrr9uawy3wen2iuXlsjGshB2n//fffZvr06ZYgjaFLNdKsC4JABg6p6mlmyXU1QCxSGuCKA29whiT17OqCIG61/tdff5mNNtrI7LvvvjVZbm7N5uodVVniu0/xqPHKhYujA+SYPHmyWbBggVlttdXKiawr/7ogiFsiPNG6d+9ubrjhBtdbrz0hcNhhh5n58+eb1Vdf3ay66qqldw9P4mtOTF1287pP6cZGnGYI+sjh6hNVT4kr4ZFZDSfpkpakLedqpF8LadRdDRIFVHlHqRT2jz/+sE9JwpQzCrd5snTpUvPbb7/ZpkerVq3s05W4wXchZEk8OROukiOcq4O8B1SKU+ketSxPf3UNI1Aognz66afm4osvNj/88IO59NJLzc4777wSQhjiPffcY7svt9tuO3PZZZeZZs2arRQOI/3+++/Ngw8+aKZOnWrb5YsWLTItWrQwm2yyienZs6cZNmyY2XLLLVd4Z8DYX375ZXPLLbdYoy9n7EIIyMxYw4EHHmh1+PPPP831119v3n77bUu+ciQjHk3Nc845x6y55po2LvpdeOGF5rPPPjNnn3222WeffawO5WSslOkCehSKIA888IBhzAQ3btw4SxAMSQyE85IlS8yNN95ovvjiC/Pmm2+aAQMGmD59+qxkGo888oi58sorDaQjHobOU/nHH380X375pXn11VcteSDJRRddZJo2/X+o6UQg3htvvFHyQ3iwN0h0giizZs0yfZcPyrVu3dq888475j//+U/JsElXwrpK4vf000+bvffe2+y222721jPPPGPuv/9+G/eqq64ye+6550rvEWGyXLlFuy4UQRjYwqAgBU0iHP/lac1/ntAYMb00NLOWLVuG9wqOUfuzzjrL3icc4ddaay17kAY1FIOWP//8s+0sgDTXXHONNUbS48mOoQspJH2MUwjrNoGo6aQW+OWXX2zTjzSRRe3GOeiQQ03Wrl270i3JP7LRjbxCXEm/FFAvSggUiiAYoDwhMRIMA0MKGhhhMN4ww3n//ffNBRdcYO8Tjt6cU045xQ6Wrb/++tbwXnrpJUuIb775xhLlzjvvNB07drThQH7kyJHmkEMOsSPRGCjdpqeeeqqVCeFGjRplOnfuXCLq1ltvXXofEv05865z1113mXXWWadUoO7FBhtsYNq0aWPzQXjyKfEJ51678fT6XwQKRRDJthBCjEb85Yw/BAoaFGS69tprbe2DITdv3tyMHTvW7L///hLVbLjhhmbzzTc3vXv3NnSJ0lSDRLfeeqslUdu2bW1N477/0G1KTcATHsL06tXLvruUhC6/gKyuQfOfsJCHplc5F0ZywrqyysVV/+UtjKKBgMFIM4a8Yyhy8B/DJ0yw+cM9DJkXbIyZ+8OHD7fkCBoh97p27WquuOIKa8QY8rfffmuoWYScyBNHU8518h895XDv+76W/AdJI/6kF7znW4dalVe4GoSCxsCZQzRkyJASEcQI6KqldyrMIOg5Wrhwoa05qBUGDRpkyzUYFhJAGl6CqU0+/vhj21yCIPRIpXWSHu82Rx11lM1PkKS77LKLOfnkk23tFbyXNv0ixS8cQShcmk+LFy82zz//vH1CuwWOMWHgPPWDDuLgz1Od6SzuC7AbFgMmDE2wLl262F4o4v30009usFTX6ElNM23atJVqJe7R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",
+  "apiMedia": []
+}

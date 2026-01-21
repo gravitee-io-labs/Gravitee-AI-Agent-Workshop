@@ -1,0 +1,26 @@
+# Hotel Booking MCP Server Configuration
+# This defines an MCP (Model Context Protocol) Server as a Protected Resource in AM
+
+name: "Hotel Booking"
+description: "MCP Server for hotel booking operations"
+type: "MCP_SERVER"
+
+# Resource Identifier (the URL of the MCP server)
+resourceIdentifiers:
+  - "http://localhost:8082/hotels/mcp"
+
+# OAuth2 Client Credentials for the MCP Server
+clientId: "hotel-bookings-mcp"
+clientSecret: "hotel-bookings-mcp"
+
+# MCP Tools (features) exposed by this server
+tools:
+  - key: "getAccommodations"
+    description: "Get available accommodations from the hotel booking system"
+    type: "MCP_TOOL"
+    scopes: []
+
+  - key: "getBookings"
+    description: "Get bookings for a user from the hotel booking system"
+    type: "MCP_TOOL"
+    scopes: []
