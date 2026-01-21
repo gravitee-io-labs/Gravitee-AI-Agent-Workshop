@@ -1,10 +1,10 @@
 services:
 
-# --- Gravitee API Management Components ---
+  # --- Gravitee API Management Components ---
 
   ### MongoDB
   mongodb:
-    image: mongo:${MONGODB_VERSION:-7.0.25} # https://hub.docker.com/_/mongo/tags?name=7.0
+    image: mongo:${MONGODB_VERSION:-8.0.17} # https://hub.docker.com/_/mongo/tags?name=7.0
     container_name: gio-apim-mongodb
     restart: always
     volumes:
@@ -19,13 +19,20 @@ services:
 
   ### Elasticsearch
   elasticsearch:
-    image: docker.elastic.co/elasticsearch/elasticsearch:${ELASTIC_VERSION:-8.19.5} # https://www.docker.elastic.co/r/elasticsearch/elasticsearch
+    image: docker.elastic.co/elasticsearch/elasticsearch:${ELASTIC_VERSION:-9.2.4} # https://www.docker.elastic.co/r/elasticsearch/elasticsearch
     container_name: gio-apim-elasticsearch
     restart: always
+    ports:
+      - "9200:9200"
     volumes:
       - data-elasticsearch:/usr/share/elasticsearch/data
     environment:
       - http.host=0.0.0.0
+      - http.port=9200
+      - http.cors.allow-origin=http://localhost:1358,http://127.0.0.1:1358
+      - http.cors.enabled=true
+      - http.cors.allow-headers=X-Requested-With,X-Auth-Token,Content-Type,Content-Length,Authorization
+      - http.cors.allow-credentials=true
       - transport.host=0.0.0.0
       - xpack.security.enabled=false
       - cluster.name=elasticsearch
@@ -45,6 +52,23 @@ services:
     networks:
       - southbound
 
+  ### Kibana
+  kibana:
+    image: docker.elastic.co/kibana/kibana:${ELASTIC_VERSION:-9.2.4} # https://www.docker.elastic.co/r/kibana/kibana
+    container_name: gio-apim-kibana
+    restart: always
+    ports:
+      - "5601:5601"
+    depends_on:
+      elasticsearch:
+        condition: service_healthy
+    volumes:
+      - data-kibana:/usr/share/kibana/data
+    environment:
+      ELASTICSEARCH_HOSTS: '["http://elasticsearch:9200"]'
+    networks:
+      - southbound
+
   ### Gravitee API Management Gateway
   apim-gateway:
     image: ${APIM_REGISTRY:-graviteeio}/apim-gateway:${APIM_VERSION_GATEWAY:-latest}
@@ -60,22 +84,13 @@ services:
         condition: service_healthy
     healthcheck:
       test: >
-        sh -c '
-        response=$$(curl -s -u admin:adminadmin http://localhost:18082/_node/health);
-        status=$$(echo "$$response" | grep "\"healthy\": true");
-        if [ -z "$$status" ]; then echo "false"; else echo "true"; fi
-        ' > /dev/null
+        sh -c ' response=$$(curl -s -u admin:adminadmin http://localhost:18082/_node/health); status=$$(echo "$$response" | grep "\"healthy\": true"); if [ -z "$$status" ]; then echo "false"; else echo "true"; fi ' > /dev/null
       interval: 2s
       timeout: 2s
       retries: 10
-    volumes:
-      - ./plugins-apim:/opt/graviteeio-gateway/plugins-ext
     environment:
       ### LICENSE
       - gravitee_license_key=${GRAVITEE_LICENSE}
-      ### PLUGINS
-      - gravitee_plugins_path_0=$${gravitee.home}/plugins
-      - gravitee_plugins_path_1=$${gravitee.home}/plugins-ext
       ### Internal API (Core Service)
       - gravitee_services_core_http_host=0.0.0.0
       - gravitee_services_metrics_enabled=true
@@ -86,6 +101,12 @@ services:
       - gravitee_ratelimit_mongodb_uri=mongodb://mongodb:27017/gravitee?serverSelectionTimeoutMS=5000&connectTimeoutMS=20000&socketTimeoutMS=20000
       ### REPORTER - ES
       - gravitee_reporters_elasticsearch_endpoints_0=http://elasticsearch:9200
+      ### ALERT ENGINE
+      - gravitee_alerts_alertengine_enabled=true
+      - gravitee_alerts_alertengine_ws_discovery=true
+      - gravitee_alerts_alertengine_ws_endpoints_0=http://alert-engine:8072
+      - gravitee_alerts_alertengine_ws_security_username=admin
+      - gravitee_alerts_alertengine_ws_security_password=adminadmin
     networks:
       - southbound
       - northbound
@@ -129,7 +150,13 @@ services:
       - gravitee_installation_type=standalone
       - gravitee_installation_standalone_api_url=http://localhost:8083
       - gravitee_installation_standalone_console_url=http://localhost:8084
-      - gravitee_installation_standalone_portal_url=http://localhost:8085/next/
+      - gravitee_installation_standalone_portal_url=http://localhost:8085/next
+      ### ALERT ENGINE
+      - gravitee_alerts_alertengine_enabled=true
+      - gravitee_alerts_alertengine_ws_discovery=true
+      - gravitee_alerts_alertengine_ws_endpoints_0=http://alert-engine:8072
+      - gravitee_alerts_alertengine_ws_security_username=admin
+      - gravitee_alerts_alertengine_ws_security_password=adminadmin
     networks:
       - southbound
       - northbound
@@ -164,7 +191,7 @@ services:
     networks:
       - northbound
 
-# --- Gravitee Access Management Components ---
+  # --- Gravitee Access Management Components ---
 
   ### Gravitee Access Management Gateway
   am-gateway:
@@ -178,14 +205,10 @@ services:
         condition: service_healthy
       am-management-api:
         condition: service_started
-    volumes:
-      - ./plugins-am:/opt/graviteeio-am-gateway/plugins-ext
     environment:
       - gravitee_license_key=${GRAVITEE_LICENSE}
       - gravitee_management_mongodb_uri=mongodb://mongodb:27017/graviteeam?serverSelectionTimeoutMS=5000&connectTimeoutMS=5000&socketTimeoutMS=5000
       - gravitee_oauth2_mongodb_uri=mongodb://mongodb:27017/graviteeam?serverSelectionTimeoutMS=5000&connectTimeoutMS=5000&socketTimeoutMS=5000
-      - gravitee_plugins_path_0=/opt/graviteeio-am-gateway/plugins
-      - gravitee_plugins_path_1=/opt/graviteeio-am-gateway/plugins-ext
     networks:
       - southbound
       - northbound
@@ -200,15 +223,11 @@ services:
     depends_on:
       mongodb:
         condition: service_healthy
-    volumes:
-      - ./plugins-am:/opt/graviteeio-am-management-api/plugins-ext
     environment:
       - gravitee_license_key=${GRAVITEE_LICENSE}
       - gravitee_management_mongodb_uri=mongodb://mongodb:27017/graviteeam?serverSelectionTimeoutMS=5000&connectTimeoutMS=5000&socketTimeoutMS=5000
       - gravitee_oauth2_mongodb_uri=mongodb://mongodb:27017/graviteeam?serverSelectionTimeoutMS=5000&connectTimeoutMS=5000&socketTimeoutMS=5000
       - gravitee_dataPlanes_0_mongodb_uri=mongodb://mongodb:27017/graviteeam?serverSelectionTimeoutMS=5000&connectTimeoutMS=5000&socketTimeoutMS=5000
-      - gravitee_plugins_path_0=/opt/graviteeio-am-management-api/plugins
-      - gravitee_plugins_path_1=/opt/graviteeio-am-management-api/plugins-ext
     networks:
       - southbound
       - northbound
@@ -228,7 +247,61 @@ services:
     networks:
       - northbound
 
-# --- Gravitee Initialization ---
+  # --- OpenFGA Components ---
+  ### OpenFGA Postgres
+  openfga-postgres:
+    image: postgres:17
+    container_name: openfga-postgres
+    restart: unless-stopped
+    environment:
+      - POSTGRES_DB=openfga
+      - POSTGRES_USER=openfga
+      - POSTGRES_PASSWORD=openfga
+    volumes:
+      - openfga_postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: [ "CMD-SHELL", "pg_isready -U openfga -d openfga" ]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    networks:
+      - southbound
+
+  ### OpenFGA Tables Creation
+  openfga-migrate:
+    image: openfga/openfga:latest
+    container_name: openfga-migrate
+    command: migrate
+    environment:
+      - OPENFGA_DATASTORE_ENGINE=postgres
+      - OPENFGA_DATASTORE_URI=postgres://openfga:openfga@openfga-postgres:5432/openfga?sslmode=disable
+    depends_on:
+      openfga-postgres:
+        condition: service_healthy
+    networks:
+      - southbound
+
+  ### OpenFGA server
+  openfga:
+    image: openfga/openfga:latest
+    container_name: openfga
+    command: run
+    environment:
+      - OPENFGA_DATASTORE_ENGINE=postgres
+      - OPENFGA_DATASTORE_URI=postgres://openfga:openfga@openfga-postgres:5432/openfga?sslmode=disable
+      - OPENFGA_LOG_FORMAT=json
+      - OPENFGA_AUTHN_METHOD=none
+    depends_on:
+      openfga-migrate:
+        condition: service_completed_successfully
+    ports:
+      - "8086:8080"
+      - "8087:8081"
+      - "3000:3000"
+    networks:
+      - southbound
+
+  # --- Gravitee Initialization ---
 
   ### Gravitee Init Container
   gravitee-init:
@@ -242,8 +315,8 @@ services:
         condition: service_started
       apim-management-api:
         condition: service_healthy
-    volumes:
-      - ./apim-apis-definitions:/api-definitions:ro
+      openfga:
+        condition: service_started
     environment:
       # Access Management (AM) configuration
       - AM_BASE_URL=http://am-management-api:8093
@@ -253,18 +326,21 @@ services:
       - APIM_BASE_URL=http://apim-management-api:8083
       - APIM_USERNAME=admin
       - APIM_PASSWORD=admin
-      - API_DEFINITIONS_DIR=/api-definitions
+      - API_DEFINITIONS_DIR=/app/apim-apis
+      # OpenFGA configuration
+      - FGA_BASE_URL=http://openfga:8080
+      - FGA_CONFIG_FILE=/app/openfga/openfgastore.yaml
       # Common configuration
       - ORGANIZATION=DEFAULT
       - ENVIRONMENT=DEFAULT
     networks:
       - southbound
 
-# --- Alert Engine Components ---
+  # --- Alert Engine Components ---
 
   ### Alert Engine
   alert-engine:
-    image: graviteeio/ae-engine:${AE_VERSION:-2}
+    image: graviteeio/ae-engine:${AE_VERSION:-latest}
     container_name: gio-alert-engine
     restart: always
     environment:
@@ -272,7 +348,7 @@ services:
     networks:
       - southbound
 
-# --- AI Agents Components ---
+  # --- AI Agents Components ---
 
   ### Ollama LLM Runtime
   ollama:
@@ -311,7 +387,7 @@ services:
     ports:
       - "8000:8000"
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      test: [ "CMD", "curl", "-f", "http://localhost:8000/health" ]
       interval: 5s
       timeout: 5s
       retries: 3
@@ -351,24 +427,29 @@ services:
       apim-gateway:
         condition: service_healthy
     environment:
-      - OLLAMA_URL=http://gio-apim-gateway:8082/llm
-      - OLLAMA_MODEL=qwen3:0.6b
-      - OLLAMA_TEMPERATURE=0.3
-      - MCP_HTTP_URL=http://gio-apim-gateway:8082/hotels/mcp
+      - LLM_BASE_URL=http://gio-apim-gateway:8082/llm-proxy
+      - LLM_API_KEY=not-needed
+      # - LLM_MODEL=qwen3:0.6b
+      - LLM_MODEL=ollama:qwen3:0.6b
+      # - LLM_MODEL=gemini:gemini-3-flash-preview
+      - LLM_TEMPERATURE=0.3
+      - MCP_HTTP_URLS=http://gio-apim-gateway:8082/hotels/mcp
       - AGENT_SERVER_PORT=8001
       - OIDC_DISCOVERY_URL=http://am-gateway:8092/gravitee/oidc/.well-known/openid-configuration
-      - JWT_SECRET=my-example-secret
+      - AM_TOKEN_URL=http://gio-am-gateway:8092/gravitee/oauth/token
+      - AM_CLIENT_ID=hotel-booking-agent
+      - AM_CLIENT_SECRET=hotel-booking-agent
     ports:
       - "8001:8001"
     restart: unless-stopped
     networks:
       - southbound
 
-# --- Demo Components ---
+  # --- Demo Components ---
 
-  ### MCP Inspector
+  ## MCP Inspector
   mcp-inspector:
-    image: ghcr.io/modelcontextprotocol/inspector:0.17.1
+    image: ghcr.io/modelcontextprotocol/inspector:latest
     container_name: mcp-inspector
     ports:
       - "6274:6274"
@@ -380,30 +461,34 @@ services:
     networks:
       - southbound
       - northbound
-
+  
   ### A2A Inspector
-  a2a-inspector:
-    image: dobl1/a2a-inspector:latest
-    container_name: a2a-inspector
-    ports:
-      - "8004:8080"
-    restart: unless-stopped
-    networks:
-      - southbound
-      - northbound
+  # a2a-inspector:
+  #   image: dobl1/a2a-inspector:latest
+  #   container_name: a2a-inspector
+  #   ports:
+  #     - "8004:8080"
+  #   restart: unless-stopped
+  #   networks:
+  #     - southbound
+  #     - northbound
 
-# --- Volumes and Networks ---
+  # --- Volumes and Networks ---
 
 volumes:
   data-mongo:
     driver: local
   data-elasticsearch:
     driver: local
+  data-kibana:
+    driver: local
   ollama_data:
+    driver: local
+  openfga_postgres_data:
     driver: local
 
 networks:
-    northbound: # Consumer/Client-facing
-        name: northbound
-    southbound: # Upstream/Backend-facing
-        name: southbound
+  northbound: # Consumer/Client-facing
+    name: northbound
+  southbound: # Upstream/Backend-facing
+    name: southbound
