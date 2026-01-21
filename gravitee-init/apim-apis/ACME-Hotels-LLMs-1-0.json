@@ -89,7 +89,7 @@
               "target": "https://generativelanguage.googleapis.com/v1beta",
               "authentication": {
                 "headerName": "X-goog-api-key",
-                "apiKey": "AIzaSyB1mW5zvhxQYd4cpOxroXATNNNZxo2d-G4",
+                "apiKey": "your-personal-api-key-here",
                 "type": "API_KEY"
               }
             },
