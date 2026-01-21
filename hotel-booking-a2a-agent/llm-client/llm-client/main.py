@@ -5,7 +5,7 @@ import json
 import logging
 from typing import Any
 
-from openai import OpenAI
+from openai import OpenAI, RateLimitError
 from dotenv import load_dotenv
 
 # Add the agent-server package to Python path to access colored_logger
@@ -19,6 +19,17 @@ except ImportError:
     logger = logging.getLogger(__name__)
 
 load_dotenv()
+
+
+class LLMRateLimitError(Exception):
+    """Exception raised when LLM API returns a 429 rate limit error."""
+    
+    def __init__(self, message: str, limit: str | None = None, remaining: str | None = None, reset: str | None = None):
+        super().__init__(message)
+        self.limit = limit
+        self.remaining = remaining
+        self.reset = reset
+
 
 # LLM API configuration
 LLM_BASE_URL = os.getenv("LLM_BASE_URL", "http://gio-apim-gateway:8082/llm/v1")
@@ -67,7 +78,21 @@ class LLMClient:
             params["tools"] = available_tools
             params["tool_choice"] = "auto"
         
-        response = self.client.chat.completions.create(**params)
+        try:
+            response = self.client.chat.completions.create(**params)
+        except RateLimitError as e:
+            logger.warning(f"Rate limit exceeded: {e}")
+            # Extract rate limit headers from the response
+            headers = getattr(e.response, 'headers', {}) if hasattr(e, 'response') else {}
+            limit = headers.get('X-Token-Rate-Limit-Limit')
+            remaining = headers.get('X-Token-Rate-Limit-Remaining')
+            reset = headers.get('X-Token-Rate-Limit-Reset')
+            raise LLMRateLimitError(
+                "Rate limit exceeded",
+                limit=limit,
+                remaining=remaining,
+                reset=reset
+            ) from e
         
         # Handle empty response
         if not response.choices:
@@ -139,11 +164,25 @@ class LLMClient:
             }
         ])
 
-        response = self.client.chat.completions.create(
-            model=self.model,
-            messages=messages,
-            temperature=self.temperature,
-        )
+        try:
+            response = self.client.chat.completions.create(
+                model=self.model,
+                messages=messages,
+                temperature=self.temperature,
+            )
+        except RateLimitError as e:
+            logger.warning(f"Rate limit exceeded during tool result processing: {e}")
+            # Extract rate limit headers from the response
+            headers = getattr(e.response, 'headers', {}) if hasattr(e, 'response') else {}
+            limit = headers.get('X-Token-Rate-Limit-Limit')
+            remaining = headers.get('X-Token-Rate-Limit-Remaining')
+            reset = headers.get('X-Token-Rate-Limit-Reset')
+            raise LLMRateLimitError(
+                "Rate limit exceeded",
+                limit=limit,
+                remaining=remaining,
+                reset=reset
+            ) from e
 
         final_response = response.choices[0].message.content or ""
         logger.info("Generated final response from LLM")

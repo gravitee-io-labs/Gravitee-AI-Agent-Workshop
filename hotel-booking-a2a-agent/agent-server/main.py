@@ -12,7 +12,7 @@ sys.path.insert(0, '/app/hotel-booking-a2a-agent/mcp-client')
 sys.path.insert(0, '/app/hotel-booking-a2a-agent/llm-client')
 
 from mcp_client.main import MCPMultiClient
-from llm_client.main import LLMClient
+from llm_client.main import LLMClient, LLMRateLimitError
 from agent_server.auth_service import AuthService, AuthenticationError
 from agent_server.colored_logger import get_agent_logger
 
@@ -156,26 +156,77 @@ class HotelBookingAgent:
                 "Please rephrase or provide more details (for example: search for hotels in New York) "
                 "and I'll help you."
             )
+        
+        except LLMRateLimitError as rate_error:
+            logger.warning(f"Rate limit exceeded: {rate_error}")
+            logger.info("=" * 80)
+            
+            # Build a user-friendly rate limit message
+            message_parts = ["You've reached your request limit."]
+            
+            if rate_error.reset:
+                try:
+                    import time
+                    # X-Token-Rate-Limit-Reset is a Unix timestamp in milliseconds
+                    reset_timestamp_ms = int(rate_error.reset)
+                    current_timestamp_ms = int(time.time() * 1000)
+                    wait_ms = reset_timestamp_ms - current_timestamp_ms
+                    
+                    if wait_ms > 0:
+                        wait_seconds = wait_ms // 1000
+                        if wait_seconds >= 60:
+                            minutes = wait_seconds // 60
+                            seconds = wait_seconds % 60
+                            if seconds > 0:
+                                message_parts.append(f"Please wait {minutes} minute(s) and {seconds} second(s) before sending a new request.")
+                            else:
+                                message_parts.append(f"Please wait {minutes} minute(s) before sending a new request.")
+                        else:
+                            message_parts.append(f"Please wait {wait_seconds} second(s) before sending a new request.")
+                    else:
+                        message_parts.append("Please try again now.")
+                except (ValueError, TypeError):
+                    message_parts.append("Please wait a moment before trying again.")
+            else:
+                message_parts.append("Please wait a moment before trying again.")
+            
+            if rate_error.limit and rate_error.remaining:
+                try:
+                    limit = int(rate_error.limit)
+                    remaining = int(rate_error.remaining)
+                    message_parts.append(f"(Limit: {limit} tokens, Remaining: {remaining})")
+                except (ValueError, TypeError):
+                    pass
+            
+            return " ".join(message_parts)
             
         except Exception as e:
             logger.error(f"Error processing request: {e}", exc_info=True)
             logger.info("=" * 80)
+            
             # Use LLM to generate a user-friendly error message
             try:
                 error_prompt = (
-                    f"An error occurred: {str(e)}\n\n"
-                    "Generate a polite, user-friendly response explaining that something went wrong "
-                    "and suggest what the user could try instead. Keep it brief and helpful."
+                    f"An error occurred while processing a user request: {str(e)}\n\n"
+                    "Generate a brief, friendly response for the user. "
+                    "Do NOT include any technical details such as HTTP status codes, error codes, "
+                    "reason codes, technical terms, or the original error message. "
+                    "Just explain to the user what went wrong in simple terms."
                 )
                 friendly_error = await self.llm_client.process_query(
                     error_prompt,
                     [],
-                    system_prompt="You are a helpful hotel booking assistant. Convert technical errors into friendly, actionable messages for users."
+                    system_prompt=(
+                        "You are a friendly hotel booking assistant. "
+                        "When something goes wrong, respond naturally like a helpful human would. "
+                        "Never mention technical details, technical error codes, HTTP statuse, etc.. "
+                        "Keep responses short, warm, and helpful."
+                    )
                 )
-                return friendly_error[0] if friendly_error[0] else f"Sorry, I encountered an error while processing your request: {str(e)}"
+                return friendly_error[0] if friendly_error[0] else "I'm sorry, something went wrong. Could you please try rephrasing your request?"
             except Exception as llm_error:
                 logger.error(f"Failed to generate friendly error message: {llm_error}")
-                return f"Sorry, I encountered an error while processing your request: {str(e)}"
+                return "I'm sorry, something went wrong. Could you please try rephrasing your request?"
 
     async def cleanup(self):
         """Clean up resources."""
