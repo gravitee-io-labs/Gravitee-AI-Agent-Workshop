@@ -5,19 +5,19 @@
 }
 
 :root {
-    --primary-orange: #FE6006;
-    --secondary-red: #F83D0D;
-    --light-cream: #F7F1EF;
-    --dark-brown: #250C0E;
+    --primary-blue: #2563EB;
+    --secondary-blue: #1D4ED8;
+    --light-blue: #EFF6FF;
+    --dark-navy: #1E293B;
     --white: #FFFFFF;
-    --shadow: rgba(37, 12, 14, 0.1);
-    --shadow-lg: rgba(37, 12, 14, 0.2);
+    --shadow: rgba(30, 41, 59, 0.1);
+    --shadow-lg: rgba(30, 41, 59, 0.2);
 }
 
 body {
     font-family: 'Kanit', sans-serif;
-    background-color: var(--light-cream);
-    color: var(--dark-brown);
+    background-color: var(--light-blue);
+    color: var(--dark-navy);
     line-height: 1.6;
 }
 
@@ -49,10 +49,16 @@ body {
     height: 32px;
 }
 
+.brand-name {
+    font-size: 2.2rem;
+    font-weight: 700;
+    color: var(--primary-blue);
+}
+
 .hotel-name {
     font-size: 1.5rem;
     font-weight: 600;
-    color: var(--primary-orange);
+    color: var(--secondary-blue);
 }
 
 .nav-actions {
@@ -77,7 +83,7 @@ body {
     width: 40px;
     height: 40px;
     border-radius: 50%;
-    background: linear-gradient(135deg, var(--primary-orange), var(--secondary-red));
+    background: linear-gradient(135deg, var(--primary-blue), var(--secondary-blue));
     color: var(--white);
     display: flex;
     align-items: center;
@@ -93,7 +99,7 @@ body {
 
 .user-name {
     font-weight: 600;
-    color: var(--dark-brown);
+    color: var(--dark-navy);
 }
 
 .user-email {
@@ -114,25 +120,25 @@ body {
     gap: 0.5rem;
     padding: 0.5rem 1rem;
     background-color: var(--white);
-    border: 2px solid var(--light-cream);
+    border: 2px solid var(--light-blue);
     border-radius: 8px;
     cursor: pointer;
     transition: all 0.3s;
     font-family: 'Kanit', sans-serif;
     font-weight: 500;
-    color: var(--dark-brown);
+    color: var(--dark-navy);
 }
 
 .user-menu-btn:hover {
-    background-color: var(--light-cream);
-    border-color: var(--primary-orange);
+    background-color: var(--light-blue);
+    border-color: var(--primary-blue);
 }
 
 .user-avatar-small {
     width: 32px;
     height: 32px;
     border-radius: 50%;
-    background: linear-gradient(135deg, var(--primary-orange), var(--secondary-red));
+    background: linear-gradient(135deg, var(--primary-blue), var(--secondary-blue));
     display: flex;
     align-items: center;
     justify-content: center;
@@ -149,7 +155,7 @@ body {
 
 .user-display-name {
     font-weight: 500;
-    color: var(--dark-brown);
+    color: var(--dark-navy);
 }
 
 .user-dropdown {
@@ -168,7 +174,7 @@ body {
     padding: 0.5rem 0;
     font-size: 0.9rem;
     color: #666;
-    border-bottom: 1px solid var(--light-cream);
+    border-bottom: 1px solid var(--light-blue);
     margin-bottom: 0.75rem;
     word-break: break-word;
 }
@@ -180,7 +186,7 @@ body {
 
 /* Hero Section */
 .hero {
-    background: linear-gradient(135deg, var(--primary-orange), var(--secondary-red));
+    background: linear-gradient(135deg, var(--primary-blue), var(--secondary-blue));
     color: var(--white);
     padding: 6rem 2rem;
     text-align: center;
@@ -220,7 +226,7 @@ body {
     font-weight: 600;
     text-align: center;
     margin-bottom: 3rem;
-    color: var(--dark-brown);
+    color: var(--dark-navy);
 }
 
 .features-grid {
@@ -252,7 +258,7 @@ body {
     font-size: 1.5rem;
     font-weight: 600;
     margin-bottom: 0.5rem;
-    color: var(--dark-brown);
+    color: var(--dark-navy);
 }
 
 .feature-card p {
@@ -273,29 +279,29 @@ body {
 }
 
 .btn-primary {
-    background-color: var(--primary-orange);
+    background-color: var(--primary-blue);
     color: var(--white);
 }
 
 .btn-primary:hover {
-    background-color: var(--secondary-red);
+    background-color: var(--secondary-blue);
     transform: translateY(-2px);
     box-shadow: 0 4px 12px var(--shadow-lg);
 }
 
 .btn-secondary {
     background-color: transparent;
-    color: var(--dark-brown);
-    border: 2px solid var(--dark-brown);
+    color: var(--dark-navy);
+    border: 2px solid var(--dark-navy);
 }
 
 .btn-secondary:hover {
-    background-color: var(--dark-brown);
+    background-color: var(--dark-navy);
     color: var(--white);
 }
 
 .btn-accent {
-    background: linear-gradient(135deg, var(--primary-orange), var(--secondary-red));
+    background: linear-gradient(135deg, var(--primary-blue), var(--secondary-blue));
     color: var(--white);
 }
 
@@ -305,12 +311,12 @@ body {
     display: inline-flex;
     align-items: center;
     gap: 0.5rem;
-    box-shadow: 0 8px 24px rgba(254, 96, 6, 0.4);
+    box-shadow: 0 8px 24px rgba(37, 99, 235, 0.4);
 }
 
 .btn-accent:hover {
     transform: translateY(-3px);
-    box-shadow: 0 12px 32px rgba(254, 96, 6, 0.6);
+    box-shadow: 0 12px 32px rgba(37, 99, 235, 0.6);
 }
 
 .icon-btn {
@@ -320,11 +326,11 @@ body {
     padding: 0.5rem;
     border-radius: 8px;
     transition: background-color 0.3s;
-    color: var(--dark-brown);
+    color: var(--dark-navy);
 }
 
 .icon-btn:hover {
-    background-color: var(--light-cream);
+    background-color: var(--light-blue);
 }
 
 .btn-with-icon {
@@ -334,7 +340,7 @@ body {
     padding: 0.5rem 1rem;
     border-radius: 8px;
     transition: background-color 0.3s;
-    color: var(--dark-brown);
+    color: var(--dark-navy);
     display: flex;
     align-items: center;
     gap: 0.5rem;
@@ -344,7 +350,7 @@ body {
 }
 
 .btn-with-icon:hover {
-    background-color: var(--light-cream);
+    background-color: var(--light-blue);
 }
 
 /* Chat Widget Button */
@@ -355,7 +361,7 @@ body {
     width: 60px;
     height: 60px;
     border-radius: 50%;
-    background: linear-gradient(135deg, var(--primary-orange), var(--secondary-red));
+    background: linear-gradient(135deg, var(--primary-blue), var(--secondary-blue));
     color: var(--white);
     border: none;
     cursor: pointer;
@@ -402,7 +408,7 @@ body {
 }
 
 .chat-header {
-    background: linear-gradient(135deg, var(--primary-orange), var(--secondary-red));
+    background: linear-gradient(135deg, var(--primary-blue), var(--secondary-blue));
     color: var(--white);
     padding: 1.25rem;
     border-radius: 16px 16px 0 0;
@@ -429,6 +435,25 @@ body {
     background: var(--white);
     border-radius: 50%;
     padding: 0.5rem;
+}
+
+.chat-bot-icon {
+    width: 40px;
+    height: 40px;
+    background: var(--white);
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.65rem;
+    font-weight: 700;
+    color: var(--primary-blue);
+}
+
+.bot-emoji {
+    font-size: 0.55rem;
+    font-weight: 700;
+    color: var(--primary-blue);
 }
 
 .chat-header h3 {
@@ -495,17 +520,17 @@ body {
 }
 
 .user-message .message-avatar {
-    background: linear-gradient(135deg, var(--primary-orange), var(--secondary-red));
+    background: linear-gradient(135deg, var(--primary-blue), var(--secondary-blue));
     color: var(--white);
     font-weight: 600;
 }
 
 .message-content {
     flex: 1;
-    background: var(--light-cream);
+    background: var(--light-blue);
     padding: 0.75rem 1rem;
     border-radius: 12px;
-    color: var(--dark-brown);
+    color: var(--dark-navy);
     word-wrap: break-word;
 }
 
@@ -514,7 +539,7 @@ body {
 }
 
 .user-message .message-content {
-    background: linear-gradient(135deg, var(--primary-orange), var(--secondary-red));
+    background: linear-gradient(135deg, var(--primary-blue), var(--secondary-blue));
     color: var(--white);
 }
 
@@ -528,7 +553,7 @@ body {
     width: 8px;
     height: 8px;
     border-radius: 50%;
-    background-color: var(--primary-orange);
+    background-color: var(--primary-blue);
     animation: typing 1.4s infinite;
 }
 
@@ -552,7 +577,7 @@ body {
 /* Chat Input */
 .chat-input-container {
     padding: 1rem;
-    border-top: 1px solid var(--light-cream);
+    border-top: 1px solid var(--light-blue);
     display: flex;
     gap: 0.75rem;
 }
@@ -560,7 +585,7 @@ body {
 .chat-input {
     flex: 1;
     padding: 0.75rem;
-    border: 2px solid var(--light-cream);
+    border: 2px solid var(--light-blue);
     border-radius: 8px;
     font-family: 'Kanit', sans-serif;
     font-size: 1rem;
@@ -569,17 +594,17 @@ body {
 }
 
 .chat-input:focus {
-    border-color: var(--primary-orange);
+    border-color: var(--primary-blue);
 }
 
 .chat-input:disabled {
-    background-color: var(--light-cream);
+    background-color: var(--light-blue);
     cursor: not-allowed;
 }
 
 .send-btn {
     padding: 0.75rem 1rem;
-    background: linear-gradient(135deg, var(--primary-orange), var(--secondary-red));
+    background: linear-gradient(135deg, var(--primary-blue), var(--secondary-blue));
     color: var(--white);
     border: none;
     border-radius: 8px;
@@ -620,7 +645,7 @@ body {
     left: 0;
     width: 100%;
     height: 100%;
-    background-color: rgba(37, 12, 14, 0.5);
+    background-color: rgba(30, 41, 59, 0.5);
     backdrop-filter: blur(4px);
 }
 
@@ -649,7 +674,7 @@ body {
 
 .modal-header {
     padding: 1.5rem;
-    border-bottom: 1px solid var(--light-cream);
+    border-bottom: 1px solid var(--light-blue);
     display: flex;
     justify-content: space-between;
     align-items: center;
@@ -658,7 +683,7 @@ body {
 .modal-header h2 {
     font-size: 1.5rem;
     font-weight: 600;
-    color: var(--dark-brown);
+    color: var(--dark-navy);
 }
 
 .modal-body {
@@ -667,7 +692,7 @@ body {
 
 .modal-footer {
     padding: 1.5rem;
-    border-top: 1px solid var(--light-cream);
+    border-top: 1px solid var(--light-blue);
     display: flex;
     justify-content: flex-end;
     gap: 1rem;
@@ -682,13 +707,13 @@ body {
     display: block;
     margin-bottom: 0.5rem;
     font-weight: 500;
-    color: var(--dark-brown);
+    color: var(--dark-navy);
 }
 
 .form-input {
     width: 100%;
     padding: 0.75rem;
-    border: 2px solid var(--light-cream);
+    border: 2px solid var(--light-blue);
     border-radius: 8px;
     font-family: 'Kanit', sans-serif;
     font-size: 1rem;
@@ -697,7 +722,7 @@ body {
 }
 
 .form-input:focus {
-    border-color: var(--primary-orange);
+    border-color: var(--primary-blue);
 }
 
 .form-hint {
@@ -710,7 +735,7 @@ body {
 
 /* Connection Status */
 .connection-section {
-    border: 2px solid var(--light-cream);
+    border: 2px solid var(--light-blue);
     border-radius: 12px;
     padding: 1.5rem;
     margin-bottom: 1.5rem;
@@ -735,7 +760,7 @@ body {
     align-items: center;
     gap: 0.75rem;
     padding: 0.75rem 1rem;
-    background-color: var(--light-cream);
+    background-color: var(--light-blue);
     border-radius: 8px;
     font-size: 0.9rem;
 }
@@ -757,7 +782,7 @@ body {
 }
 
 .status-connecting {
-    background-color: var(--primary-orange);
+    background-color: var(--primary-blue);
     animation: pulse 1s infinite;
 }
 
@@ -788,7 +813,7 @@ body {
 
 .btn-connect {
     padding: 0.75rem 1.75rem;
-    background: linear-gradient(135deg, var(--primary-orange), var(--secondary-red));
+    background: linear-gradient(135deg, var(--primary-blue), var(--secondary-blue));
     color: var(--white);
     border: none;
     border-radius: 8px;
@@ -831,7 +856,7 @@ body {
     left: 0;
     right: 0;
     background: var(--white);
-    border-top: 2px solid var(--light-cream);
+    border-top: 2px solid var(--light-blue);
     box-shadow: 0 -4px 20px var(--shadow-lg);
     z-index: 1001;
     height: 400px;
@@ -876,7 +901,7 @@ body {
 
 .debug-panel-resize-handle:hover::before,
 .debug-panel-resize-handle:active::before {
-    background: var(--primary-orange);
+    background: var(--primary-blue);
     width: 80px;
     height: 4px;
 }
@@ -886,7 +911,7 @@ body {
     justify-content: space-between;
     align-items: center;
     padding: 0.75rem 1.5rem;
-    background: linear-gradient(135deg, var(--dark-brown), #3a1518);
+    background: linear-gradient(135deg, var(--dark-navy), #0f172a);
     color: var(--white);
     cursor: pointer;
     user-select: none;
@@ -982,7 +1007,7 @@ body {
 
 .debug-request {
     background: var(--white);
-    border: 1px solid var(--light-cream);
+    border: 1px solid var(--light-blue);
     border-radius: 8px;
     overflow: hidden;
     box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
@@ -1015,14 +1040,14 @@ body {
     font-size: 0.85rem;
     padding: 0.25rem 0.5rem;
     border-radius: 4px;
-    background: var(--primary-orange);
+    background: var(--primary-blue);
     color: var(--white);
 }
 
 .debug-request-url {
     font-family: 'Courier New', monospace;
     font-size: 0.85rem;
-    color: var(--dark-brown);
+    color: var(--dark-navy);
     flex: 1;
     overflow: hidden;
     text-overflow: ellipsis;
@@ -1088,7 +1113,7 @@ body {
 
 .debug-request-tabs {
     display: flex;
-    border-bottom: 1px solid var(--light-cream);
+    border-bottom: 1px solid var(--light-blue);
     background: #fafafa;
 }
 
@@ -1103,13 +1128,13 @@ body {
 }
 
 .debug-request-tab:hover {
-    color: var(--primary-orange);
+    color: var(--primary-blue);
     background: rgba(254, 96, 6, 0.05);
 }
 
 .debug-request-tab.active {
-    color: var(--primary-orange);
-    border-bottom-color: var(--primary-orange);
+    color: var(--primary-blue);
+    border-bottom-color: var(--primary-blue);
     background: var(--white);
 }
 
@@ -1153,7 +1178,7 @@ body {
 
 .debug-metadata-value {
     font-family: 'Courier New', monospace;
-    color: var(--dark-brown);
+    color: var(--dark-navy);
     word-break: break-all;
 }
 
@@ -1171,10 +1196,10 @@ body {
 .debug-column-header {
     font-size: 0.9rem;
     font-weight: 600;
-    color: var(--dark-brown);
+    color: var(--dark-navy);
     margin-bottom: 0.5rem;
     padding: 0.5rem;
-    background: var(--light-cream);
+    background: var(--light-blue);
     border-radius: 4px;
 }
 
@@ -1242,14 +1267,14 @@ body {
 }
 
 .chat-messages::-webkit-scrollbar-track {
-    background: var(--light-cream);
+    background: var(--light-blue);
 }
 
 .chat-messages::-webkit-scrollbar-thumb {
-    background: var(--primary-orange);
+    background: var(--primary-blue);
     border-radius: 3px;
 }
 
 .chat-messages::-webkit-scrollbar-thumb:hover {
-    background: var(--secondary-red);
+    background: var(--secondary-blue);
 }
