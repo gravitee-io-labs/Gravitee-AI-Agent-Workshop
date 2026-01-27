@@ -491,7 +491,7 @@ docker compose down
    ollama pull qwen3:0.6b
    ```
 
-3. **Update the API `ACME Hotels LLMs` endpoint URL configuration** in Gravitee Console to point to `http://host.docker.internal:11434` instead of `http://ollama:11434`
+3. **Update the API `ACME Hotels LLMs` endpoint URL configuration** in Gravitee Console to point to `http://host.docker.internal:11434/v1` instead of `http://ollama:11434/v1`
 
 **Benefits:**
 - ⚡ Much faster responses (GPU acceleration)
