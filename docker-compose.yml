@@ -71,7 +71,7 @@ services:
 
   ### Gravitee API Management Gateway
   apim-gateway:
-    image: ${APIM_REGISTRY:-graviteeio}/apim-gateway:${APIM_VERSION_GATEWAY:-latest}
+    image: ${APIM_REGISTRY:-graviteeio}/apim-gateway:${APIM_VERSION:-latest}
     container_name: gio-apim-gateway
     restart: always
     ports:
@@ -110,6 +110,16 @@ services:
     networks:
       - southbound
       - northbound
+
+  mcp-server:
+    build:
+      context: docker/mcp-server
+      dockerfile: Dockerfile
+    container_name: gio_ai-workshop_mcp_server
+    ports:
+      - "8005:8000"
+    networks:
+      - southbound
 
   ### Gravitee API Management Management API
   apim-management-api:
