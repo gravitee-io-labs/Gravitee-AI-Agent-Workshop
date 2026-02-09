@@ -51,7 +51,7 @@
                 }
               ],
               "provider": "OPEN_AI_COMPATIBLE",
-              "target": "http://ollama:11434/v1",
+              "target": "http://host.docker.internal:11434/v1",
               "authentication": {
                 "type": "NONE"
               }

@@ -9,16 +9,27 @@ Want to dive straight in? Follow these simple steps:
 1. **Get Your License** 🔑  
    Make sure you have a Gravitee Enterprise license file. If not, check the section ["Unlock Gravitee Enterprise AI Features"](#1-unlock-gravitee-enterprise-ai-features) below to get your free 2-week license in less than a minute.
 
-2. **Start the Workshop** 🚀  
-   ```bash
-   docker compose up -d --build
-   ```
-   *(This can take a few minutes to download and start all images - grab a coffee! ☕)*
+2. **Install Ollama** 🧠  
+    *(Why Ollama? It’s the LLM runtime that lets the agent “think” and decide which tools to call.)*  
+    > *Recommended for everyone: local Ollama is consistently faster and more responsive than running it in a container.*
+   
+    Download and install Ollama from https://ollama.com/download
+    ```bash
+    ollama serve
+    ollama pull qwen3:0.6b # Small 500MB Model, capable enough to handle Agentic workflows
+    ollama list | grep -q 'qwen3:0.6b' && echo "Ollama OK"
+    ```
 
-3. **Visit the Hotel Website** 🏨  
+3. **Start the Workshop** 🚀  
+    ```bash
+    docker compose up -d --build
+    ```
+    *(This can take a few minutes to download and start all images - grab a coffee! ☕)*
+
+4. **Visit the Hotel Website** 🏨  
    Open your browser and go to the **[ACME Hotels Demo Website](http://localhost:8002/)**
 
-4. **Start Chatting with the AI Agent** 💬  
+5. **Start Chatting with the AI Agent** 💬  
    Try these interactions to see the platform in action:
    
    - **✅ "Do you have any hotels in New York?"**  
@@ -33,8 +44,6 @@ Want to dive straight in? Follow these simple steps:
      - **Password:** `HelloWorld@123`
      
      *Now retry the request - you can now access your personal bookings!*
-
-    > **⚠️ Note**: If you experience timeouts (~30 seconds) during AI requests, this is due to Docker's network proxy timeout. Or if you want somehting way faster (running model on GPU is faster than on CPU) See the [Troubleshooting section](#-troubleshooting) for a quick fix.
 
 **💡 Want to understand how this all works?** Continue reading to explore the architecture, understand each component, and learn how enterprise AI agents are built and secured! 👇
 
@@ -150,7 +159,19 @@ cp .env-template .env
 export GRAVITEE_LICENSE="YOUR_BASE64_LICENSE_FROM_EMAIL"
 ```
 
-### 2. Launch the Environment
+### 2. Install and Validate Ollama Locally (Recommended)
+
+Download and install Ollama from https://ollama.com/download
+
+```bash
+ollama serve
+ollama pull qwen3:0.6b
+ollama list | grep -q 'qwen3:0.6b' && echo "Ollama OK"
+```
+
+> **Optional (CPU-only alternative):** You can use the Dockerized Ollama service by uncommenting it in the Docker Compose file, but it will be slower than running Ollama locally.
+
+### 3. Launch the Environment
 
 ```bash
 docker compose up -d
@@ -472,35 +493,36 @@ docker compose down
 
 ## 🔧 Troubleshooting
 
-### Request Timeout (30 seconds) on macOS
+### Slow or Timing Out AI Responses
 
-**Problem:** Requests to the AI agent timeout after ~30 seconds.
+**Problem:** AI requests are slow or time out (~30 seconds).
 
-**Cause:** Docker Desktop on macOS has a hardcoded network proxy timeout. The LLM running in CPU-only mode can exceed this limit.
+**Cause:** LLM inference is running in a CPU-only container.
 
-**💡 Recommended Solution:** Run Ollama locally on your Mac:
+**💡 Recommended Solution:** Run Ollama locally for better performance:
 
-1. **Install Ollama:**
-   ```bash
-   brew install ollama
-   ```
+1. **Install Ollama:** https://ollama.com/download
 
 2. **Start Ollama and pull the model:**
-   ```bash
-   ollama serve
-   ollama pull qwen3:0.6b
-   ```
+    ```bash
+    ollama serve
+    ollama pull qwen3:0.6b
+    ```
 
-3. **Update the API `ACME Hotels LLMs` endpoint URL configuration** in Gravitee Console to point to `http://host.docker.internal:11434/v1` instead of `http://ollama:11434/v1`
+3. **Validate the model is available:**
+     ```bash
+     ollama list | grep -q 'qwen3:0.6b' && echo "Ollama OK"
+     ```
+
+4. **Update the API `ACME Hotels LLMs` endpoint URL configuration** in Gravitee Console to point to `http://host.docker.internal:11434` instead of `http://ollama:11434`
 
 **Benefits:**
-- ⚡ Much faster responses (GPU acceleration)
-- 🚫 No timeout issues
+- ⚡ Faster responses
+- ✅ Fewer timeouts
 
-**Alternative:** Use [Colima](https://github.com/abiosoft/colima) instead of Docker Desktop.
+**Alternative:** If you keep Ollama in Docker, expect slower responses due to CPU-only inference.
 
 ---
-
 ## 📚 Learn More
 
 - [Model Context Protocol (MCP) Specification](https://modelcontextprotocol.io/)
