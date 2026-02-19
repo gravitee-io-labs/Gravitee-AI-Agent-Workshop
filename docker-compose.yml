@@ -110,10 +110,10 @@ services:
       - gravitee_alerts_alertengine_ws_security_username=admin
       - gravitee_alerts_alertengine_ws_security_password=adminadmin
       ### OPENTELEMETRY
-      - gravitee_services_opentelemetry_enabled=true
-      - gravitee_services_opentelemetry_verbose=true
-      - gravitee_services_opentelemetry_exporter_endpoint=http://jaeger:4318
-      - gravitee_services_opentelemetry_exporter_protocol=http/protobuf
+      # - gravitee_services_opentelemetry_enabled=true
+      # - gravitee_services_opentelemetry_verbose=true
+      # - gravitee_services_opentelemetry_exporter_endpoint=http://jaeger:4318
+      # - gravitee_services_opentelemetry_exporter_protocol=http/protobuf
       ### TCP REPORTER (sends JSON events to agent-live-graph for real-time visualization)
       - gravitee_reporters_tcp_enabled=true
       - gravitee_reporters_tcp_host=agent-live-graph
@@ -497,19 +497,19 @@ services:
   # --- Observability Components ---
 
   ### Jaeger (OpenTelemetry traces UI)
-  jaeger:
-    image: jaegertracing/jaeger:2.15.1
-    container_name: jaeger
-    restart: unless-stopped
-    ports:
-      - "16686:16686" # Jaeger UI
-      - "4317:4317"   # OTLP gRPC receiver
-      - "4318:4318"   # OTLP HTTP receiver
-    environment:
-      - COLLECTOR_OTLP_ENABLED=true
-    networks:
-      - southbound
-      - northbound
+  # jaeger:
+  #   image: jaegertracing/jaeger:2.15.1
+  #   container_name: jaeger
+  #   restart: unless-stopped
+  #   ports:
+  #     - "16686:16686" # Jaeger UI
+  #     - "4317:4317"   # OTLP gRPC receiver
+  #     - "4318:4318"   # OTLP HTTP receiver
+  #   environment:
+  #     - COLLECTOR_OTLP_ENABLED=true
+  #   networks:
+  #     - southbound
+  #     - northbound
 
   ### Agent Live Graph (real-time flow visualization)
   agent-live-graph:
