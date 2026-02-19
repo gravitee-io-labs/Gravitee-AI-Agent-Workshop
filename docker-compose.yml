@@ -109,6 +109,16 @@ services:
       - gravitee_alerts_alertengine_ws_endpoints_0=http://alert-engine:8072
       - gravitee_alerts_alertengine_ws_security_username=admin
       - gravitee_alerts_alertengine_ws_security_password=adminadmin
+      ### OPENTELEMETRY
+      - gravitee_services_opentelemetry_enabled=true
+      - gravitee_services_opentelemetry_verbose=true
+      - gravitee_services_opentelemetry_exporter_endpoint=http://jaeger:4318
+      - gravitee_services_opentelemetry_exporter_protocol=http/protobuf
+      ### TCP REPORTER (sends JSON events to agent-live-graph for real-time visualization)
+      - gravitee_reporters_tcp_enabled=true
+      - gravitee_reporters_tcp_host=agent-live-graph
+      - gravitee_reporters_tcp_port=9001
+      - gravitee_reporters_tcp_output=json
     networks:
       - southbound
       - northbound
@@ -483,6 +493,42 @@ services:
   #   networks:
   #     - southbound
   #     - northbound
+
+  # --- Observability Components ---
+
+  ### Jaeger (OpenTelemetry traces UI)
+  jaeger:
+    image: jaegertracing/jaeger:2.15.1
+    container_name: jaeger
+    restart: unless-stopped
+    ports:
+      - "16686:16686" # Jaeger UI
+      - "4317:4317"   # OTLP gRPC receiver
+      - "4318:4318"   # OTLP HTTP receiver
+    environment:
+      - COLLECTOR_OTLP_ENABLED=true
+    networks:
+      - southbound
+      - northbound
+
+  ### Agent Live Graph (real-time flow visualization)
+  agent-live-graph:
+    build:
+      context: ./agent-live-graph
+      dockerfile: Dockerfile
+    container_name: agent-live-graph
+    restart: unless-stopped
+    ports:
+      - "9002:9002" # Web UI + WebSocket
+    environment:
+    ### Web UI Configuration
+      - HTTP_PORT=9002 # Port for serving the Web UI and WebSocket
+    ### Gravitee Gateways Logs, Metrics and Traces
+      - TCP_PORT=9001 # Port for receiving TCP events from the APIM Gateway's TCP Reporter
+      - JAEGER_API=http://jaeger:16686 # For fetching trace details to enrich the visualization
+    networks:
+      - southbound
+      - northbound
 
   # --- Volumes and Networks ---
 
