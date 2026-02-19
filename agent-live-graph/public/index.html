@@ -3,7 +3,8 @@
 <head>
   <meta charset="UTF-8"/>
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>Agent Live Graph — Gravitee AI Workshop</title>
+  <title>Gravitee AI Agent Inspector</title>
+  <link rel="icon" href="assets/gravitee-mark.svg" type="image/svg+xml"/>
   <link rel="stylesheet" href="styles.css"/>
   <script src="https://unpkg.com/@phosphor-icons/web@2.1.1"></script>
   <link rel="preconnect" href="https://fonts.googleapis.com"/>
@@ -14,14 +15,9 @@
   <!-- ── Header ──────────────────────────────────────────────── -->
   <header>
     <div class="header-left">
-      <svg class="logo" viewBox="0 0 36 36" width="28" height="28">
-        <circle cx="18" cy="18" r="15" fill="none" stroke="var(--gateway)" stroke-width="2" opacity="0.3"/>
-        <circle cx="18" cy="18" r="5" fill="var(--gateway)"/>
-        <path d="M18 3A15 15 0 0 1 33 18" fill="none" stroke="var(--agent)" stroke-width="2.5" stroke-linecap="round">
-          <animateTransform attributeName="transform" type="rotate" from="0 18 18" to="360 18 18" dur="3s" repeatCount="indefinite"/>
-        </path>
-      </svg>
-      <h1>Agent Live Graph</h1>
+      <img class="logo" src="assets/gravitee-logo.svg" alt="Gravitee" height="22"/>
+      <div class="header-sep"></div>
+      <h1>AI Agent Inspector</h1>
     </div>
 
     <!-- Mode toggle -->
@@ -52,49 +48,39 @@
 
     <!-- Lane headers -->
     <div class="lane-headers">
+      <div class="lane-header" data-lane="client">
+        <div class="lane-icon icon-client">
+          <i class="ph ph-app-window" style="font-size:24px"></i>
+        </div>
+        <span class="lane-name">Client</span>
+        <span class="lane-sub">Request the Agent</span>
+      </div>
       <div class="lane-header" data-lane="agent">
         <div class="lane-icon icon-agent">
-          <svg width="22" height="22" viewBox="0 0 24 24" fill="none">
-            <rect x="4" y="2" width="16" height="20" rx="3" stroke="currentColor" stroke-width="1.6"/>
-            <circle cx="12" cy="9" r="3" stroke="currentColor" stroke-width="1.6"/>
-            <path d="M7 17c0-2.76 2.24-5 5-5s5 2.24 5 5" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/>
-          </svg>
+          <i class="ph ph-robot" style="font-size:24px"></i>
         </div>
-        <span class="lane-name">Hotel AI Agent</span>
-        <span class="lane-sub">A2A Protocol</span>
+        <span class="lane-name">AI Agent</span>
+        <span class="lane-sub">Orchestrate</span>
       </div>
       <div class="lane-header" data-lane="gateway">
         <div class="lane-icon icon-gateway">
-          <svg width="22" height="22" viewBox="0 0 24 24" fill="none">
-            <path d="M12 2L3 7v10l9 5 9-5V7l-9-5z" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/>
-            <path d="M12 22V12M3 7l9 5 9-5" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/>
-          </svg>
+          <img src="assets/gravitee-mark.svg" alt="Gravitee" width="26" height="26"/>
         </div>
         <span class="lane-name">Gravitee Gateway</span>
-        <span class="lane-sub">API &amp; MCP Server</span>
+        <span class="lane-sub">API, AI Management &amp; MCP Server</span>
       </div>
       <div class="lane-header" data-lane="llm">
         <div class="lane-icon icon-llm">
-          <svg width="22" height="22" viewBox="0 0 24 24" fill="none">
-            <path d="M12 2C6.48 2 2 6 2 11c0 3 1.5 5.5 4 7v4l3.5-2c.8.2 1.6.3 2.5.3 5.52 0 10-4 10-9.3C22 6 17.52 2 12 2z" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/>
-            <circle cx="8" cy="11" r="1" fill="currentColor"/>
-            <circle cx="12" cy="11" r="1" fill="currentColor"/>
-            <circle cx="16" cy="11" r="1" fill="currentColor"/>
-          </svg>
+          <i class="ph ph-brain" style="font-size:24px"></i>
         </div>
         <span class="lane-name">LLM</span>
-        <span class="lane-sub">Ollama / qwen3</span>
+        <span class="lane-sub">Think &amp; Decide</span>
       </div>
       <div class="lane-header" data-lane="api">
         <div class="lane-icon icon-api">
-          <svg width="22" height="22" viewBox="0 0 24 24" fill="none">
-            <path d="M4 6h16M4 12h16M4 18h16" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/>
-            <circle cx="8" cy="6" r="1.5" fill="currentColor"/>
-            <circle cx="8" cy="12" r="1.5" fill="currentColor"/>
-            <circle cx="8" cy="18" r="1.5" fill="currentColor"/>
-          </svg>
+          <i class="ph ph-code" style="font-size:24px"></i>
         </div>
-        <span class="lane-name">Hotels API</span>
+        <span class="lane-name">API</span>
         <span class="lane-sub">REST Backend</span>
       </div>
     </div>

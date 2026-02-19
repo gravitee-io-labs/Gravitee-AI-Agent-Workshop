@@ -523,9 +523,8 @@ services:
     environment:
     ### Web UI Configuration
       - HTTP_PORT=9002 # Port for serving the Web UI and WebSocket
-    ### Gravitee Gateways Logs, Metrics and Traces
+    ### Gravitee Gateways Logs & Metrics
       - TCP_PORT=9001 # Port for receiving TCP events from the APIM Gateway's TCP Reporter
-      - JAEGER_API=http://jaeger:16686 # For fetching trace details to enrich the visualization
     networks:
       - southbound
       - northbound

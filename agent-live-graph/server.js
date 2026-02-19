@@ -1,5 +1,5 @@
 /**
- * Agent Live Graph — Server
+ * Gravitee AI Agent Inspector — Server
  *
  * TCP  (port 9001) — receives Gravitee Gateway TCP reporter JSON events
  * HTTP (port 9002) — serves the static frontend + WebSocket for live push
@@ -117,6 +117,39 @@ function parseUserRequest(body) {
   return '';
 }
 
+function parseAgentResponse(body) {
+  const p = tryJSON(body);
+  if (!p) return '';
+  if (p.result) {
+    // A2A JSON-RPC: result IS the Message → result.parts[].text
+    if (p.result.parts) {
+      const tp = (p.result.parts || []).find(part => part.text);
+      if (tp) return tp.text;
+    }
+    // A2A Task response: result.artifacts[].parts[].text
+    if (p.result.artifacts) {
+      for (const art of p.result.artifacts) {
+        for (const part of (art.parts || [])) {
+          if (part.text) return part.text;
+        }
+      }
+    }
+    // A2A Task status: result.status.message.parts[].text
+    if (p.result.status && p.result.status.message && p.result.status.message.parts) {
+      const tp = p.result.status.message.parts.find(part => part.text);
+      if (tp) return tp.text;
+    }
+    // A2A: result.message.parts[].text
+    if (p.result.message && p.result.message.parts) {
+      const tp = p.result.message.parts.find(part => part.text);
+      if (tp) return tp.text;
+    }
+  }
+  if (p.message && typeof p.message === 'string') return p.message;
+  if (p.text && typeof p.text === 'string') return p.text;
+  return '';
+}
+
 /* ═══════════════════════════════════════════════════════════════
  * Noise filter
  * ═══════════════════════════════════════════════════════════════ */
@@ -154,11 +187,12 @@ function classify(evt) {
   const s    = evt.status || 0;
   const gw   = evt.gatewayLatencyMs || 0;
   const tot  = evt.gatewayResponseTimeMs || 0;
-  const log  = evt.log || {};
-  const reqB = (log.entrypointRequest  || {}).body || '';
-  const resB = (log.endpointResponse   || {}).body || '';
-  const eRes = (log.entrypointResponse || {}).body || '';
-  const d    = { m, s, gw, tot, reqB, resB, eRes };
+  const log   = evt.log || {};
+  const reqB  = (log.entrypointRequest  || {}).body || '';
+  const edReq = (log.endpointRequest    || {}).body || '';
+  const resB  = (log.endpointResponse   || {}).body || '';
+  const eRes  = (log.entrypointResponse || {}).body || '';
+  const d     = { m, s, gw, tot, reqB, edReq, resB, eRes };
 
   if (uri.startsWith('/bookings-agent'))                    return fAgent(evt, d);
   if (uri.startsWith('/llm-proxy') || api.includes('LLM')) return fLLM(evt, d);
@@ -172,16 +206,19 @@ function classify(evt) {
 
 /* ── /bookings-agent/ — User <-> Agent ───────────────────── */
 function fAgent(evt, d) {
-  const userText = parseUserRequest(d.reqB);
+  const userText  = parseUserRequest(d.reqB) || parseUserRequest(d.edReq);
+  const agentText = parseAgentResponse(d.eRes) || parseAgentResponse(d.resB);
+  const reqBody   = d.reqB || d.edReq || null;
+  const resBody   = d.eRes || d.resB || null;
   return [
-    { type: 'divider', label: 'User Request', userText: userText || null },
+    { type: 'divider', label: 'User Request' },
     {
       type: 'arrow', from: 'agent', to: 'gateway',
       label: `${d.m} ${evt.uri}`,
       message: {
         lane: 'gateway',
         text: userText ? trunc(userText, 100) : 'User request',
-        rawDetail: d.reqB || null,
+        rawDetail: reqBody,
       },
       policies: [],
       plan: 'Keyless',
@@ -191,8 +228,8 @@ function fAgent(evt, d) {
       label: `${d.s} — ${d.tot}ms`,
       message: {
         lane: 'agent',
-        text: d.s < 400 ? 'Agent replied' : `Error ${d.s}`,
-        rawDetail: d.eRes || null,
+        text: agentText ? trunc(agentText, 120) : (d.s < 400 ? 'Agent replied' : `Error ${d.s}`),
+        rawDetail: resBody,
       },
       badge: { type: st(d.s), text: `${d.tot}ms` },
     },
@@ -202,21 +239,57 @@ function fAgent(evt, d) {
 /* ── /llm-proxy/ — Agent <-> LLM ────────────────────────── */
 function fLLM(evt, d) {
   const req = parseLLMReq(d.reqB);
-  const res = parseLLMRes(d.resB || d.eRes);
   const mdl = req.model || 'LLM';
-  const tc  = res.hasToolCalls;
+
+  // If no endpoint response body, the request was blocked at the gateway
+  // (e.g. guardrails policy) and never reached the LLM.
+  const blockedAtGateway = d.s >= 400 && !d.resB;
+
+  // Policy pass/fail based on actual status codes
+  const guardrailsPassed  = d.s !== 400;
+  const rateLimitPassed   = d.s !== 429;
 
   const reqText = req.hasTools
     ? `${req.nMsgs} messages + ${req.nTools} tool definitions`
     : `${req.nMsgs} messages`;
 
+  // When blocked at gateway, only show the gateway rejection — no LLM arrows
+  if (blockedAtGateway) {
+    return [
+      { type: 'divider', label: 'LLM — Blocked by Policy' },
+      {
+        type: 'arrow', from: 'agent', to: 'gateway',
+        label: `${d.m} ${evt.uri}`,
+        message: { lane: 'gateway', text: 'Forwarding to LLM', rawDetail: d.reqB || null },
+        policies: [
+          { name: 'AI Guardrails', passed: guardrailsPassed },
+          { name: 'Token Rate Limit', passed: rateLimitPassed },
+        ],
+        plan: 'Keyless',
+      },
+      {
+        type: 'arrow', from: 'gateway', to: 'agent',
+        label: `${d.s} — ${d.tot}ms`,
+        message: {
+          lane: 'agent',
+          text: `Error ${d.s}`,
+          rawDetail: d.eRes || null,
+        },
+        badge: { type: st(d.s), text: `${d.tot}ms / ${d.gw}ms gw` },
+      },
+    ];
+  }
+
+  // Normal flow — request reached the LLM
+  const res = parseLLMRes(d.resB || d.eRes);
+  const tc  = res.hasToolCalls;
+
   let resText;
   if (d.s >= 400)       resText = `Error ${d.s}`;
   else if (tc)          resText = `Call ${res.toolCalls.join(', ')}`;
-  else if (res.content) resText = trunc(res.content, 80);
+  else if (res.content) resText = `Text response${res.tokens ? ' — ' + res.tokens + ' tokens' : ''}`;
   else                  resText = 'Response received';
 
-  const passed = d.s < 400;
   return [
     { type: 'divider', label: tc ? 'LLM — Tool Call Decision' : 'LLM — Response' },
     // Agent → Gateway (incoming request)
@@ -225,8 +298,8 @@ function fLLM(evt, d) {
       label: `${d.m} ${evt.uri}`,
       message: { lane: 'gateway', text: 'Forwarding to LLM', rawDetail: d.reqB || null },
       policies: [
-        { name: 'AI Guardrails', passed: passed },
-        { name: 'Token Rate Limit', passed: passed },
+        { name: 'AI Guardrails', passed: guardrailsPassed },
+        { name: 'Token Rate Limit', passed: rateLimitPassed },
       ],
       plan: 'Keyless',
     },
@@ -261,7 +334,7 @@ function fLLM(evt, d) {
 
 /* ── MCP — Gateway acts as MCP Tool Server ────────────────
  *  tools/list:  Agent → Gateway → Agent  (gateway answers directly)
- *  tools/call:  Agent → Gateway → Hotels API → Gateway → Agent
+ *  tools/call:  Agent → Gateway → API → Gateway → Agent
  * ─────────────────────────────────────────────────────────── */
 function fMCP(evt, d, plan) {
   const mcp    = parseMCP(d.reqB);
@@ -319,7 +392,7 @@ function fMCP(evt, d, plan) {
     ];
   }
 
-  // tools/call — gateway calls Hotels API backend to fulfill the tool
+  // tools/call — gateway calls API backend to fulfill the tool
   return [
     { type: 'divider', label: dividerLabel },
     // Agent → Gateway (incoming MCP request)
@@ -335,58 +408,19 @@ function fMCP(evt, d, plan) {
       policies: policies,
       plan: plan,
     },
-    // Gateway → Hotels API (gateway fulfills the tool by calling backend)
+    // Gateway → API (gateway fulfills the tool by calling backend)
     {
       type: 'arrow', from: 'gateway', to: 'api',
       label: `GET /accommodations`,
       message: { lane: 'api', text: mcp.toolName || 'Backend call' },
     },
-    // Hotels API → Gateway (backend response)
+    // API → Gateway (backend response)
     {
       type: 'arrow', from: 'api', to: 'gateway',
       label: `${d.s}`,
       message: { lane: 'gateway', text: resText },
     },
     // Gateway → Agent (MCP response forwarded)
-    {
-      type: 'arrow', from: 'gateway', to: 'agent',
-      label: `${d.s} — ${d.tot}ms`,
-      message: {
-        lane: 'agent',
-        text: resText,
-        rawDetail: d.eRes || d.resB || null,
-      },
-      badge: { type: st(d.s), text: `${d.tot}ms / ${d.gw}ms gw` },
-    },
-  ];
-}
-
-/* ── /hotels/ — REST API ─────────────────────────────────── */
-function fHotel(evt, d) {
-  const pi    = evt.pathInfo || evt.uri.replace(/^\/hotels/, '') || '/';
-  const isAcc = pi.includes('accommodations');
-  const isBook= pi.includes('booking');
-
-  const resArr = tryJSON(d.eRes || d.resB);
-  let resText;
-  if (d.s >= 400) resText = `Error ${d.s}`;
-  else if (Array.isArray(resArr))
-    resText = `${resArr.length} ${isAcc ? 'accommodations' : isBook ? 'bookings' : 'items'}`;
-  else resText = `${d.s} OK`;
-
-  return [
-    { type: 'divider', label: `Hotels API — ${d.m} ${pi}` },
-    {
-      type: 'arrow', from: 'agent', to: 'gateway',
-      label: `${d.m} ${pi}`,
-      message: {
-        lane: 'gateway',
-        text: isAcc ? 'Get Accommodations' : isBook ? 'Manage Bookings' : `${d.m} ${pi}`,
-        rawDetail: d.reqB || null,
-      },
-      policies: [],
-      plan: isBook ? 'JWT' : 'Keyless',
-    },
     {
       type: 'arrow', from: 'gateway', to: 'agent',
       label: `${d.s} — ${d.tot}ms`,
@@ -415,9 +449,117 @@ function fOther(evt, d) {
 
 /* ═══════════════════════════════════════════════════════════════
  * TCP Server — Gravitee Reporter events
+ *
+ * ALL events are collected in a single buffer. The /bookings-agent
+ * event (the outermost user-facing request) arrives last because it
+ * wraps every sub-call. Its arrival triggers a flush:
+ *
+ *   1. User → Agent arrows  (client → gateway → agent)
+ *   2. Inner events sorted by timestamp (LLM, MCP, etc.)
+ *   3. Agent → User arrows  (agent → gateway → client)
+ *
+ * A 60 s timeout flushes orphan events that never get a trigger.
  * ═══════════════════════════════════════════════════════════════ */
 const seen = new Set();
+const a2aPayloads = new Map();       // requestId → { request?, response?, userText?, agentText? }
 
+/* ── Single event buffer ─────────────────────────────────── */
+let pendingEvents     = [];          // { uri, apiName, timestamp, steps, isAgent, requestId, ... }
+let bufferTimeout     = null;        // 60 s safety net
+let flushTimer        = null;        // 500 ms grace after trigger
+const MAX_WAIT_MS     = 60_000;
+const FLUSH_DELAY_MS  = 500;
+
+function flushBuffer() {
+  if (bufferTimeout)  { clearTimeout(bufferTimeout);  bufferTimeout = null; }
+  if (flushTimer)     { clearTimeout(flushTimer);     flushTimer    = null; }
+
+  const events = pendingEvents;
+  pendingEvents = [];
+
+  if (!events.length) return;
+
+  /* ── separate the bookings-agent wrapper from inner events ── */
+  const agentEvt    = events.find(e => e.isAgent);
+  const innerEvents = events.filter(e => !e.isAgent);
+  innerEvents.sort((a, b) => a.timestamp - b.timestamp);
+
+  const allSteps = [];
+
+  /* ── Last-chance A2A enrichment (SUBSCRIBE may arrive after HTTP event) ── */
+  if (agentEvt && agentEvt.requestId) {
+    const a2a = a2aPayloads.get(agentEvt.requestId);
+    if (a2a) {
+      if (!agentEvt.userText         && a2a.userText)  agentEvt.userText         = a2a.userText;
+      if (!agentEvt.agentText        && a2a.agentText) agentEvt.agentText        = a2a.agentText;
+      if (!agentEvt.agentRawRequest  && a2a.request)   agentEvt.agentRawRequest  = a2a.request;
+      if (!agentEvt.agentRawResponse && a2a.response)  agentEvt.agentRawResponse = a2a.response;
+      a2aPayloads.delete(agentEvt.requestId);
+    }
+    console.log(`[FLUSH] Agent text: userText=${agentEvt.userText ? agentEvt.userText.slice(0,60) : 'null'} agentText=${agentEvt.agentText ? agentEvt.agentText.slice(0,60) : 'null'}`);
+  }
+
+  /* 1. User → Agent arrows (Client → Gateway → Agent) */
+  if (agentEvt) {
+    const userText = agentEvt.userText || 'User request to agent';
+    const rawReq   = agentEvt.agentRawRequest || null;
+    allSteps.push(
+      { type: 'divider', label: 'User Request' },
+      {
+        type: 'arrow', from: 'client', to: 'gateway',
+        label: `POST /bookings-agent/`,
+        message: { lane: 'gateway', text: trunc(userText, 120), rawDetail: rawReq },
+        policies: [], plan: 'Keyless',
+      },
+      {
+        type: 'arrow', from: 'gateway', to: 'agent',
+        label: 'Forwarded',
+        message: { lane: 'agent', text: 'Processing request' },
+      },
+    );
+  }
+
+  /* 2. All intermediate gateway events chronologically */
+  for (const evt of innerEvents) {
+    allSteps.push(...evt.steps);
+  }
+
+  /* 3. Agent → User arrows (Agent → Gateway → Client) */
+  if (agentEvt) {
+    const agentText = agentEvt.agentText
+                        || (agentEvt.agentStatus < 400 ? 'Agent replied' : `Error ${agentEvt.agentStatus}`);
+    const rawRes    = agentEvt.agentRawResponse || null;
+    const s         = agentEvt.agentStatus || 200;
+    const tot       = agentEvt.agentTotalMs || 0;
+    allSteps.push(
+      { type: 'divider', label: 'Agent Response' },
+      {
+        type: 'arrow', from: 'agent', to: 'gateway',
+        label: 'A2A response',
+        message: { lane: 'gateway', text: 'Agent response ready', rawDetail: rawRes },
+      },
+      {
+        type: 'arrow', from: 'gateway', to: 'client',
+        label: `${s} — ${tot}ms`,
+        message: { lane: 'client', text: 'Response delivered', rawDetail: rawRes },
+        badge: { type: st(s), text: `${tot}ms total` },
+      },
+    );
+  }
+
+  const ts = (agentEvt || events[events.length - 1] || {}).timestamp || Date.now();
+
+  console.log(`[FLUSH] ${events.length} events -> ${allSteps.length} steps`);
+
+  broadcast({
+    type:      'live-steps',
+    apiName:   agentEvt ? 'Complete Flow' : (events[0] || {}).apiName || '?',
+    timestamp: ts,
+    steps:     allSteps,
+  });
+}
+
+/* ── Event processing ──────────────────────────────────────── */
 const tcpServer = net.createServer((socket) => {
   console.log(`[TCP] Gateway reporter connected from ${socket.remoteAddress}`);
   let buffer = '';
@@ -439,6 +581,44 @@ const tcpServer = net.createServer((socket) => {
 });
 
 function processEvent(evt) {
+  /* ── A2A message events (no uri, payload in message.payload) ── */
+  if (evt.connectorId === 'agent-to-agent' && evt.message && evt.message.payload) {
+    const rid = evt.requestId;
+    if (!rid) return;
+
+    const payload = evt.message.payload;
+    const entry = a2aPayloads.get(rid) || {};
+
+    if (evt.operation === 'PUBLISH') {
+      entry.request   = payload;
+      entry.userText  = parseUserRequest(payload)  || null;
+      console.log(`[A2A]  PUBLISH  ${rid.slice(0,8)}… userText=${entry.userText ? entry.userText.slice(0,60) : 'null'}`);
+    } else if (evt.operation === 'SUBSCRIBE') {
+      entry.response  = payload;
+      entry.agentText = parseAgentResponse(payload) || null;
+      console.log(`[A2A]  SUBSCRIBE ${rid.slice(0,8)}… agentText=${entry.agentText ? entry.agentText.slice(0,60) : 'null'}`);
+    }
+
+    a2aPayloads.set(rid, entry);
+
+    // If there's already a pending agent event with this requestId, enrich it
+    const pending = pendingEvents.find(e => e.isAgent && e.requestId === rid);
+    if (pending) {
+      if (entry.userText  && !pending.userText)         pending.userText         = entry.userText;
+      if (entry.agentText && !pending.agentText)        pending.agentText        = entry.agentText;
+      if (entry.request   && !pending.agentRawRequest)  pending.agentRawRequest  = entry.request;
+      if (entry.response  && !pending.agentRawResponse) pending.agentRawResponse = entry.response;
+    }
+
+    // Clean up old entries
+    if (a2aPayloads.size > 500) {
+      const keys = [...a2aPayloads.keys()];
+      keys.slice(0, 250).forEach(k => a2aPayloads.delete(k));
+    }
+    return;
+  }
+
+  /* ── Standard HTTP events ── */
   if (!evt.uri && !evt.jvm) return;
 
   if (evt.requestId) {
@@ -452,16 +632,57 @@ function processEvent(evt) {
   const steps = classify(evt);
   if (!steps || !steps.length) return;
 
-  console.log(`[LIVE] ${(evt.apiName || '?').padEnd(30)} ${evt.httpMethod} ${evt.uri} -> ${steps.length} steps (${evt.status}, ${evt.gatewayResponseTimeMs}ms)`);
+  const isAgent = (evt.uri || '').startsWith('/bookings-agent');
 
-  broadcast({
-    type:          'live-steps',
-    requestId:     evt.requestId,
-    transactionId: evt.transactionId,
-    apiName:       evt.apiName,
-    timestamp:     evt.timestamp,
-    steps,
-  });
+  /* ── build the buffered entry ── */
+  const entry = { uri: evt.uri, apiName: evt.apiName, timestamp: evt.timestamp, steps, isAgent, requestId: evt.requestId };
+
+  if (isAgent) {
+    const log = evt.log || {};
+
+    // Try HTTP body locations first
+    const epReqBody = (log.entrypointRequest  || {}).body;
+    const edReqBody = (log.endpointRequest    || {}).body;
+    const epResBody = (log.entrypointResponse || {}).body;
+    const edResBody = (log.endpointResponse   || {}).body;
+
+    const reqB = epReqBody || edReqBody || '';
+    const eRes = epResBody || edResBody || '';
+
+    entry.userText         = parseUserRequest(reqB)   || null;
+    entry.agentText        = parseAgentResponse(eRes)  || null;
+    entry.agentRawResponse = eRes || null;
+    entry.agentRawRequest  = reqB || null;
+    entry.agentStatus      = evt.status || 0;
+    entry.agentTotalMs     = evt.gatewayResponseTimeMs || 0;
+
+    // Merge A2A payloads (may have arrived before or after this event)
+    const a2a = a2aPayloads.get(evt.requestId) || {};
+    if (!entry.userText         && a2a.userText)  entry.userText         = a2a.userText;
+    if (!entry.agentText        && a2a.agentText) entry.agentText        = a2a.agentText;
+    if (!entry.agentRawRequest  && a2a.request)   entry.agentRawRequest  = a2a.request;
+    if (!entry.agentRawResponse && a2a.response)  entry.agentRawResponse = a2a.response;
+
+    console.log(`[AGENT] ${evt.requestId.slice(0,8)}… userText=${entry.userText ? entry.userText.slice(0, 80) : 'null'} agentText=${entry.agentText ? entry.agentText.slice(0, 80) : 'null'}`);
+  }
+
+  pendingEvents.push(entry);
+
+  /* start the safety-net timeout on the first event */
+  if (!bufferTimeout) {
+    bufferTimeout = setTimeout(flushBuffer, MAX_WAIT_MS);
+  }
+
+  console.log(`[BUF]  +${(evt.apiName || '?').padEnd(25)} ${evt.httpMethod || evt.operation || '?'} ${evt.uri} (${pendingEvents.length} buffered)`);
+
+  /* notify frontends that events are being collected */
+  broadcast({ type: 'tx-progress', buffered: pendingEvents.length });
+
+  /* bookings-agent = outermost request → trigger flush after short grace period */
+  if (isAgent) {
+    if (flushTimer) clearTimeout(flushTimer);
+    flushTimer = setTimeout(flushBuffer, FLUSH_DELAY_MS);
+  }
 }
 
 tcpServer.listen(TCP_PORT, '0.0.0.0', () =>
