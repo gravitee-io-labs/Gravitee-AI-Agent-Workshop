@@ -59,6 +59,7 @@ This workshop will help you understand the core concepts behind AI agents and th
 | **LLM Proxy** | How to control and secure access to Large Language Models |
 | **AI Agents** | How agents reason, decide, and execute actions |
 | **Authentication & Authorization** | How to implement fine-grained access control with OpenFGA and AuthZen |
+| **Real-Time Observability** | How to visualize and inspect every step of an AI Agent flow in real time |
 
 ---
 
@@ -129,6 +130,7 @@ The workshop environment is **fully automated**, all APIs, applications, and sub
 | **Gravitee AM** | OAuth2/OIDC authorization server for authentication |
 | **AuthZen** | Standard authorization API integrated in Gravitee AM |
 | **OpenFGA** | Fine-grained authorization engine (relationship-based access control) |
+| **AI Agent Inspector** | Real-time visual inspector showing every step of the AI Agent flow |
 
 ---
 
@@ -194,6 +196,7 @@ docker compose up -d
 | **Gravitee APIM Gateway** | http://localhost:8082 | API Gateway |
 | **Gravitee AM Console** | http://localhost:8081 | Access Management Console (login: `admin` / `adminadmin`) |
 | **MCP Inspector** | http://localhost:6274 | Visual MCP Protocol Inspector |
+| **AI Agent Inspector** | http://localhost:9002 | Real-time sequence diagram of AI Agent flows |
 
 ---
 
@@ -488,6 +491,7 @@ docker compose down
 | **LLM Proxy** | Secure, monitor, and control access to language models through a unified gateway |
 | **Agent Architecture** | Agents follow a Discover → Decide → Execute → Reflect loop |
 | **Authorization** | Combine OAuth2/OIDC for identity with OpenFGA for fine-grained permissions |
+| **Observability** | Visualize every step of an AI Agent flow in real time to debug, understand, and verify behavior |
 
 ---
 
