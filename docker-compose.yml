@@ -90,9 +90,15 @@ services:
       retries: 10
     volumes:
       - ./apim-gateway-models:/opt/graviteeio-gateway/models
+      - ./plugins-apim:/opt/graviteeio-gateway/plugins-ext
     environment:
+      ### TIMEOUT
+      - gravitee_http_requestTimeout=120000
       ### LICENSE
       - gravitee_license_key=${GRAVITEE_LICENSE}
+      ### PLUGINS
+      - gravitee_plugins_path_0=/opt/graviteeio-gateway/plugins
+      - gravitee_plugins_path_1=/opt/graviteeio-gateway/plugins-ext
       ### Internal API (Core Service)
       - gravitee_services_core_http_host=0.0.0.0
       - gravitee_services_metrics_enabled=true
@@ -145,9 +151,14 @@ services:
       interval: 2s
       timeout: 2s
       retries: 10
+    volumes:
+      - ./plugins-apim:/opt/graviteeio-management-api/plugins-ext
     environment:
       ### LICENSE
       - gravitee_license_key=${GRAVITEE_LICENSE}
+      ### PLUGINS
+      - gravitee_plugins_path_0=/opt/graviteeio-management-api/plugins
+      - gravitee_plugins_path_1=/opt/graviteeio-management-api/plugins-ext
       ### Internal API (Core Service)
       - gravitee_services_core_http_host=0.0.0.0
       - gravitee_services_metrics_enabled=true
@@ -388,17 +399,17 @@ services:
   #   environment:
   #     - OLLAMA_HOST=0.0.0.0
   #   healthcheck:
-  #     test: ["CMD", "/bin/sh", "-c", "ollama list | grep -q 'qwen3:0.6b'"]
+  #     test: ["CMD", "/bin/sh", "-c", "ollama list | grep -q 'qwen3:4b'"]
   #     interval: 5s
   #     timeout: 10s
-  #     retries: 60 # Accomodate for qwen3:0.6b model download time (523MB)
+  #     retries: 60 # Accomodate for qwen3:4b model download time
   #     start_period: 5s
   #   entrypoint: ["/bin/sh", "-c"]
   #   command: 
   #     - |
   #       ollama serve &
   #       sleep 5
-  #       ollama pull qwen3:0.6b || true
+  #       ollama pull qwen3:4b || true
   #       wait
   #   networks:
   #     - southbound
@@ -452,7 +463,7 @@ services:
         condition: service_healthy
     environment:
       - LLM_BASE_URL=http://gio-apim-gateway:8082/llm-proxy
-      - LLM_MODEL=ollama:qwen3:0.6b
+      - LLM_MODEL=ollama:qwen3:4b
       - LLM_TEMPERATURE=0.3
       - MCP_HTTP_URLS=http://gio-apim-gateway:8082/hotels/mcp
       - AGENT_SERVER_PORT=8001
@@ -465,6 +476,20 @@ services:
     restart: unless-stopped
     networks:
       - southbound
+
+  currency-converter-a2a-agent:
+    build:
+      context: ./currency-converter-a2a-agent
+      dockerfile: Dockerfile
+    image: currency-converter-a2a-agent:local
+    container_name: currency-converter-a2a-agent
+    ports:
+      - "10000:10000"
+    environment:
+      STREAMING: "true"
+      GOOGLE_API_KEY: ${GOOGLE_API_KEY}
+    networks:
+        - southbound
 
   # --- Demo Components ---
 
@@ -483,16 +508,16 @@ services:
       - southbound
       - northbound
   
-  ### A2A Inspector
-  # a2a-inspector:
-  #   image: dobl1/a2a-inspector:latest
-  #   container_name: a2a-inspector
-  #   ports:
-  #     - "8004:8080"
-  #   restart: unless-stopped
-  #   networks:
-  #     - southbound
-  #     - northbound
+  ## A2A Inspector
+  a2a-inspector:
+    image: dobl1/a2a-inspector:latest
+    container_name: a2a-inspector
+    ports:
+      - "8004:8080"
+    restart: unless-stopped
+    networks:
+      - southbound
+      - northbound
 
   # --- Observability Components ---
 

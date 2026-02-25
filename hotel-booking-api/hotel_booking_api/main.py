@@ -19,6 +19,7 @@ class Accommodation(BaseModel):
     location: str = Field(..., example="London")
     description: str = Field(..., example="Luxury hotel in the heart of the city")
     price_per_night: float = Field(..., example=250.0)
+    currency: str = Field(..., example="EUR")
     available_rooms: int = Field(..., example=10)
 
 class Booking(BaseModel):

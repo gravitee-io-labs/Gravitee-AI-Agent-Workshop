@@ -12,12 +12,13 @@
   'use strict';
 
   /* ── Lane geometry ──────────────────────────────────────── */
-  const LANES = { client: 0, agent: 1, gateway: 2, llm: 3, api: 4 };
-  const centerPct = (idx) => (idx * 20) + 10;
+  const LANES = { client: 0, agent: 1, gateway: 2, currency: 3, llm: 4, api: 5 };
+  const centerPct = (idx) => (idx * (100 / 6)) + (100 / 12); // 6 lanes, equally spaced
   const LANE_COLORS = {
     client:  '#6B7280',
     agent:   '#7C3AED',
     gateway: '#0284C7',
+    currency: '#eab308',
     llm:     '#EA580C',
     api:     '#059669',
   };
@@ -144,11 +145,11 @@
 
     row.appendChild(arrowZone);
 
-    /* ── Content zone (5-column grid — message cards, policies, badges) ── */
+    /* ── Content zone (6-column grid — message cards, policies, badges) ── */
     const contentZone = document.createElement('div');
     contentZone.className = 'content-zone';
 
-    for (let i = 0; i < 5; i++) {
+    for (let i = 0; i < 6; i++) {
       const col = document.createElement('div');
       col.className = 'lane-col';
 
