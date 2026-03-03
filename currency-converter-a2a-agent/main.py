@@ -13,7 +13,7 @@ import uvicorn
 from dotenv import load_dotenv
 from langchain_core.messages import AIMessage, ToolMessage
 from langchain_core.tools import tool
-from langchain_google_genai import ChatGoogleGenerativeAI
+from langchain_openai import ChatOpenAI
 from langgraph.checkpoint.memory import MemorySaver
 from langgraph.prebuilt import create_react_agent
 from pydantic import BaseModel
@@ -111,7 +111,12 @@ class CurrencyAgentExecutor(AgentExecutor):
 
     def __init__(self, streaming: bool = True):
         self.streaming = streaming
-        self.model = ChatGoogleGenerativeAI(model='gemini-2.0-flash')
+        self.model = ChatOpenAI(
+            base_url=os.getenv('LLM_BASE_URL', 'http://gio-apim-gateway:8082/llm-proxy'),
+            api_key=os.getenv('LLM_API_KEY', 'not-needed'),
+            model=os.getenv('LLM_MODEL', 'ollama:qwen3:4b'),
+            temperature=float(os.getenv('LLM_TEMPERATURE', '0.3')),
+        )
         self.tools = [get_exchange_rate]
         self.graph = create_react_agent(
             self.model,
@@ -235,9 +240,6 @@ def create_agent_card(host: str, port: int, streaming: bool) -> AgentCard:
 def main(host: str, port: int):
     """Starts the Currency Agent server using the official A2A SDK."""
     try:
-        if not os.getenv('GOOGLE_API_KEY'):
-            raise ValueError('GOOGLE_API_KEY environment variable not set.')
-
         streaming = str2bool(os.getenv('STREAMING', 'true'))
         agent_card = create_agent_card(host, port, streaming)
 

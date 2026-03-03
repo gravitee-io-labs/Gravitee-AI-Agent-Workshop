@@ -1,3 +1,4 @@
+import os
 from collections.abc import AsyncIterable
 from typing import Any, Literal
 
@@ -5,7 +6,7 @@ import httpx
 
 from langchain_core.messages import AIMessage, ToolMessage
 from langchain_core.tools import tool
-from langchain_google_genai import ChatGoogleGenerativeAI
+from langchain_openai import ChatOpenAI
 from pydantic import BaseModel
 
 from langgraph.checkpoint.memory import MemorySaver
@@ -74,7 +75,12 @@ class CurrencyAgent:
     )
 
     def __init__(self):
-        self.model = ChatGoogleGenerativeAI(model='gemini-2.0-flash')
+        self.model = ChatOpenAI(
+            base_url=os.getenv('LLM_BASE_URL', 'http://gio-apim-gateway:8082/llm'),
+            api_key=os.getenv('LLM_API_KEY', 'not-needed'),
+            model=os.getenv('LLM_MODEL', 'ollama:qwen3:4b'),
+            temperature=float(os.getenv('LLM_TEMPERATURE', '0.3')),
+        )
         self.tools = [get_exchange_rate]
 
         self.graph = create_react_agent(

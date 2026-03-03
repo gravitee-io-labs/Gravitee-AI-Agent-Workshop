@@ -93,7 +93,7 @@ services:
       - ./plugins-apim:/opt/graviteeio-gateway/plugins-ext
     environment:
       ### TIMEOUT
-      - gravitee_http_requestTimeout=120000
+      - gravitee_http_requestTimeout=160000
       ### LICENSE
       - gravitee_license_key=${GRAVITEE_LICENSE}
       ### PLUGINS
@@ -487,7 +487,10 @@ services:
       - "10000:10000"
     environment:
       STREAMING: "true"
-      GOOGLE_API_KEY: ${GOOGLE_API_KEY}
+      LLM_BASE_URL: http://gio-apim-gateway:8082/llm-proxy
+      LLM_API_KEY: not-needed
+      LLM_MODEL: "ollama:qwen3:4b"
+      LLM_TEMPERATURE: "0.3"
     networks:
         - southbound
 
