@@ -5,46 +5,178 @@
     "location": "London",
     "description": "Luxury 5-star hotel in central London with exceptional service",
     "price_per_night": 350.0,
+    "currency": "EUR",
     "available_rooms": 15
   },
   {
     "id": 2,
+    "name": "The Small Hotel London",
+    "location": "London",
+    "description": "Not Luxury 3-stars hotel in central London with really bad service",
+    "price_per_night": 120.0,
+    "currency": "EUR",
+    "available_rooms": 3
+  },
+  {
+    "id": 3,
     "name": "Riverside Inn London",
     "location": "London",
     "description": "Charming boutique hotel along the Thames",
     "price_per_night": 180.0,
+    "currency": "EUR",
     "available_rooms": 8
   },
   {
-    "id": 3,
+    "id": 4,
+    "name": "Kensington Palace Suites",
+    "location": "London",
+    "description": "Elegant suites near Kensington Gardens with afternoon tea service",
+    "price_per_night": 275.0,
+    "currency": "EUR",
+    "available_rooms": 6
+  },
+  {
+    "id": 5,
+    "name": "Shoreditch Loft Hotel",
+    "location": "London",
+    "description": "Trendy industrial-chic hotel in the heart of East London's creative quarter",
+    "price_per_night": 95.0,
+    "currency": "EUR",
+    "available_rooms": 12
+  },
+  {
+    "id": 6,
     "name": "Le Château Paris",
     "location": "Paris",
     "description": "Elegant hotel near the Eiffel Tower with stunning views",
     "price_per_night": 420.0,
+    "currency": "EUR",
     "available_rooms": 12
   },
   {
-    "id": 4,
+    "id": 7,
     "name": "Montmartre Boutique",
     "location": "Paris",
     "description": "Cozy hotel in the artistic Montmartre district",
     "price_per_night": 210.0,
+    "currency": "EUR",
     "available_rooms": 10
   },
   {
-    "id": 5,
+    "id": 8,
+    "name": "Hôtel du Marais",
+    "location": "Paris",
+    "description": "Charming 3-star hotel in the trendy Marais neighborhood",
+    "price_per_night": 145.0,
+    "currency": "EUR",
+    "available_rooms": 7
+  },
+  {
+    "id": 9,
+    "name": "La Petite Auberge",
+    "location": "Paris",
+    "description": "Budget-friendly guesthouse near Gare du Nord, perfect for backpackers",
+    "price_per_night": 65.0,
+    "currency": "EUR",
+    "available_rooms": 4
+  },
+  {
+    "id": 10,
     "name": "Manhattan Grand Hotel",
     "location": "New York",
     "description": "Modern luxury hotel in the heart of Manhattan",
     "price_per_night": 450.0,
+    "currency": "EUR",
     "available_rooms": 20
   },
   {
-    "id": 6,
+    "id": 11,
     "name": "Brooklyn Heights Inn",
     "location": "New York",
     "description": "Contemporary hotel with Brooklyn Bridge views",
     "price_per_night": 280.0,
+    "currency": "EUR",
     "available_rooms": 14
+  },
+  {
+    "id": 12,
+    "name": "Times Square Budget Stay",
+    "location": "New York",
+    "description": "Affordable hotel steps away from Times Square and Broadway theaters",
+    "price_per_night": 155.0,
+    "currency": "EUR",
+    "available_rooms": 22
+  },
+  {
+    "id": 13,
+    "name": "SoHo Art Hotel",
+    "location": "New York",
+    "description": "Stylish boutique hotel in SoHo with rotating art gallery",
+    "price_per_night": 320.0,
+    "currency": "EUR",
+    "available_rooms": 9
+  },
+  {
+    "id": 14,
+    "name": "Sagrada Familia Residences",
+    "location": "Barcelona",
+    "description": "Modern apartments with rooftop pool and views of Gaudí's masterpiece",
+    "price_per_night": 190.0,
+    "currency": "EUR",
+    "available_rooms": 11
+  },
+  {
+    "id": 15,
+    "name": "Gothic Quarter Hostel",
+    "location": "Barcelona",
+    "description": "Vibrant hostel in the historic Gothic Quarter near Las Ramblas",
+    "price_per_night": 55.0,
+    "currency": "EUR",
+    "available_rooms": 18
+  },
+  {
+    "id": 16,
+    "name": "Hotel Shibuya Crossing",
+    "location": "Tokyo",
+    "description": "Ultra-modern capsule hotel overlooking the famous Shibuya intersection",
+    "price_per_night": 80.0,
+    "currency": "EUR",
+    "available_rooms": 30
+  },
+  {
+    "id": 17,
+    "name": "Imperial Palace Hotel Tokyo",
+    "location": "Tokyo",
+    "description": "Traditional Japanese luxury ryokan with onsen and kaiseki dining",
+    "price_per_night": 520.0,
+    "currency": "EUR",
+    "available_rooms": 5
+  },
+  {
+    "id": 18,
+    "name": "Colosseum View Hotel",
+    "location": "Rome",
+    "description": "Historic hotel with panoramic terrace overlooking the Colosseum",
+    "price_per_night": 260.0,
+    "currency": "EUR",
+    "available_rooms": 8
+  },
+  {
+    "id": 19,
+    "name": "Trastevere B&B",
+    "location": "Rome",
+    "description": "Cozy bed and breakfast in Rome's most charming neighborhood",
+    "price_per_night": 90.0,
+    "currency": "EUR",
+    "available_rooms": 3
+  },
+  {
+    "id": 20,
+    "name": "Santorini Sunset Villas",
+    "location": "Santorini",
+    "description": "Whitewashed villas with infinity pool and caldera sunset views",
+    "price_per_night": 380.0,
+    "currency": "EUR",
+    "available_rooms": 4
   }
 ]

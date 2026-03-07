@@ -195,6 +195,7 @@ function classify(evt) {
   const d     = { m, s, gw, tot, reqB, edReq, resB, eRes };
 
   if (uri.startsWith('/bookings-agent'))                    return fAgent(evt, d);
+  if (uri.startsWith('/currency-agent'))                    return fCurrency(evt, d);
   if (uri.startsWith('/llm-proxy') || api.includes('LLM')) return fLLM(evt, d);
   if (uri.startsWith('/mcp-proxy'))                         return fMCP(evt, d, 'OAuth2');
   if (uri.startsWith('/hotels') && uri.includes('/mcp'))    return fMCP(evt, d, 'Keyless');
@@ -232,6 +233,59 @@ function fAgent(evt, d) {
         rawDetail: resBody,
       },
       badge: { type: st(d.s), text: `${d.tot}ms` },
+    },
+  ];
+}
+
+/* ── /currency-agent/ — Hotel Agent <-> Currency Agent (A2A) ── */
+function fCurrency(evt, d) {
+  const userText  = parseUserRequest(d.reqB) || parseUserRequest(d.edReq);
+  const agentText = parseAgentResponse(d.eRes) || parseAgentResponse(d.resB);
+  const reqBody   = d.reqB || d.edReq || null;
+  const resBody   = d.eRes || d.resB || null;
+
+  return [
+    { type: 'divider', label: 'A2A — Currency Conversion' },
+    // Agent → Gateway (outgoing A2A request)
+    {
+      type: 'arrow', from: 'agent', to: 'gateway',
+      label: `${d.m} ${evt.uri}`,
+      message: {
+        lane: 'gateway',
+        text: userText ? trunc(userText, 100) : 'Currency conversion request',
+        rawDetail: reqBody,
+      },
+      policies: [],
+      plan: 'Keyless',
+    },
+    // Gateway → Currency Agent (forwarded to remote agent)
+    {
+      type: 'arrow', from: 'gateway', to: 'currency',
+      label: 'A2A message/send',
+      message: {
+        lane: 'currency',
+        text: userText ? trunc(userText, 100) : 'Convert currencies',
+      },
+    },
+    // Currency Agent → Gateway (response from remote agent)
+    {
+      type: 'arrow', from: 'currency', to: 'gateway',
+      label: `${d.s}`,
+      message: {
+        lane: 'gateway',
+        text: agentText ? trunc(agentText, 100) : (d.s < 400 ? 'Conversion result' : `Error ${d.s}`),
+      },
+    },
+    // Gateway → Agent (response forwarded)
+    {
+      type: 'arrow', from: 'gateway', to: 'agent',
+      label: `${d.s} — ${d.tot}ms`,
+      message: {
+        lane: 'agent',
+        text: agentText ? trunc(agentText, 100) : (d.s < 400 ? 'Conversion result received' : `Error ${d.s}`),
+        rawDetail: resBody,
+      },
+      badge: { type: st(d.s), text: `${d.tot}ms / ${d.gw}ms gw` },
     },
   ];
 }

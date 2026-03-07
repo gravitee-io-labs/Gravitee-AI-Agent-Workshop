@@ -45,9 +45,9 @@
             "configuration": {
               "models": [
                 {
-                  "outputPrice": 1,
-                  "name": "qwen3:0.6b",
-                  "inputPrice": 0.1
+                  "outputPrice": 0.5,
+                  "name": "qwen3:4b",
+                  "inputPrice": 0.05
                 }
               ],
               "provider": "OPEN_AI_COMPATIBLE",
@@ -56,7 +56,7 @@
                 "type": "NONE"
               }
             },
-            "sharedConfigurationOverride": "{\"http\":{\"version\":\"HTTP_1_1\",\"keepAlive\":true,\"keepAliveTimeout\":30000,\"connectTimeout\":3000,\"pipelining\":false,\"readTimeout\":10000,\"useCompression\":true,\"propagateClientHost\":false,\"idleTimeout\":0,\"followRedirects\":false,\"maxConcurrentConnections\":20},\"proxy\":{\"enabled\":false,\"useSystemProxy\":false},\"ssl\":{\"hostnameVerifier\":true,\"trustAll\":false,\"trustStore\":{\"type\":\"\"},\"keyStore\":{\"type\":\"\"}}}",
+            "sharedConfigurationOverride": "{\"http\":{\"version\":\"HTTP_1_1\",\"keepAlive\":true,\"keepAliveTimeout\":120000,\"connectTimeout\":3000,\"pipelining\":false,\"readTimeout\":120000,\"useCompression\":true,\"propagateClientHost\":false,\"idleTimeout\":0,\"followRedirects\":false,\"maxConcurrentConnections\":20},\"proxy\":{\"enabled\":false,\"useSystemProxy\":false},\"ssl\":{\"hostnameVerifier\":true,\"trustAll\":false,\"trustStore\":{\"type\":\"\"},\"keyStore\":{\"type\":\"\"}}}",
             "services": {},
             "secondary": false,
             "tenants": []

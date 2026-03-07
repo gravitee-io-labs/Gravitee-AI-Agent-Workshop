@@ -34,7 +34,7 @@ class LLMRateLimitError(Exception):
 # LLM API configuration
 LLM_BASE_URL = os.getenv("LLM_BASE_URL", "http://gio-apim-gateway:8082/llm/v1")
 LLM_API_KEY = os.getenv("LLM_API_KEY", "not-needed")
-LLM_MODEL = os.getenv("LLM_MODEL", "qwen3:0.6b")
+LLM_MODEL = os.getenv("LLM_MODEL", "qwen3:8b")
 LLM_TEMPERATURE = float(os.getenv("LLM_TEMPERATURE", "0.3"))
 
 
@@ -136,7 +136,7 @@ class LLMClient:
         """Process tool result and generate final response."""
         
         tool_name = tool_call.get("function", {}).get("name", "unknown")
-        logger.info(f"Processing result from tool '{tool_name}'")
+        logger.info(f"Processing result from tool '{tool_name}' (model: {self.model})")
         
         # Build conversation with tool result
         messages = []
