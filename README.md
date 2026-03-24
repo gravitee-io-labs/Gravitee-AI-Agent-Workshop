@@ -1,6 +1,6 @@
 # Gravitee AI Agent Workshop: ACME Hotels 🏨🤖
 
-Welcome to the **Gravitee AI Agent Workshop**! This hands-on workshop demonstrates how to build, secure, and manage AI agents using the **Gravitee AI Agent Mesh**. Through the lens of a fictional hotel booking company—**ACME Hotels**—you'll explore the key concepts and technologies powering the next generation of AI-driven applications.
+Welcome to the **Gravitee AI Agent Workshop**! This hands-on workshop demonstrates how to build, secure, and manage AI agents using the **Gravitee AI Agent Management Platform**. Through the lens of a fictional hotel booking company—**ACME Hotels**—you'll explore the key concepts and technologies powering the next generation of AI-driven applications.
 
 ## ⚡ TL;DR - Quick Start (5 Minutes)
 
@@ -51,7 +51,7 @@ Want to dive straight in? Follow these simple steps:
 
 ## 🎯 What You'll Learn
 
-This workshop will help you understand the core concepts behind AI agents and the Gravitee AI Agent Mesh:
+This workshop will help you understand the core concepts behind AI agents and the Gravitee AI Agent Management Platform:
 
 | Concept | Description |
 |---------|-------------|
@@ -532,7 +532,7 @@ docker compose down
 - [Model Context Protocol (MCP) Specification](https://modelcontextprotocol.io/)
 - [A2A Protocol Documentation](https://google.github.io/A2A/)
 - [OpenFGA Documentation](https://openfga.dev/)
-- [Gravitee AI Agent Mesh](https://www.gravitee.io/)
+- [Gravitee AI Agent Management Platform](https://www.gravitee.io/)
 
 ---
 
