@@ -63,6 +63,7 @@ class HotelBookingAgent:
         try:
             # Connect with limited retries during startup to fail fast
             await self.mcp_client.connect_all(max_retries=3, connection_timeout=15)
+            self.available_tools = await self.mcp_client.list_all_tools()
             await self.auth_service.initialize()
             self._initialized = True
             logger.info("Agent initialized successfully")
@@ -81,8 +82,8 @@ class HotelBookingAgent:
             logger.info("=" * 80)
             
             # Get available tools from all MCP servers
-            available_tools = await self.mcp_client.list_all_tools()
-            logger.info(f"Retrieved {len(available_tools)} available tools from all MCP servers")
+            available_tools = self.available_tools
+            logger.info(f"Retrieved {len(available_tools)} available tools from all MCP servers from self")
 
             # Get LLM response with potential tool calls
             logger.info("Querying LLM to determine action...")
