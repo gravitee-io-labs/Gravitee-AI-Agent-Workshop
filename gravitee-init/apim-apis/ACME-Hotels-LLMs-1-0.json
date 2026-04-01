@@ -1,8 +1,4 @@
 {
-  "export": {
-    "date": "2026-01-21T14:43:59.632685506Z",
-    "apimVersion": "4.10.0"
-  },
   "api": {
     "definitionVersion": "V4",
     "type": "LLM_PROXY",
@@ -132,7 +128,6 @@
     },
     "flows": [
       {
-        "id": "ddeba02b-bc61-49ad-aba0-2bbc6119ad49",
         "enabled": true,
         "selectors": [
           {
@@ -167,7 +162,7 @@
               "rate": {
                 "useKeyOnly": false,
                 "periodTime": 10,
-                "limit": 400,
+                "limit": 500,
                 "periodTimeUnit": "SECONDS",
                 "key": ""
               },
@@ -183,7 +178,6 @@
         "tags": []
       },
       {
-        "id": "f6578874-a1ac-4399-9788-74a1ac03992e",
         "enabled": true,
         "selectors": [
           {
@@ -204,7 +198,6 @@
         "tags": []
       },
       {
-        "id": "bdf209e3-c5b6-4927-b209-e3c5b6b92711",
         "enabled": true,
         "selectors": [
           {
@@ -225,15 +218,9 @@
         "tags": []
       }
     ],
-    "id": "c667b02d-b946-487c-a7b0-2db946387ce3",
     "name": "ACME Hotels LLMs",
     "description": "ACME Hotels LLMs",
     "apiVersion": "1.0",
-    "deployedAt": "2026-01-13T12:49:51.672Z",
-    "createdAt": "2025-12-19T17:07:25.682Z",
-    "updatedAt": "2026-01-16T03:39:20.274Z",
-    "disableMembershipNotifications": false,
-    "groups": [],
     "state": "STARTED",
     "visibility": "PRIVATE",
     "labels": [
@@ -242,16 +229,7 @@
     ],
     "lifecycleState": "PUBLISHED",
     "tags": [],
-    "primaryOwner": {
-      "id": "1f89bd40-77be-4f8f-89bd-4077be1f8fd0",
-      "email": "dorian.blanc@graviteesource.com",
-      "displayName": "Dorian Blanc",
-      "type": "USER"
-    },
     "categories": [],
-    "originContext": {
-      "origin": "MANAGEMENT"
-    },
     "responseTemplates": {},
     "resources": [
       {
@@ -268,10 +246,8 @@
     {
       "definitionVersion": "V4",
       "flows": [],
-      "id": "ddb12659-1c34-4a6b-b126-591c343a6b68",
       "name": "Open",
       "description": "Default unsecured plan",
-      "apiId": "c667b02d-b946-487c-a7b0-2db946387ce3",
       "security": {
         "type": "KEY_LESS",
         "configuration": {}
@@ -279,14 +255,11 @@
       "mode": "STANDARD",
       "characteristics": [],
       "commentRequired": false,
-      "createdAt": "2025-12-19T17:07:25.824Z",
       "excludedGroups": [],
       "order": 1,
-      "publishedAt": "2025-12-19T17:07:25.853Z",
       "status": "PUBLISHED",
       "tags": [],
       "type": "API",
-      "updatedAt": "2025-12-19T17:07:25.853Z",
       "validation": "MANUAL"
     }
   ],

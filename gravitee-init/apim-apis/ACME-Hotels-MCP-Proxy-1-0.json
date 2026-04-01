@@ -1,8 +1,4 @@
 {
-  "export": {
-    "date": "2026-01-21T14:44:03.570701466Z",
-    "apimVersion": "4.10.0"
-  },
   "api": {
     "definitionVersion": "V4",
     "type": "MCP_PROXY",
@@ -81,15 +77,9 @@
       "matchRequired": false
     },
     "flows": [],
-    "id": "9351740a-b119-4a0c-9174-0ab119fa0cee",
     "name": "ACME Hotels MCP Proxy",
     "description": "ACME Hotels MCP Proxy",
     "apiVersion": "1.0",
-    "deployedAt": "2026-01-13T12:55:36.825Z",
-    "createdAt": "2026-01-11T18:22:07.881Z",
-    "updatedAt": "2026-01-16T03:39:20.713Z",
-    "disableMembershipNotifications": false,
-    "groups": [],
     "state": "STARTED",
     "visibility": "PRIVATE",
     "labels": [
@@ -98,16 +88,7 @@
     ],
     "lifecycleState": "PUBLISHED",
     "tags": [],
-    "primaryOwner": {
-      "id": "1f89bd40-77be-4f8f-89bd-4077be1f8fd0",
-      "email": "dorian.blanc@graviteesource.com",
-      "displayName": "Dorian Blanc",
-      "type": "USER"
-    },
     "categories": [],
-    "originContext": {
-      "origin": "MANAGEMENT"
-    },
     "responseTemplates": {},
     "resources": [
       {
@@ -125,7 +106,6 @@
       "definitionVersion": "V4",
       "flows": [
         {
-          "id": "30b484c2-7871-491f-b484-c27871291f87",
           "name": "Limit Tool Access",
           "enabled": true,
           "selectors": [
@@ -137,16 +117,7 @@
               ]
             }
           ],
-          "request": [
-            {
-              "name": "MCP ACL",
-              "enabled": true,
-              "policy": "mcp-acl",
-              "configuration": {
-                "authorizations": []
-              }
-            }
-          ],
+          "request": [],
           "response": [],
           "subscribe": [],
           "publish": [],
@@ -155,10 +126,8 @@
           "tags": []
         }
       ],
-      "id": "1a9769f2-5d79-4f81-9769-f25d790f81d6",
       "name": "Secured",
       "description": "Secured plan with OAuth2",
-      "apiId": "9351740a-b119-4a0c-9174-0ab119fa0cee",
       "security": {
         "type": "OAUTH2",
         "configuration": {
@@ -175,15 +144,12 @@
       "characteristics": [],
       "commentMessage": "",
       "commentRequired": false,
-      "createdAt": "2026-01-12T12:21:41.823Z",
       "excludedGroups": [],
       "generalConditions": "",
       "order": 1,
-      "publishedAt": "2026-01-12T12:21:45.084Z",
       "status": "PUBLISHED",
       "tags": [],
       "type": "API",
-      "updatedAt": "2026-01-13T12:55:35.405Z",
       "validation": "MANUAL"
     }
   ],

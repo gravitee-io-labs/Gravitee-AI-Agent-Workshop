@@ -1,8 +1,4 @@
 {
-  "export": {
-    "date": "2026-01-21T14:43:56.504776463Z",
-    "apimVersion": "4.10.0"
-  },
   "api": {
     "definitionVersion": "V4",
     "type": "PROXY",
@@ -122,7 +118,6 @@
     },
     "flows": [
       {
-        "id": "2c72bc17-624a-4173-b2bc-17624a1173e4",
         "name": "MCP Server",
         "enabled": true,
         "selectors": [
@@ -185,15 +180,9 @@
         "tags": []
       }
     ],
-    "id": "fbdadc8b-13e0-4638-9adc-8b13e0e638fa",
     "name": "ACME Hotels API",
     "description": "ACME Hotels API",
     "apiVersion": "1.0",
-    "deployedAt": "2026-01-13T12:35:07.845Z",
-    "createdAt": "2026-01-12T22:55:52.975Z",
-    "updatedAt": "2026-01-16T03:39:19.789Z",
-    "disableMembershipNotifications": false,
-    "groups": [],
     "state": "STARTED",
     "visibility": "PRIVATE",
     "labels": [
@@ -201,30 +190,19 @@
     ],
     "lifecycleState": "PUBLISHED",
     "tags": [],
-    "primaryOwner": {
-      "id": "1f89bd40-77be-4f8f-89bd-4077be1f8fd0",
-      "email": "dorian.blanc@graviteesource.com",
-      "displayName": "Dorian Blanc",
-      "type": "USER"
-    },
     "categories": [],
-    "originContext": {
-      "origin": "MANAGEMENT"
-    },
     "responseTemplates": {},
     "resources": [],
     "properties": []
   },
   "pages": [
     {
-      "id": "17613053-52bb-472c-a130-5352bb572c43",
       "name": "OpenAPI",
       "type": "SWAGGER",
       "content": "openapi: 3.0.3\ninfo:\n  title: ACME Hotel API\n  version: \"1.0\"\n  description: Acme Hotel API to manage Accommodations and Bookings\nservers:\n  - url: http://localhost:8082/hotels\ntags:\n  - name: Accommodations\n    description: Browse available accommodations\n  - name: Bookings\n    description: Manage hotel bookings\n\npaths:\n  /accommodations:\n    get:\n      tags: [Accommodations]\n      summary: Retrieves a list of available accommodations. Optionally filter by location.\n      operationId: getAccommodations\n      parameters:\n        - name: location\n          in: query\n          required: false\n          schema:\n            type: string\n          description: Filter by city name (e.g., London, Paris, New York)\n      responses:\n        \"200\":\n          description: List of accommodations\n          content:\n            application/json:\n              schema:\n                type: array\n                items:\n                  $ref: \"#/components/schemas/Accommodation\"\n\n  /bookings:\n    get:\n      tags: [Bookings]\n      summary: Retrieves all existing bookings.\n      operationId: getBookings\n      security:\n        - oauth2: [read:bookings]\n        - bearerAuth: []\n      responses:\n        \"200\":\n          description: List of bookings for a specific user\n          content:\n            application/json:\n              schema:\n                type: array\n                items:\n                  $ref: \"#/components/schemas/Booking\"\n        \"401\":\n          description: Unauthorized - Missing or invalid authentication token\n          content:\n            application/json:\n              schema:\n                type: object\n                properties:\n                  error:\n                    type: string\n                    example: \"Unauthorized\"\n                  message:\n                    type: string\n                    example: \"Valid authentication token is required\"\n        \"403\":\n          description: Forbidden - Insufficient permissions\n          content:\n            application/json:\n              schema:\n                type: object\n                properties:\n                  error:\n                    type: string\n                    example: \"Forbidden\"\n                  message:\n                    type: string\n                    example: \"Insufficient permissions to access this resource\"\n\ncomponents:\n  securitySchemes:\n    oauth2:\n      type: oauth2\n      description: OAuth2 authentication with authorization code flow\n      flows:\n        authorizationCode:\n          authorizationUrl: http://localhost:8092/gravitee/oauth/authorize\n          tokenUrl: http://localhost:8092/gravitee/oauth/token\n          scopes:\n            read:bookings: Read access to booking information\n            write:bookings: Write access to create or modify bookings\n        clientCredentials:\n          tokenUrl: http://localhost:8092/gravitee/oauth/token\n          scopes:\n            read:bookings: Read access to booking information\n            write:bookings: Write access to create or modify bookings\n    bearerAuth:\n      type: http\n      scheme: bearer\n      bearerFormat: JWT\n      description: JWT Bearer token authentication\n\n  schemas:\n    Accommodation:\n      type: object\n      properties:\n        id:\n          type: integer\n          example: 1\n        name:\n          type: string\n          example: The Grand Hotel London\n        location:\n          type: string\n          example: London\n        description:\n          type: string\n          example: Luxury 5-star hotel in central London with exceptional service\n        price_per_night:\n          type: number\n          format: float\n          example: 350.0\n        available_rooms:\n          type: integer\n          example: 15\n      required:\n        - id\n        - name\n        - location\n        - description\n        - price_per_night\n        - available_rooms\n\n    Booking:\n      type: object\n      properties:\n        id:\n          type: integer\n          example: 1\n        user_email:\n          type: string\n          format: email\n          description: Email address of the booking owner\n          example: john.doe@gravitee.io\n        hotel_name:\n          type: string\n          example: The Grand Hotel London\n        room_number:\n          type: string\n          example: \"305\"\n        start_date:\n          type: string\n          format: date-time\n          example: \"2025-10-17T14:00:00\"\n        end_date:\n          type: string\n          format: date-time\n          example: \"2025-10-24T11:00:00\"\n        price:\n          type: number\n          format: float\n          example: 2450.0\n      required:\n        - id\n        - user_email\n        - hotel_name\n        - room_number\n        - start_date\n        - end_date\n        - price\n",
       "order": 0,
       "published": true,
       "visibility": "PUBLIC",
-      "updatedAt": "2026-01-13T12:00:58.843Z",
       "configuration": {
         "viewer": "Swagger",
         "entrypointAsBasePath": "false",
@@ -245,39 +223,32 @@
       "homepage": false,
       "excludedAccessControls": false,
       "accessControls": [],
-      "attachedMedia": [],
-      "metadata": {}
+      "attachedMedia": []
     },
     {
-      "id": "8edec398-c055-423f-9ec3-98c055a23f3b",
       "name": "Aside",
       "type": "SYSTEM_FOLDER",
       "order": 0,
       "published": true,
       "visibility": "PUBLIC",
-      "updatedAt": "2026-01-12T22:55:53.039Z",
       "configuration": {},
       "homepage": false,
       "excludedAccessControls": false,
       "accessControls": [],
-      "attachedMedia": [],
-      "metadata": {}
+      "attachedMedia": []
     },
     {
-      "id": "7ddd1907-922e-4ed5-9d19-07922e2ed5ba",
       "name": "Homepage",
       "type": "MARKDOWN",
       "content": "# 🏨 Hotel API\n\nThe **Hotel API** provides a modern, secure interface for discovering hotel accommodations and managing bookings.  \nIt is designed for partners, agencies, and internal applications that require authenticated access to booking data.\n\n---\n\n## 🌐 Overview\n\nThis API enables seamless integration with hotel reservation systems.  \nIt supports both **public data retrieval** (accommodation browsing) and **protected operations** (booking management).\n\nAuthentication is enforced via **OAuth2** or **JWT Bearer tokens**, ensuring sensitive information such as booking details remains secure.\n\n---\n\n## 🔐 Authentication\n\nThe API uses standard authentication mechanisms for maximum flexibility and security.\n\n### OAuth2 Authentication\nSupports both the **Authorization Code** and **Client Credentials** flows for delegated and machine-to-machine access.\n\n**Endpoints:**\n- Authorization URL: `https://auth.example.com/oauth/authorize`\n- Token URL: `https://auth.example.com/oauth/token`\n\n**Scopes:**\n- `read:bookings` – Read access to booking data  \n- `write:bookings` – Create or modify bookings\n\n### Bearer Token (JWT)\nApplications can also use JWT Bearer tokens for quick access.\n\nHeader example:\n```\nAuthorization: Bearer <your_jwt_token>\n```\n\n---\n\n## 💡 Key Features\n\n- 🔎 **Browse Accommodations:** Search for available hotels by location.  \n- 🛎️ **Manage Bookings:** View or manage confirmed reservations (requires authentication).  \n- 🧭 **Flexible Security:** Compatible with OAuth2 and JWT-based authentication.  \n- 💬 **Rich Metadata:** Each accommodation includes detailed descriptions, pricing, and room availability.  \n- ⚙️ **Standardized Model:** Follows OpenAPI 3.0.3 specifications for easy integration.  \n\n---\n\n## 📦 Data Models\n\n### Accommodation\nDescribes a hotel listing, including pricing and availability.\n\n| Field | Type | Description |\n|--------|------|-------------|\n| `id` | integer | Unique accommodation identifier |\n| `name` | string | Name of the hotel |\n| `location` | string | City or region where the hotel is located |\n| `description` | string | Hotel summary or key features |\n| `price_per_night` | number | Price per night (in USD) |\n| `available_rooms` | integer | Number of available rooms |\n\n### Booking\nRepresents a confirmed reservation made by an authenticated user.\n\n| Field | Type | Description |\n|--------|------|-------------|\n| `id` | integer | Unique booking identifier |\n| `user_email` | string | Email of the booking owner |\n| `hotel_name` | string | Name of the booked hotel |\n| `room_number` | string | Room number assigned |\n| `start_date` | date-time | Start date/time of the stay |\n| `end_date` | date-time | End date/time of the stay |\n| `price` | number | Total cost of the booking |\n\n## 📖 API Reference\n\nThe full OpenAPI specification is available in the documentation pages.\n\n---\n\n© 2025 Gravitee – Hotel API\n",
       "order": 1,
       "published": true,
       "visibility": "PUBLIC",
-      "updatedAt": "2026-01-13T12:00:22.096Z",
       "configuration": {},
       "homepage": true,
       "excludedAccessControls": false,
       "accessControls": [],
-      "attachedMedia": [],
-      "metadata": {}
+      "attachedMedia": []
     }
   ],
   "plans": [
@@ -285,7 +256,6 @@
       "definitionVersion": "V4",
       "flows": [
         {
-          "id": "e732c9c7-1f1b-44da-b2c9-c71f1b14da26",
           "name": "Default",
           "enabled": true,
           "selectors": [
@@ -331,10 +301,8 @@
           "tags": []
         }
       ],
-      "id": "f9ad85b7-758b-49ad-ad85-b7758b39ad36",
       "name": "Bookings Management",
       "description": "Restricted access, for bookings management.",
-      "apiId": "fbdadc8b-13e0-4638-9adc-8b13e0e638fa",
       "security": {
         "type": "JWT",
         "configuration": {
@@ -382,23 +350,19 @@
       "characteristics": [],
       "commentMessage": "",
       "commentRequired": false,
-      "createdAt": "2026-01-12T22:55:53.098Z",
       "excludedGroups": [],
       "generalConditions": "",
       "order": 2,
-      "publishedAt": "2026-01-12T22:55:53.098Z",
       "selectionRule": "",
       "status": "PUBLISHED",
       "tags": [],
       "type": "API",
-      "updatedAt": "2026-01-13T12:35:06.291Z",
       "validation": "MANUAL"
     },
     {
       "definitionVersion": "V4",
       "flows": [
         {
-          "id": "42cd198d-eab5-46f8-8d19-8deab5e6f805",
           "name": "Only Allow GET Accommodations",
           "enabled": true,
           "selectors": [
@@ -440,10 +404,8 @@
           "tags": []
         }
       ],
-      "id": "a9813101-1464-48bf-8131-01146408bf89",
       "name": "Accommodation Availability",
       "description": "Unrestricted access to list of publicly available accommodation",
-      "apiId": "fbdadc8b-13e0-4638-9adc-8b13e0e638fa",
       "security": {
         "type": "KEY_LESS",
         "configuration": {}
@@ -451,14 +413,11 @@
       "mode": "STANDARD",
       "characteristics": [],
       "commentRequired": false,
-      "createdAt": "2026-01-12T22:55:53.091Z",
       "excludedGroups": [],
       "order": 1,
-      "publishedAt": "2026-01-12T22:55:53.091Z",
       "status": "PUBLISHED",
       "tags": [],
       "type": "API",
-      "updatedAt": "2026-01-12T22:55:53.091Z",
       "validation": "MANUAL"
     }
   ],

@@ -1,8 +1,4 @@
 {
-  "export": {
-    "date": "2026-01-21T14:44:07.665187843Z",
-    "apimVersion": "4.10.0"
-  },
   "api": {
     "definitionVersion": "V4",
     "type": "PROXY",
@@ -131,30 +127,15 @@
       "matchRequired": false
     },
     "flows": [],
-    "id": "78e3d9b6-4d0f-4e64-a3d9-b64d0f7e64e7",
     "name": "Internal ACME Hotels API MCP Server",
     "description": "Internal ACME Hotels API MCP Server",
     "apiVersion": "1.0",
-    "deployedAt": "2026-01-11T17:19:55.677Z",
-    "createdAt": "2026-01-11T16:17:32.838Z",
-    "updatedAt": "2026-01-16T03:39:21.148Z",
-    "disableMembershipNotifications": false,
-    "groups": [],
     "state": "STARTED",
     "visibility": "PRIVATE",
     "labels": [],
     "lifecycleState": "PUBLISHED",
     "tags": [],
-    "primaryOwner": {
-      "id": "1f89bd40-77be-4f8f-89bd-4077be1f8fd0",
-      "email": "dorian.blanc@graviteesource.com",
-      "displayName": "Dorian Blanc",
-      "type": "USER"
-    },
     "categories": [],
-    "originContext": {
-      "origin": "MANAGEMENT"
-    },
     "responseTemplates": {},
     "resources": [],
     "properties": []
@@ -165,7 +146,6 @@
       "definitionVersion": "V4",
       "flows": [
         {
-          "id": "f48989a8-eda6-40a3-8989-a8eda690a395",
           "name": "Manage Errors",
           "enabled": true,
           "selectors": [
@@ -203,10 +183,8 @@
           "tags": []
         }
       ],
-      "id": "36c40e0b-bffa-4ace-840e-0bbffa6acea0",
       "name": "Open",
       "description": "Default unsecured plan",
-      "apiId": "78e3d9b6-4d0f-4e64-a3d9-b64d0f7e64e7",
       "security": {
         "type": "KEY_LESS",
         "configuration": {}
@@ -214,14 +192,11 @@
       "mode": "STANDARD",
       "characteristics": [],
       "commentRequired": false,
-      "createdAt": "2026-01-11T16:17:32.872Z",
       "excludedGroups": [],
       "order": 1,
-      "publishedAt": "2026-01-11T16:17:32.882Z",
       "status": "PUBLISHED",
       "tags": [],
       "type": "API",
-      "updatedAt": "2026-01-11T17:19:54.522Z",
       "validation": "MANUAL"
     }
   ],
