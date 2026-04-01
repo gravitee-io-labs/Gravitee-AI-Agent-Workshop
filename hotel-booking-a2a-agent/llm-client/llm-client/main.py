@@ -54,19 +54,35 @@ class LLMClient:
         self.temperature = temperature or LLM_TEMPERATURE
 
     async def process_query(
-        self, 
-        query: str, 
+        self,
+        query: str,
         available_tools: list[dict[str, Any]],
-        system_prompt: str | None = None
+        system_prompt: str | None = None,
+        conversation_history: list[dict[str, Any]] | None = None
     ) -> tuple[str, list[dict[str, Any]]]:
-        """Process a query using the LLM with available tools."""
-        
+        """Process a query using the LLM with available tools.
+
+        Args:
+            query: The current user message.
+            available_tools: Tool definitions for the LLM.
+            system_prompt: System prompt for the LLM.
+            conversation_history: Previous messages in this conversation.
+                If provided, the full history (including the current query)
+                is used instead of just the single query.
+        """
+
         logger.info(f"Processing query with LLM (model: {self.model})")
-        
+
         messages = []
         if system_prompt:
             messages.append({"role": "system", "content": system_prompt})
-        messages.append({"role": "user", "content": query})
+
+        if conversation_history:
+            # Use the full conversation history (already includes the new user message)
+            messages.extend(conversation_history)
+            logger.info(f"Using conversation history with {len(conversation_history)} message(s)")
+        else:
+            messages.append({"role": "user", "content": query})
 
         # Build request parameters
         params = {
@@ -127,24 +143,36 @@ class LLMClient:
         return content, tool_calls
 
     async def process_tool_result(
-        self, 
-        original_query: str, 
-        tool_call: dict[str, Any], 
+        self,
+        original_query: str,
+        tool_call: dict[str, Any],
         tool_result: Any,
-        system_prompt: str | None = None
+        system_prompt: str | None = None,
+        conversation_history: list[dict[str, Any]] | None = None
     ) -> str:
-        """Process tool result and generate final response."""
-        
+        """Process tool result and generate final response.
+
+        When *conversation_history* is supplied, the full prior conversation
+        is prepended so the LLM sees everything that happened before.
+        """
+
         tool_name = tool_call.get("function", {}).get("name", "unknown")
         logger.info(f"Processing result from tool '{tool_name}'")
-        
+
         # Build conversation with tool result
         messages = []
         if system_prompt:
             messages.append({"role": "system", "content": system_prompt})
-        
+
+        if conversation_history:
+            # Add prior turns (the last entry is the current user message)
+            messages.extend(conversation_history)
+            logger.info(f"Tool-result context includes {len(conversation_history)} history message(s)")
+        else:
+            messages.append({"role": "user", "content": original_query})
+
+        # Append the assistant tool-call turn + the tool result
         messages.extend([
-            {"role": "user", "content": original_query},
             {
                 "role": "assistant",
                 "content": None,
