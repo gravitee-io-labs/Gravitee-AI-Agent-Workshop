@@ -3,9 +3,9 @@ requires = ["hatchling>=1.25.0"]
 build-backend = "hatchling.build"
 
 [project]
-name = "hotel-booking-a2a-agent"
-version = "0.1.0"
-description = "Hotel Booking A2A Agent Server using MCP tools for booking management"
+name = "a2a-agent"
+version = "1.0.0"
+description = "Generic A2A Agent that discovers and uses MCP tools"
 requires-python = ">=3.12"
 dependencies = [
   "a2a-sdk",
@@ -15,19 +15,15 @@ dependencies = [
   "httpx",
   "uvicorn",
 ]
+
 [project.scripts]
-hotel-booking-a2a-agent = "agent_server.main:main"
+a2a-agent = "agent.main:main"
+
+[tool.hatch.build.targets.wheel]
+packages = ["agent"]
 
 [dependency-groups]
 dev = [
   "pytest",
   "ruff",
 ]
-
-[tool.hatch.build.targets.wheel]
-only-include = ["agent-server", "llm-client/llm-client", "mcp-client/mcp-client"]
-
-[tool.hatch.build.targets.wheel.force-include]
-"agent-server" = "agent_server"
-"llm-client/llm-client" = "llm_client"
-"mcp-client/mcp-client" = "mcp_client"
