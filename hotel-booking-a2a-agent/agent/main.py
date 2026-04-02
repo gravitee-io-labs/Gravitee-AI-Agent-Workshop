@@ -23,7 +23,7 @@ from collections import OrderedDict
 from dotenv import load_dotenv
 
 from agent.mcp_client import MCPMultiClient
-from agent.llm_client import LLMClient, LLMRateLimitError
+from agent.llm_client import LLMClient, LLMRateLimitError, LLMRequestBlockedError
 from agent.auth_service import AuthService, AuthenticationError
 from agent.logger import get_agent_logger
 
@@ -160,11 +160,14 @@ class MCPAgent:
         tools = await self.mcp.list_all_tools()
         logger.info(f"Available tools: {len(tools)}")
 
-        content, tool_calls = await self.llm.process_query(
-            message, tools,
-            system_prompt=SYSTEM_PROMPT,
-            conversation_history=history,
-        )
+        try:
+            content, tool_calls = await self.llm.process_query(
+                message, tools,
+                system_prompt=SYSTEM_PROMPT,
+                conversation_history=history,
+            )
+        except LLMRequestBlockedError as e:
+            return "Your request was blocked because it was deemed invalid or unsafe."
 
         # No tool selected — return the LLM's direct response
         if not tool_calls:
@@ -199,6 +202,8 @@ class MCPAgent:
                 system_prompt=SYSTEM_PROMPT,
                 conversation_history=history,
             )
+        except LLMRequestBlockedError as e:
+            return "Your request was blocked because it was deemed invalid or unsafe."
         except LLMRateLimitError:
             return self._extract_text(result)
 

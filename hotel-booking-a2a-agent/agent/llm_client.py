@@ -4,7 +4,7 @@ import logging
 import os
 from typing import Any
 
-from openai import OpenAI, RateLimitError
+from openai import OpenAI, RateLimitError, BadRequestError
 from dotenv import load_dotenv
 
 from agent.logger import get_llm_logger
@@ -20,6 +20,11 @@ class LLMRateLimitError(Exception):
         self.limit = limit
         self.remaining = remaining
         self.reset = reset
+
+
+class LLMRequestBlockedError(Exception):
+    """Raised when the gateway rejects the request (e.g. prompt security validation)."""
+    pass
 
 
 LLM_BASE_URL = os.getenv("LLM_BASE_URL", "http://gio-apim-gateway:8082/llm/v1")
@@ -76,6 +81,11 @@ class LLMClient:
 
         try:
             response = self.client.chat.completions.create(**params)
+        except BadRequestError as e:
+            logger.warning(f"Request blocked: {e}")
+            body = e.body if hasattr(e, 'body') and isinstance(e.body, dict) else {}
+            reason = body.get("message", str(e))
+            raise LLMRequestBlockedError(reason) from e
         except RateLimitError as e:
             self._handle_rate_limit(e)
 
@@ -147,6 +157,11 @@ class LLMClient:
                 messages=messages,
                 temperature=self.temperature,
             )
+        except BadRequestError as e:
+            logger.warning(f"Request blocked: {e}")
+            body = e.body if hasattr(e, 'body') and isinstance(e.body, dict) else {}
+            reason = body.get("message", str(e))
+            raise LLMRequestBlockedError(reason) from e
         except RateLimitError as e:
             self._handle_rate_limit(e)
 
