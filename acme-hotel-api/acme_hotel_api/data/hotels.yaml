@@ -1,0 +1,1398 @@
+hotels:
+
+  # ═══════════════════════════════════════════════════════════════════════
+  #  LONDON
+  # ═══════════════════════════════════════════════════════════════════════
+
+  - id: "grand-london"
+    name: "The Grand London"
+    city: "London"
+    country: "United Kingdom"
+    address: "45 Park Lane, Mayfair, London W1K 1PN"
+    stars: 5
+    description: >
+      A landmark five-star hotel on Park Lane offering timeless British elegance.
+      Overlooking Hyde Park, The Grand London features Michelin-starred dining,
+      a world-class spa, and impeccably designed rooms blending classic charm
+      with modern luxury. Ideal for discerning travellers seeking the finest
+      London has to offer.
+    check_in_time: "15:00"
+    check_out_time: "11:00"
+    amenities:
+      - free_wifi
+      - swimming_pool
+      - spa
+      - restaurant
+      - fitness_center
+      - bar
+      - valet_parking
+      - room_service
+      - concierge
+      - business_center
+      - laundry_service
+      - airport_shuttle
+    room_types:
+      - type: "standard"
+        name: "Classic Room"
+        description: "Elegant 30m² room with king bed, marble bathroom, and garden views."
+        price_per_night: 320.00
+        capacity: 2
+        count: 20
+      - type: "deluxe"
+        name: "Park View Deluxe"
+        description: "Spacious 45m² room with panoramic Hyde Park views, sitting area, and premium amenities."
+        price_per_night: 480.00
+        capacity: 2
+        count: 15
+      - type: "suite"
+        name: "Royal Suite"
+        description: "Luxurious 85m² suite with separate living room, dining area, butler service, and private terrace."
+        price_per_night: 950.00
+        capacity: 4
+        count: 5
+    rating: 4.8
+    review_count: 2847
+    reviews:
+      - author: "Sarah M."
+        rating: 5
+        title: "Absolutely stunning"
+        comment: "From the moment we arrived, everything was perfect. The Park View Deluxe room was breathtaking and the staff anticipated our every need."
+        date: "2024-11-15"
+      - author: "James W."
+        rating: 5
+        title: "Best hotel in London"
+        comment: "The Royal Suite is worth every penny. Butler service was impeccable and the spa is world-class. Will definitely return."
+        date: "2024-10-22"
+      - author: "Aiko T."
+        rating: 4
+        title: "Wonderful but pricey"
+        comment: "Beautiful hotel with outstanding service. The restaurant was exceptional. Only downside is the premium pricing for extras."
+        date: "2024-09-08"
+    contact:
+      phone: "+44 20 7123 4567"
+      email: "reservations@grandlondon.com"
+
+  - id: "riverside-inn"
+    name: "Riverside Inn"
+    city: "London"
+    country: "United Kingdom"
+    address: "12 Bankside Walk, Southwark, London SE1 9PH"
+    stars: 3
+    description: >
+      A charming boutique hotel nestled along the Thames in vibrant Southwark.
+      Steps from the Tate Modern and Shakespeare's Globe, the Riverside Inn
+      offers cosy rooms with exposed brick walls, a relaxed gastropub, and
+      stunning river views. Perfect for culture lovers on a budget.
+    check_in_time: "14:00"
+    check_out_time: "11:00"
+    amenities:
+      - free_wifi
+      - restaurant
+      - bar
+      - laundry_service
+    room_types:
+      - type: "standard"
+        name: "Cosy Room"
+        description: "Compact 18m² room with double bed, en-suite shower, and city views."
+        price_per_night: 140.00
+        capacity: 2
+        count: 12
+      - type: "deluxe"
+        name: "Thames View Room"
+        description: "Bright 25m² room with queen bed and floor-to-ceiling river views."
+        price_per_night: 195.00
+        capacity: 2
+        count: 8
+      - type: "family"
+        name: "Family Room"
+        description: "Spacious 35m² room with queen bed, bunk beds, and riverside balcony."
+        price_per_night: 240.00
+        capacity: 4
+        count: 4
+    rating: 4.3
+    review_count: 1056
+    reviews:
+      - author: "Emily R."
+        rating: 5
+        title: "Hidden gem by the Thames"
+        comment: "Such a lovely find! The Thames View Room was gorgeous and the gastropub downstairs served the best fish and chips we had in London."
+        date: "2024-12-01"
+      - author: "Marco P."
+        rating: 4
+        title: "Great location, cosy rooms"
+        comment: "Perfect base for exploring Southwark. Rooms are small but beautifully decorated. Breakfast could be better."
+        date: "2024-11-10"
+    contact:
+      phone: "+44 20 7946 0123"
+      email: "hello@riversideinn.co.uk"
+
+  - id: "kensington-boutique"
+    name: "Kensington Boutique Hotel"
+    city: "London"
+    country: "United Kingdom"
+    address: "8 Gloucester Road, Kensington, London SW7 4PP"
+    stars: 4
+    description: >
+      A stylish boutique hotel in the heart of Kensington, steps from the
+      Natural History Museum and the V&A. Combining Victorian architecture
+      with contemporary interiors, this hotel offers a refined retreat with
+      an excellent cocktail bar and intimate courtyard garden.
+    check_in_time: "15:00"
+    check_out_time: "10:30"
+    amenities:
+      - free_wifi
+      - bar
+      - fitness_center
+      - room_service
+      - concierge
+      - laundry_service
+    room_types:
+      - type: "standard"
+        name: "Heritage Room"
+        description: "Charming 22m² room with period features, queen bed, and rainfall shower."
+        price_per_night: 210.00
+        capacity: 2
+        count: 14
+      - type: "deluxe"
+        name: "Garden View Room"
+        description: "Elegant 32m² room overlooking the courtyard garden with premium linens."
+        price_per_night: 295.00
+        capacity: 2
+        count: 8
+      - type: "suite"
+        name: "Kensington Suite"
+        description: "Refined 55m² suite with separate lounge, workspace, and luxury bathroom with freestanding tub."
+        price_per_night: 520.00
+        capacity: 3
+        count: 3
+    rating: 4.5
+    review_count: 892
+    reviews:
+      - author: "Charlotte D."
+        rating: 5
+        title: "Charming and perfectly located"
+        comment: "Loved every minute of our stay. The cocktail bar is fantastic and the location is unbeatable for museum visits."
+        date: "2024-10-30"
+      - author: "Robert H."
+        rating: 4
+        title: "Stylish and comfortable"
+        comment: "Beautiful hotel with great attention to detail. The Heritage Room was compact but very well appointed."
+        date: "2024-09-15"
+    contact:
+      phone: "+44 20 7589 8900"
+      email: "info@kensingtonboutique.com"
+
+  # ═══════════════════════════════════════════════════════════════════════
+  #  PARIS
+  # ═══════════════════════════════════════════════════════════════════════
+
+  - id: "chateau-paris"
+    name: "Le Château Paris"
+    city: "Paris"
+    country: "France"
+    address: "17 Avenue de Suffren, 75007 Paris"
+    stars: 5
+    description: >
+      An exquisite palace hotel with unobstructed views of the Eiffel Tower.
+      Le Château Paris embodies French haute couture hospitality with its
+      Michelin-starred restaurant, champagne bar, and sumptuous rooms
+      adorned with silk fabrics and antique furnishings. A jewel of the
+      7th arrondissement.
+    check_in_time: "15:00"
+    check_out_time: "12:00"
+    amenities:
+      - free_wifi
+      - spa
+      - restaurant
+      - fitness_center
+      - bar
+      - valet_parking
+      - room_service
+      - concierge
+      - business_center
+      - laundry_service
+    room_types:
+      - type: "standard"
+        name: "Chambre Classique"
+        description: "Refined 28m² room with French décor, king bed, and Eiffel Tower glimpses."
+        price_per_night: 380.00
+        capacity: 2
+        count: 18
+      - type: "deluxe"
+        name: "Chambre Eiffel"
+        description: "Stunning 40m² room with full Eiffel Tower views, sitting area, and marble bathroom."
+        price_per_night: 560.00
+        capacity: 2
+        count: 12
+      - type: "suite"
+        name: "Suite Impériale"
+        description: "Magnificent 100m² suite with private terrace facing the Eiffel Tower, grand salon, and personal butler."
+        price_per_night: 1200.00
+        capacity: 4
+        count: 4
+    rating: 4.9
+    review_count: 3215
+    reviews:
+      - author: "Marie L."
+        rating: 5
+        title: "A Parisian dream"
+        comment: "Watching the Eiffel Tower sparkle from our private terrace was magical. The restaurant deserves every Michelin star."
+        date: "2024-11-28"
+      - author: "David K."
+        rating: 5
+        title: "Perfection"
+        comment: "Hands down the best hotel experience of my life. The Suite Impériale is beyond words. Worth saving up for."
+        date: "2024-10-15"
+    contact:
+      phone: "+33 1 45 67 89 00"
+      email: "reservation@lechateauparis.fr"
+
+  - id: "montmartre-boutique"
+    name: "Hôtel Montmartre"
+    city: "Paris"
+    country: "France"
+    address: "23 Rue Lepic, 75018 Paris"
+    stars: 3
+    description: >
+      A bohemian-chic hotel in the artistic heart of Montmartre. Set in a
+      beautifully restored 19th-century building, Hôtel Montmartre offers
+      colourful rooms with vintage Parisian flair, a rooftop terrace with
+      Sacré-Cœur views, and an on-site crêperie. The spirit of Amélie
+      Poulain lives here.
+    check_in_time: "14:00"
+    check_out_time: "11:00"
+    amenities:
+      - free_wifi
+      - restaurant
+      - bar
+      - laundry_service
+    room_types:
+      - type: "standard"
+        name: "Chambre Artiste"
+        description: "Colourful 16m² room inspired by Montmartre artists, with double bed and street views."
+        price_per_night: 135.00
+        capacity: 2
+        count: 10
+      - type: "deluxe"
+        name: "Chambre Sacré-Cœur"
+        description: "Bright 24m² room with Sacré-Cœur views, queen bed, and vintage décor."
+        price_per_night: 185.00
+        capacity: 2
+        count: 6
+    rating: 4.4
+    review_count: 1578
+    reviews:
+      - author: "Sophie B."
+        rating: 5
+        title: "So charming!"
+        comment: "This hotel is Montmartre in a nutshell. Loved the crêperie and the rooftop terrace at sunset is unforgettable."
+        date: "2024-12-05"
+      - author: "Tom A."
+        rating: 4
+        title: "Character-filled stay"
+        comment: "Rooms are small but packed with personality. The location is perfect for exploring the neighbourhood."
+        date: "2024-11-01"
+    contact:
+      phone: "+33 1 42 58 72 00"
+      email: "bonjour@hotelmontmartre.fr"
+
+  - id: "marais-residence"
+    name: "Résidence du Marais"
+    city: "Paris"
+    country: "France"
+    address: "56 Rue de Turenne, 75003 Paris"
+    stars: 4
+    description: >
+      A sophisticated hotel in the trendy Marais district, housed in a
+      17th-century hôtel particulier. The Résidence du Marais blends
+      historic Parisian architecture with minimalist Scandinavian design.
+      Features a serene inner courtyard, a wine bar showcasing natural
+      wines, and beautifully curated rooms.
+    check_in_time: "15:00"
+    check_out_time: "11:00"
+    amenities:
+      - free_wifi
+      - bar
+      - fitness_center
+      - room_service
+      - concierge
+      - laundry_service
+      - bicycle_rental
+    room_types:
+      - type: "standard"
+        name: "Chambre Marais"
+        description: "Minimalist 20m² room with oak floors, queen bed, and courtyard views."
+        price_per_night: 245.00
+        capacity: 2
+        count: 12
+      - type: "deluxe"
+        name: "Chambre Supérieure"
+        description: "Spacious 35m² room with exposed beams, sitting area, and premium bath products."
+        price_per_night: 340.00
+        capacity: 2
+        count: 8
+      - type: "suite"
+        name: "Suite du Marais"
+        description: "Elegant 60m² suite with separate living area, fireplace, and original 17th-century ceiling."
+        price_per_night: 580.00
+        capacity: 3
+        count: 3
+    rating: 4.6
+    review_count: 1120
+    reviews:
+      - author: "Nina G."
+        rating: 5
+        title: "Design heaven"
+        comment: "The most beautiful hotel interior I've ever seen. The wine bar is a gem and the neighbourhood is unbeatable."
+        date: "2024-11-20"
+      - author: "Luca F."
+        rating: 4
+        title: "Stylish and central"
+        comment: "Great base for exploring Paris on foot. The courtyard is a peaceful oasis. Rooms are impeccable."
+        date: "2024-10-08"
+    contact:
+      phone: "+33 1 48 87 65 00"
+      email: "contact@residencedumarais.fr"
+
+  # ═══════════════════════════════════════════════════════════════════════
+  #  NEW YORK
+  # ═══════════════════════════════════════════════════════════════════════
+
+  - id: "manhattan-grand"
+    name: "Manhattan Grand Hotel"
+    city: "New York"
+    country: "United States"
+    address: "301 Park Avenue, Midtown, New York, NY 10022"
+    stars: 5
+    description: >
+      An iconic luxury hotel on Park Avenue defining Manhattan sophistication.
+      The Manhattan Grand features a rooftop infinity pool, award-winning
+      steakhouse, and rooms with floor-to-ceiling windows overlooking the
+      skyline. A favourite of business executives and celebrities alike.
+    check_in_time: "16:00"
+    check_out_time: "11:00"
+    amenities:
+      - free_wifi
+      - swimming_pool
+      - spa
+      - restaurant
+      - fitness_center
+      - bar
+      - valet_parking
+      - room_service
+      - concierge
+      - business_center
+      - laundry_service
+    room_types:
+      - type: "standard"
+        name: "City Room"
+        description: "Modern 32m² room with king bed, smart TV, and midtown skyline views."
+        price_per_night: 420.00
+        capacity: 2
+        count: 25
+      - type: "deluxe"
+        name: "Skyline Deluxe"
+        description: "Premium 45m² room with Central Park views, rain shower, and Nespresso machine."
+        price_per_night: 620.00
+        capacity: 2
+        count: 15
+      - type: "suite"
+        name: "Penthouse Suite"
+        description: "Breathtaking 120m² suite on the 50th floor with wraparound terrace, grand piano, and private chef option."
+        price_per_night: 1800.00
+        capacity: 4
+        count: 3
+    rating: 4.7
+    review_count: 4521
+    reviews:
+      - author: "Michael B."
+        rating: 5
+        title: "NYC luxury at its finest"
+        comment: "The rooftop pool with the skyline view is unreal. Service was five-star in every way. Will be back."
+        date: "2024-12-10"
+      - author: "Jennifer L."
+        rating: 4
+        title: "Great hotel, great location"
+        comment: "Perfect for a business trip. The steakhouse alone is worth the visit. Rooms are large by NYC standards."
+        date: "2024-11-05"
+    contact:
+      phone: "+1 212 555 0100"
+      email: "reservations@manhattangrand.com"
+
+  - id: "brooklyn-heights"
+    name: "Brooklyn Heights Inn"
+    city: "New York"
+    country: "United States"
+    address: "88 Atlantic Avenue, Brooklyn Heights, NY 11201"
+    stars: 3
+    description: >
+      A trendy neighbourhood hotel in historic Brooklyn Heights with
+      breathtaking Manhattan skyline and Brooklyn Bridge views. The inn
+      features industrial-chic design, a craft cocktail bar, and a rooftop
+      garden. Ideal for travellers who want authentic New York beyond
+      the tourist trail.
+    check_in_time: "15:00"
+    check_out_time: "11:00"
+    amenities:
+      - free_wifi
+      - bar
+      - fitness_center
+      - bicycle_rental
+      - laundry_service
+    room_types:
+      - type: "standard"
+        name: "Brooklyn Room"
+        description: "Industrial-chic 20m² room with exposed brick, queen bed, and neighborhood views."
+        price_per_night: 195.00
+        capacity: 2
+        count: 16
+      - type: "deluxe"
+        name: "Bridge View Room"
+        description: "Stylish 28m² room with Brooklyn Bridge panorama, record player, and local art."
+        price_per_night: 275.00
+        capacity: 2
+        count: 8
+    rating: 4.4
+    review_count: 987
+    reviews:
+      - author: "Alex C."
+        rating: 5
+        title: "Brooklyn vibes done right"
+        comment: "The rooftop garden with the Manhattan skyline is incredible at sunset. Cocktail bar is top-notch. Great neighborhood for walking."
+        date: "2024-11-18"
+      - author: "Rachel S."
+        rating: 4
+        title: "Cool and comfortable"
+        comment: "Loved the industrial design and local feel. The bicycle rental was a great touch for exploring the Promenade."
+        date: "2024-10-25"
+    contact:
+      phone: "+1 718 555 0200"
+      email: "stay@brooklynheightsinn.com"
+
+  - id: "soho-loft"
+    name: "SoHo Loft Hotel"
+    city: "New York"
+    country: "United States"
+    address: "155 Mercer Street, SoHo, New York, NY 10012"
+    stars: 4
+    description: >
+      A design-forward hotel in a converted SoHo cast-iron building. Each
+      room is a mini art gallery featuring works by emerging New York artists.
+      The hotel houses a celebrated farm-to-table restaurant, a speakeasy
+      cocktail bar, and a gallery space hosting rotating exhibitions.
+    check_in_time: "16:00"
+    check_out_time: "12:00"
+    amenities:
+      - free_wifi
+      - restaurant
+      - bar
+      - fitness_center
+      - room_service
+      - concierge
+      - laundry_service
+    room_types:
+      - type: "standard"
+        name: "Gallery Room"
+        description: "Art-filled 26m² room with queen bed, 4m ceilings, and curated local artworks."
+        price_per_night: 310.00
+        capacity: 2
+        count: 14
+      - type: "deluxe"
+        name: "Loft Room"
+        description: "Open-plan 40m² loft with king bed, exposed cast-iron columns, and designer furniture."
+        price_per_night: 450.00
+        capacity: 2
+        count: 8
+      - type: "suite"
+        name: "Artist Suite"
+        description: "Stunning 75m² duplex suite with mezzanine bedroom, living area, and private terrace."
+        price_per_night: 780.00
+        capacity: 3
+        count: 4
+    rating: 4.6
+    review_count: 1345
+    reviews:
+      - author: "Diana M."
+        rating: 5
+        title: "A work of art itself"
+        comment: "Every corner of this hotel is Instagram-worthy. The speakeasy bar is one of the best-kept secrets in SoHo."
+        date: "2024-12-02"
+      - author: "Chris P."
+        rating: 4
+        title: "Design lovers' paradise"
+        comment: "The Loft Room was spectacular. Great restaurant downstairs. Location is perfect for shopping and galleries."
+        date: "2024-11-12"
+    contact:
+      phone: "+1 212 555 0300"
+      email: "hello@soholofthotel.com"
+
+  # ═══════════════════════════════════════════════════════════════════════
+  #  TOKYO
+  # ═══════════════════════════════════════════════════════════════════════
+
+  - id: "imperial-tokyo"
+    name: "Imperial Palace Hotel Tokyo"
+    city: "Tokyo"
+    country: "Japan"
+    address: "1-1-1 Uchisaiwaicho, Chiyoda-ku, Tokyo 100-0011"
+    stars: 5
+    description: >
+      A prestigious hotel overlooking the Imperial Palace gardens, blending
+      Japanese tradition with world-class luxury. Features an award-winning
+      kaiseki restaurant, a serene onsen spa, and rooms with shoji screens
+      and panoramic city views. The epitome of Japanese omotenashi hospitality.
+    check_in_time: "15:00"
+    check_out_time: "11:00"
+    amenities:
+      - free_wifi
+      - swimming_pool
+      - spa
+      - restaurant
+      - fitness_center
+      - bar
+      - room_service
+      - concierge
+      - business_center
+      - laundry_service
+      - airport_shuttle
+    room_types:
+      - type: "standard"
+        name: "Garden Room"
+        description: "Tranquil 30m² room with Imperial Palace garden views, tatami seating area, and deep soaking tub."
+        price_per_night: 350.00
+        capacity: 2
+        count: 22
+      - type: "deluxe"
+        name: "Sakura Suite"
+        description: "Elegant 50m² room with cherry blossom-themed décor, panoramic views, and premium yukata robes."
+        price_per_night: 520.00
+        capacity: 2
+        count: 12
+      - type: "suite"
+        name: "Emperor Suite"
+        description: "Magnificent 110m² suite with traditional Japanese living room, private onsen, and butler service."
+        price_per_night: 1500.00
+        capacity: 4
+        count: 3
+    rating: 4.9
+    review_count: 2890
+    reviews:
+      - author: "Yuki S."
+        rating: 5
+        title: "Perfection in every detail"
+        comment: "The private onsen in the Emperor Suite was extraordinary. Kaiseki dinner was a culinary journey. True Japanese luxury."
+        date: "2024-11-25"
+      - author: "Peter H."
+        rating: 5
+        title: "Best hotel in Tokyo"
+        comment: "Incredible service — they remembered my name and preferences from day one. The garden views are magical at sunrise."
+        date: "2024-10-18"
+    contact:
+      phone: "+81 3 3504 1111"
+      email: "reservations@imperialpalacetokyo.jp"
+
+  - id: "shibuya-capsule-plus"
+    name: "Shibuya Capsule Plus"
+    city: "Tokyo"
+    country: "Japan"
+    address: "2-25-12 Dogenzaka, Shibuya-ku, Tokyo 150-0043"
+    stars: 2
+    description: >
+      A modern evolution of the Japanese capsule hotel in the heart of
+      Shibuya. Capsule Plus offers surprisingly spacious pods with
+      privacy screens, personal entertainment systems, and premium bedding.
+      Shared facilities include a high-tech onsen, manga library, and
+      24-hour ramen bar. Budget-friendly without sacrificing comfort.
+    check_in_time: "16:00"
+    check_out_time: "10:00"
+    amenities:
+      - free_wifi
+      - spa
+      - restaurant
+      - laundry_service
+    room_types:
+      - type: "standard"
+        name: "Premium Pod"
+        description: "Modern 4m² capsule with memory foam mattress, reading light, USB charging, and privacy screen."
+        price_per_night: 55.00
+        capacity: 1
+        count: 60
+      - type: "deluxe"
+        name: "First Class Pod"
+        description: "Spacious 6m² pod with semi-private entrance, 32-inch TV, mini safe, and blackout curtains."
+        price_per_night: 85.00
+        capacity: 1
+        count: 20
+    rating: 4.2
+    review_count: 3456
+    reviews:
+      - author: "Kevin O."
+        rating: 5
+        title: "Best capsule hotel ever"
+        comment: "Forget your preconceptions about capsule hotels — this is something else. The onsen after a long day of sightseeing is heaven."
+        date: "2024-12-08"
+      - author: "Lisa T."
+        rating: 4
+        title: "Fun experience"
+        comment: "Clean, modern, and perfectly located for Shibuya nightlife. The ramen bar at 2am was a lifesaver."
+        date: "2024-11-14"
+    contact:
+      phone: "+81 3 6455 0011"
+      email: "info@shibuyacapsuleplus.jp"
+
+  - id: "shinjuku-garden"
+    name: "Shinjuku Garden Hotel"
+    city: "Tokyo"
+    country: "Japan"
+    address: "3-14-1 Shinjuku, Shinjuku-ku, Tokyo 160-0022"
+    stars: 4
+    description: >
+      A refined hotel adjacent to the serene Shinjuku Gyoen National Garden.
+      Balances Japanese minimalism with warm hospitality, offering rooms with
+      garden or skyline views, a teppanyaki restaurant, and a zen rock garden
+      on the ground floor. Excellent access to transport with Shinjuku station
+      minutes away.
+    check_in_time: "15:00"
+    check_out_time: "11:00"
+    amenities:
+      - free_wifi
+      - restaurant
+      - fitness_center
+      - bar
+      - room_service
+      - concierge
+      - laundry_service
+    room_types:
+      - type: "standard"
+        name: "Zen Room"
+        description: "Minimalist 24m² room with futon-style bed, shoji screens, and bamboo accents."
+        price_per_night: 180.00
+        capacity: 2
+        count: 18
+      - type: "deluxe"
+        name: "Garden View Room"
+        description: "Peaceful 32m² room overlooking Shinjuku Gyoen with soaking tub and green tea amenities."
+        price_per_night: 270.00
+        capacity: 2
+        count: 10
+      - type: "suite"
+        name: "Shinjuku Suite"
+        description: "Spacious 55m² suite with tatami lounge, panoramic city views, and premium sake minibar."
+        price_per_night: 450.00
+        capacity: 3
+        count: 4
+    rating: 4.5
+    review_count: 1678
+    reviews:
+      - author: "Haruki M."
+        rating: 5
+        title: "Peaceful oasis in Shinjuku"
+        comment: "The zen garden downstairs is a beautiful escape from the Shinjuku chaos. Teppanyaki dinner was exceptional."
+        date: "2024-11-30"
+      - author: "Anna B."
+        rating: 4
+        title: "Great base for exploring"
+        comment: "Loved the Japanese-style room. Walking distance to everything. Staff went above and beyond."
+        date: "2024-10-20"
+    contact:
+      phone: "+81 3 3352 2222"
+      email: "stay@shinjukugarden.jp"
+
+  # ═══════════════════════════════════════════════════════════════════════
+  #  BARCELONA
+  # ═══════════════════════════════════════════════════════════════════════
+
+  - id: "gothic-quarter"
+    name: "Hotel Barri Gòtic"
+    city: "Barcelona"
+    country: "Spain"
+    address: "Carrer de Ferran 42, 08002 Barcelona"
+    stars: 4
+    description: >
+      A characterful hotel in the medieval Gothic Quarter, set within a
+      restored 15th-century palace. Features a rooftop pool with cathedral
+      views, a tapas bar, and rooms that artfully combine Gothic stonework
+      with contemporary Catalan design. Steps from Las Ramblas and the
+      Barcelona Cathedral.
+    check_in_time: "14:00"
+    check_out_time: "12:00"
+    amenities:
+      - free_wifi
+      - swimming_pool
+      - restaurant
+      - bar
+      - room_service
+      - concierge
+      - laundry_service
+    room_types:
+      - type: "standard"
+        name: "Gothic Room"
+        description: "Atmospheric 20m² room with original stone walls, queen bed, and modern bathroom."
+        price_per_night: 175.00
+        capacity: 2
+        count: 14
+      - type: "deluxe"
+        name: "Cathedral View Room"
+        description: "Elegant 30m² room with balcony overlooking the Cathedral, sitting area, and minibar."
+        price_per_night: 260.00
+        capacity: 2
+        count: 8
+      - type: "suite"
+        name: "Palau Suite"
+        description: "Grand 50m² suite in the original palace wing with vaulted ceilings and private terrace."
+        price_per_night: 420.00
+        capacity: 3
+        count: 3
+    rating: 4.5
+    review_count: 1890
+    reviews:
+      - author: "Carlos R."
+        rating: 5
+        title: "History meets luxury"
+        comment: "Sleeping in a 15th-century palace with modern comforts — incredible. The rooftop pool with cathedral views is magical."
+        date: "2024-11-22"
+      - author: "Hannah W."
+        rating: 4
+        title: "Perfect Gothic Quarter base"
+        comment: "The tapas bar is excellent and the location cannot be beaten. Rooms have tons of character."
+        date: "2024-10-14"
+    contact:
+      phone: "+34 93 301 5678"
+      email: "reservas@hotelbarrigotic.es"
+
+  - id: "barceloneta-beach"
+    name: "Barceloneta Beach Hotel"
+    city: "Barcelona"
+    country: "Spain"
+    address: "Passeig Marítim 25, 08003 Barcelona"
+    stars: 4
+    description: >
+      A sun-drenched beachfront hotel on the Barceloneta promenade with
+      direct Mediterranean access. Features a stunning infinity pool
+      overlooking the sea, a seafood restaurant, and bright rooms with
+      nautical-inspired design. The ultimate Barcelona beach retreat.
+    check_in_time: "15:00"
+    check_out_time: "11:00"
+    amenities:
+      - free_wifi
+      - swimming_pool
+      - restaurant
+      - fitness_center
+      - bar
+      - room_service
+      - concierge
+      - laundry_service
+      - bicycle_rental
+    room_types:
+      - type: "standard"
+        name: "Marina Room"
+        description: "Bright 24m² room with nautical décor, double bed, and city views."
+        price_per_night: 190.00
+        capacity: 2
+        count: 16
+      - type: "deluxe"
+        name: "Sea View Room"
+        description: "Luminous 32m² room with floor-to-ceiling Mediterranean views and private balcony."
+        price_per_night: 290.00
+        capacity: 2
+        count: 10
+      - type: "suite"
+        name: "Penthouse Mar"
+        description: "Spectacular 65m² penthouse with wraparound terrace, outdoor shower, and 180° sea views."
+        price_per_night: 520.00
+        capacity: 3
+        count: 2
+    rating: 4.6
+    review_count: 2134
+    reviews:
+      - author: "Julia V."
+        rating: 5
+        title: "Beach paradise"
+        comment: "Waking up to the sound of waves and stepping onto the beach from the hotel is priceless. The paella at the restaurant was the best I've had."
+        date: "2024-11-08"
+      - author: "Thomas K."
+        rating: 4
+        title: "Great beachfront property"
+        comment: "Infinity pool is gorgeous. Rooms are bright and modern. Can get noisy on weekends but that's the beach life."
+        date: "2024-10-01"
+    contact:
+      phone: "+34 93 224 0000"
+      email: "info@barcelonetabeach.es"
+
+  # ═══════════════════════════════════════════════════════════════════════
+  #  ROME
+  # ═══════════════════════════════════════════════════════════════════════
+
+  - id: "trastevere-palazzo"
+    name: "Palazzo Trastevere"
+    city: "Rome"
+    country: "Italy"
+    address: "Via della Lungaretta 85, 00153 Roma"
+    stars: 4
+    description: >
+      A lovingly restored Renaissance palazzo in Rome's most charming
+      neighbourhood. Palazzo Trastevere offers terracotta-tiled rooms
+      with antique furnishings, a citrus-scented courtyard, and a
+      rooftop terrace with panoramic views of Rome's domes and rooftops.
+      Surrounded by the best trattorias in the city.
+    check_in_time: "14:00"
+    check_out_time: "11:00"
+    amenities:
+      - free_wifi
+      - bar
+      - room_service
+      - concierge
+      - laundry_service
+    room_types:
+      - type: "standard"
+        name: "Camera Classica"
+        description: "Warm 18m² room with terracotta floors, wrought-iron bed, and courtyard views."
+        price_per_night: 155.00
+        capacity: 2
+        count: 10
+      - type: "deluxe"
+        name: "Camera Panoramica"
+        description: "Charming 28m² room with antique furniture, frescoed ceiling, and rooftop views."
+        price_per_night: 230.00
+        capacity: 2
+        count: 6
+      - type: "suite"
+        name: "Suite Rinascimento"
+        description: "Opulent 50m² suite with original Renaissance frescoes, four-poster bed, and private balcony."
+        price_per_night: 400.00
+        capacity: 3
+        count: 2
+    rating: 4.7
+    review_count: 1456
+    reviews:
+      - author: "Giovanni C."
+        rating: 5
+        title: "Roma autentica"
+        comment: "This is the real Rome. The palazzo is stunning and Trastevere is the perfect neighbourhood. The rooftop at sunset is unforgettable."
+        date: "2024-11-16"
+      - author: "Laura P."
+        rating: 5
+        title: "Magical stay"
+        comment: "Sleeping under Renaissance frescoes! The staff recommended the most amazing hidden trattorias. Pure Roman magic."
+        date: "2024-10-05"
+    contact:
+      phone: "+39 06 5812 3456"
+      email: "info@palazzotrastevere.it"
+
+  - id: "roma-termini-modern"
+    name: "Roma Central Hotel"
+    city: "Rome"
+    country: "Italy"
+    address: "Via Cavour 47, 00184 Roma"
+    stars: 3
+    description: >
+      A modern, efficient hotel near Termini station, perfect for
+      travellers who want easy access to all of Rome's landmarks.
+      Clean contemporary rooms, a breakfast terrace, and a 24-hour
+      front desk. The Colosseum, Roman Forum, and Piazza Venezia
+      are all within walking distance.
+    check_in_time: "14:00"
+    check_out_time: "10:00"
+    amenities:
+      - free_wifi
+      - restaurant
+      - bar
+      - laundry_service
+    room_types:
+      - type: "standard"
+        name: "Comfort Room"
+        description: "Clean 16m² room with double bed, air conditioning, and modern bathroom."
+        price_per_night: 95.00
+        capacity: 2
+        count: 18
+      - type: "deluxe"
+        name: "Superior Room"
+        description: "Spacious 22m² room with queen bed, minibar, and city views."
+        price_per_night: 135.00
+        capacity: 2
+        count: 10
+      - type: "family"
+        name: "Family Room"
+        description: "Comfortable 30m² room with double bed, sofa bed, and extra space for families."
+        price_per_night: 170.00
+        capacity: 4
+        count: 6
+    rating: 4.1
+    review_count: 2345
+    reviews:
+      - author: "Stefan M."
+        rating: 4
+        title: "Great value for Rome"
+        comment: "Nothing fancy but clean, modern, and perfectly located. Walking distance to everything. Great breakfast."
+        date: "2024-11-28"
+      - author: "Emma J."
+        rating: 4
+        title: "Solid budget choice"
+        comment: "Exactly what we needed — comfortable rooms and an unbeatable location near Termini. Staff were very helpful."
+        date: "2024-10-12"
+    contact:
+      phone: "+39 06 4782 1000"
+      email: "booking@romacentralhotel.it"
+
+  # ═══════════════════════════════════════════════════════════════════════
+  #  AMSTERDAM
+  # ═══════════════════════════════════════════════════════════════════════
+
+  - id: "canal-house"
+    name: "Canal House Amsterdam"
+    city: "Amsterdam"
+    country: "Netherlands"
+    address: "Keizersgracht 148, 1015 CX Amsterdam"
+    stars: 4
+    description: >
+      A boutique hotel in a beautifully restored 17th-century canal house
+      on the prestigious Keizersgracht. Canal House Amsterdam offers
+      individually designed rooms filled with antiques and contemporary
+      art, a candlelit bar, and a private garden. Dutch Golden Age
+      elegance meets modern comfort.
+    check_in_time: "15:00"
+    check_out_time: "11:00"
+    amenities:
+      - free_wifi
+      - bar
+      - room_service
+      - concierge
+      - laundry_service
+      - bicycle_rental
+    room_types:
+      - type: "standard"
+        name: "Canal Room"
+        description: "Individually designed 20m² room with antique furnishings, canal views, and rain shower."
+        price_per_night: 220.00
+        capacity: 2
+        count: 10
+      - type: "deluxe"
+        name: "Grand Canal Room"
+        description: "Spacious 35m² room with premium canal views, sitting area, and clawfoot bathtub."
+        price_per_night: 320.00
+        capacity: 2
+        count: 6
+      - type: "suite"
+        name: "Golden Age Suite"
+        description: "Stunning 50m² suite with original ceiling paintings, separate lounge, and canal-side balcony."
+        price_per_night: 480.00
+        capacity: 3
+        count: 2
+    rating: 4.7
+    review_count: 876
+    reviews:
+      - author: "Marta S."
+        rating: 5
+        title: "Dutch perfection"
+        comment: "This canal house is an absolute dream. Every room tells a story. The candlelit bar is the most romantic spot in Amsterdam."
+        date: "2024-11-20"
+      - author: "Daniel R."
+        rating: 4
+        title: "Unique experience"
+        comment: "Love the mix of antiques and modern art. Steep Dutch stairs but worth it. The bicycle rental is a must."
+        date: "2024-10-15"
+    contact:
+      phone: "+31 20 622 1234"
+      email: "welcome@canalhouseamsterdam.nl"
+
+  - id: "jordaan-townhouse"
+    name: "The Jordaan Townhouse"
+    city: "Amsterdam"
+    country: "Netherlands"
+    address: "Bloemgracht 87, 1016 KE Amsterdam"
+    stars: 3
+    description: >
+      A cosy townhouse hotel in the bohemian Jordaan district, surrounded
+      by independent galleries, vintage shops, and brown cafés. Offers
+      warm rooms with Dutch design touches, a communal kitchen, and
+      complimentary bikes to explore the city like a local.
+    check_in_time: "14:00"
+    check_out_time: "11:00"
+    amenities:
+      - free_wifi
+      - bar
+      - laundry_service
+      - bicycle_rental
+    room_types:
+      - type: "standard"
+        name: "Jordaan Room"
+        description: "Cosy 16m² room with Dutch design, double bed, and neighbourhood views."
+        price_per_night: 145.00
+        capacity: 2
+        count: 8
+      - type: "deluxe"
+        name: "Canal View Room"
+        description: "Bright 22m² room with Bloemgracht views, queen bed, and reading nook."
+        price_per_night: 195.00
+        capacity: 2
+        count: 5
+    rating: 4.4
+    review_count: 654
+    reviews:
+      - author: "Katrin V."
+        rating: 5
+        title: "Like living in Amsterdam"
+        comment: "The Jordaan is the best neighbourhood and this townhouse captures its spirit perfectly. Loved the free bikes!"
+        date: "2024-12-01"
+      - author: "Jack M."
+        rating: 4
+        title: "Charming and well-located"
+        comment: "Great little hotel with a real neighbourhood feel. The communal kitchen was a nice touch for late-night snacks."
+        date: "2024-10-28"
+    contact:
+      phone: "+31 20 625 5678"
+      email: "info@jordaantownhouse.nl"
+
+  # ═══════════════════════════════════════════════════════════════════════
+  #  DUBAI
+  # ═══════════════════════════════════════════════════════════════════════
+
+  - id: "palm-residence"
+    name: "The Palm Residence"
+    city: "Dubai"
+    country: "United Arab Emirates"
+    address: "Crescent Road, Palm Jumeirah, Dubai"
+    stars: 5
+    description: >
+      An ultra-luxury resort on the iconic Palm Jumeirah with a private
+      beach stretching 500 metres. Features the region's largest infinity
+      pool, underwater restaurant, six dining venues, and opulent rooms
+      with Arabian Gulf views. A destination in itself for those seeking
+      the ultimate Dubai experience.
+    check_in_time: "15:00"
+    check_out_time: "12:00"
+    amenities:
+      - free_wifi
+      - swimming_pool
+      - spa
+      - restaurant
+      - fitness_center
+      - bar
+      - valet_parking
+      - room_service
+      - concierge
+      - business_center
+      - laundry_service
+      - airport_shuttle
+      - kids_club
+      - private_beach
+    room_types:
+      - type: "standard"
+        name: "Gulf View Room"
+        description: "Luxurious 40m² room with Arabian Gulf views, king bed, and rain shower with ocean view."
+        price_per_night: 450.00
+        capacity: 2
+        count: 30
+      - type: "deluxe"
+        name: "Beach Suite"
+        description: "Spacious 65m² beachfront suite with private plunge pool, outdoor terrace, and butler service."
+        price_per_night: 780.00
+        capacity: 2
+        count: 15
+      - type: "suite"
+        name: "Royal Palm Villa"
+        description: "Palatial 200m² villa with private infinity pool, garden, personal chef, and 24-hour butler."
+        price_per_night: 2500.00
+        capacity: 6
+        count: 5
+    rating: 4.8
+    review_count: 3567
+    reviews:
+      - author: "Fatima A."
+        rating: 5
+        title: "Paradise on the Palm"
+        comment: "The underwater restaurant was a once-in-a-lifetime experience. The private beach is pristine. Absolute luxury."
+        date: "2024-12-05"
+      - author: "George T."
+        rating: 5
+        title: "Over the top in the best way"
+        comment: "The Royal Palm Villa exceeded every expectation. Private chef, infinity pool, butler — living like royalty for a week."
+        date: "2024-11-15"
+    contact:
+      phone: "+971 4 555 0100"
+      email: "reservations@palmresidence.ae"
+
+  - id: "downtown-dubai"
+    name: "Burj Vista Hotel"
+    city: "Dubai"
+    country: "United Arab Emirates"
+    address: "Sheikh Mohammed bin Rashid Blvd, Downtown Dubai"
+    stars: 4
+    description: >
+      A sleek hotel in Downtown Dubai with direct views of the Burj Khalifa
+      and Dubai Fountain. Modern rooms with floor-to-ceiling windows, a
+      rooftop pool bar, and easy access to the Dubai Mall. Perfect for
+      travellers who want to be at the centre of the action.
+    check_in_time: "15:00"
+    check_out_time: "11:00"
+    amenities:
+      - free_wifi
+      - swimming_pool
+      - restaurant
+      - fitness_center
+      - bar
+      - room_service
+      - concierge
+      - laundry_service
+    room_types:
+      - type: "standard"
+        name: "City View Room"
+        description: "Contemporary 28m² room with floor-to-ceiling windows and Downtown skyline views."
+        price_per_night: 250.00
+        capacity: 2
+        count: 20
+      - type: "deluxe"
+        name: "Burj Khalifa View Room"
+        description: "Premium 38m² room with full Burj Khalifa and fountain views, sitting area, and premium amenities."
+        price_per_night: 380.00
+        capacity: 2
+        count: 12
+      - type: "suite"
+        name: "Downtown Suite"
+        description: "Elegant 60m² suite with separate living area, Burj Khalifa panorama, and access to the executive lounge."
+        price_per_night: 600.00
+        capacity: 3
+        count: 5
+    rating: 4.5
+    review_count: 2123
+    reviews:
+      - author: "Ahmed S."
+        rating: 5
+        title: "Unbeatable views"
+        comment: "Watching the Dubai Fountain from our room every evening was mesmerizing. The rooftop pool is a perfect spot for sunset."
+        date: "2024-11-22"
+      - author: "Karen L."
+        rating: 4
+        title: "Great location, great value"
+        comment: "Connected to the Dubai Mall which is incredibly convenient. Room was modern and comfortable. Good breakfast."
+        date: "2024-10-30"
+    contact:
+      phone: "+971 4 555 0200"
+      email: "info@burjvistahotel.ae"
+
+  # ═══════════════════════════════════════════════════════════════════════
+  #  SYDNEY
+  # ═══════════════════════════════════════════════════════════════════════
+
+  - id: "harbour-grand"
+    name: "Sydney Harbour Grand"
+    city: "Sydney"
+    country: "Australia"
+    address: "71 Macquarie Street, Circular Quay, Sydney NSW 2000"
+    stars: 5
+    description: >
+      A landmark hotel on Circular Quay with unrivalled views of the
+      Sydney Opera House and Harbour Bridge. The Harbour Grand offers
+      a harbourside infinity pool, acclaimed seafood restaurant, and
+      rooms that frame Sydney's most iconic vista. Australian luxury
+      hospitality at its finest.
+    check_in_time: "15:00"
+    check_out_time: "11:00"
+    amenities:
+      - free_wifi
+      - swimming_pool
+      - spa
+      - restaurant
+      - fitness_center
+      - bar
+      - room_service
+      - concierge
+      - business_center
+      - laundry_service
+    room_types:
+      - type: "standard"
+        name: "Harbour Room"
+        description: "Bright 30m² room with harbour glimpses, king bed, and marble bathroom."
+        price_per_night: 340.00
+        capacity: 2
+        count: 20
+      - type: "deluxe"
+        name: "Opera House View Room"
+        description: "Stunning 42m² room with floor-to-ceiling Opera House views, lounge area, and premium minibar."
+        price_per_night: 520.00
+        capacity: 2
+        count: 12
+      - type: "suite"
+        name: "Bridge Suite"
+        description: "Spectacular 90m² suite with panoramic Harbour Bridge views, separate dining area, and private balcony."
+        price_per_night: 950.00
+        capacity: 4
+        count: 4
+    rating: 4.8
+    review_count: 2456
+    reviews:
+      - author: "Sarah K."
+        rating: 5
+        title: "The view that stops you in your tracks"
+        comment: "Opened the curtains to the Opera House and literally gasped. The infinity pool overlooking the harbour is dreamy."
+        date: "2024-11-28"
+      - author: "Mark D."
+        rating: 5
+        title: "World-class in every way"
+        comment: "The seafood restaurant rivals anything in Sydney. Service is warm and genuinely Australian. An unforgettable stay."
+        date: "2024-10-20"
+    contact:
+      phone: "+61 2 9256 1234"
+      email: "reservations@sydneyharbourgrand.com.au"
+
+  - id: "bondi-surf-lodge"
+    name: "Bondi Surf Lodge"
+    city: "Sydney"
+    country: "Australia"
+    address: "178 Campbell Parade, Bondi Beach, Sydney NSW 2026"
+    stars: 3
+    description: >
+      A laid-back beachfront hotel right on iconic Bondi Beach. The Surf
+      Lodge captures the quintessential Australian coastal lifestyle with
+      surf-themed rooms, a beachside café, rooftop BBQ area, and board
+      hire. Roll out of bed and onto the sand.
+    check_in_time: "14:00"
+    check_out_time: "10:00"
+    amenities:
+      - free_wifi
+      - restaurant
+      - bar
+      - fitness_center
+      - laundry_service
+      - bicycle_rental
+    room_types:
+      - type: "standard"
+        name: "Surfer Room"
+        description: "Relaxed 18m² room with surf-inspired décor, double bed, and balcony."
+        price_per_night: 160.00
+        capacity: 2
+        count: 14
+      - type: "deluxe"
+        name: "Ocean Front Room"
+        description: "Breezy 26m² room with direct Bondi Beach views, queen bed, and outdoor seating."
+        price_per_night: 240.00
+        capacity: 2
+        count: 8
+    rating: 4.3
+    review_count: 1234
+    reviews:
+      - author: "Jake W."
+        rating: 5
+        title: "Bondi at its best"
+        comment: "Fell asleep to the sound of waves and woke up to surf. The rooftop BBQ is the ultimate Aussie experience."
+        date: "2024-12-02"
+      - author: "Chloe H."
+        rating: 4
+        title: "Perfect beach hotel"
+        comment: "Location is unbeatable — literally on the beach. Rooms are simple but clean and comfortable. Great vibe."
+        date: "2024-11-10"
+    contact:
+      phone: "+61 2 9130 5678"
+      email: "hello@bondisurflodge.com.au"
+
+  # ═══════════════════════════════════════════════════════════════════════
+  #  BERLIN
+  # ═══════════════════════════════════════════════════════════════════════
+
+  - id: "mitte-design"
+    name: "Mitte Design Hotel"
+    city: "Berlin"
+    country: "Germany"
+    address: "Torstraße 1, 10119 Berlin"
+    stars: 4
+    description: >
+      A cutting-edge design hotel in Berlin's creative Mitte district.
+      Set in a converted GDR-era department store, the hotel showcases
+      rotating art installations, a vinyl record library, and rooms
+      designed by different Berlin artists. The rooftop bar offers
+      panoramic views over Alexanderplatz and the TV Tower.
+    check_in_time: "15:00"
+    check_out_time: "12:00"
+    amenities:
+      - free_wifi
+      - restaurant
+      - fitness_center
+      - bar
+      - room_service
+      - concierge
+      - laundry_service
+      - bicycle_rental
+    room_types:
+      - type: "standard"
+        name: "Artist Room"
+        description: "Unique 22m² room designed by a local Berlin artist, queen bed, and industrial-chic bathroom."
+        price_per_night: 145.00
+        capacity: 2
+        count: 16
+      - type: "deluxe"
+        name: "TV Tower View Room"
+        description: "Inspiring 32m² room with Fernsehturm views, king bed, designer furniture, and vinyl player."
+        price_per_night: 210.00
+        capacity: 2
+        count: 10
+      - type: "suite"
+        name: "Penthouse Mitte"
+        description: "Spectacular 60m² penthouse with floor-to-ceiling city views, private terrace, and curated art collection."
+        price_per_night: 380.00
+        capacity: 3
+        count: 3
+    rating: 4.5
+    review_count: 1567
+    reviews:
+      - author: "Felix B."
+        rating: 5
+        title: "Berlin cool at its finest"
+        comment: "Every room is a gallery. The rooftop bar might be the best in Berlin. The vinyl library is a brilliant touch."
+        date: "2024-11-25"
+      - author: "Sophie L."
+        rating: 4
+        title: "Creative and fun"
+        comment: "Love the concept — each room is completely different. Great location for exploring Mitte's galleries and restaurants."
+        date: "2024-10-18"
+    contact:
+      phone: "+49 30 2462 0000"
+      email: "hello@mittedesignhotel.de"
+
+  - id: "kreuzberg-loft"
+    name: "Kreuzberg Loft Hotel"
+    city: "Berlin"
+    country: "Germany"
+    address: "Oranienstraße 185, 10999 Berlin"
+    stars: 3
+    description: >
+      A vibrant hotel in multicultural Kreuzberg, Berlin's most eclectic
+      neighbourhood. Housed in a former factory, the Kreuzberg Loft offers
+      spacious rooms with industrial character, a courtyard beer garden,
+      and a programme of DJ nights and cultural events. The real Berlin
+      experience.
+    check_in_time: "14:00"
+    check_out_time: "11:00"
+    amenities:
+      - free_wifi
+      - bar
+      - bicycle_rental
+      - laundry_service
+    room_types:
+      - type: "standard"
+        name: "Factory Room"
+        description: "Industrial 20m² room with polished concrete floors, double bed, and original factory windows."
+        price_per_night: 95.00
+        capacity: 2
+        count: 18
+      - type: "deluxe"
+        name: "Loft Room"
+        description: "Open-plan 35m² loft with 5m ceilings, king bed, exposed steel beams, and courtyard views."
+        price_per_night: 145.00
+        capacity: 2
+        count: 8
+    rating: 4.3
+    review_count: 1023
+    reviews:
+      - author: "Jan K."
+        rating: 5
+        title: "Authentic Berlin"
+        comment: "This is the Berlin I came for. The beer garden is legendary and Oranienstraße is the best street for nightlife and food."
+        date: "2024-12-03"
+      - author: "Amy N."
+        rating: 4
+        title: "Cool industrial vibes"
+        comment: "The loft rooms are amazing — so much space and character. Neighbourhood is buzzing with energy. Great value."
+        date: "2024-11-08"
+    contact:
+      phone: "+49 30 6128 0000"
+      email: "info@kreuzbergloft.de"

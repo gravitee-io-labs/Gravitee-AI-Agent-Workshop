@@ -1,0 +1,96 @@
+bookings:
+  - id: "BK-0001"
+    hotel_id: "grand-london"
+    guest_name: "John Doe"
+    guest_email: "john.doe@gravitee.io"
+    room_type: "deluxe"
+    check_in_offset_days: -15
+    check_out_offset_days: -8
+    guests: 2
+    status: "completed"
+    total_price: 3360.00
+    notes: "Anniversary trip. Late check-out requested."
+
+  - id: "BK-0002"
+    hotel_id: "chateau-paris"
+    guest_name: "John Doe"
+    guest_email: "john.doe@gravitee.io"
+    room_type: "suite"
+    check_in_offset_days: 10
+    check_out_offset_days: 17
+    guests: 2
+    status: "confirmed"
+    total_price: 8400.00
+    notes: "Honeymoon package. Champagne on arrival."
+
+  - id: "BK-0003"
+    hotel_id: "manhattan-grand"
+    guest_name: "Jane Doe"
+    guest_email: "jane.doe@gravitee.io"
+    room_type: "deluxe"
+    check_in_offset_days: -10
+    check_out_offset_days: -3
+    guests: 1
+    status: "completed"
+    total_price: 4340.00
+    notes: "Business trip."
+
+  - id: "BK-0004"
+    hotel_id: "riverside-inn"
+    guest_name: "Jane Doe"
+    guest_email: "jane.doe@gravitee.io"
+    room_type: "family"
+    check_in_offset_days: 5
+    check_out_offset_days: 12
+    guests: 4
+    status: "confirmed"
+    total_price: 1680.00
+    notes: "Family holiday with two children."
+
+  - id: "BK-0005"
+    hotel_id: "imperial-tokyo"
+    guest_name: "John Doe"
+    guest_email: "john.doe@gravitee.io"
+    room_type: "standard"
+    check_in_offset_days: 30
+    check_out_offset_days: 37
+    guests: 2
+    status: "confirmed"
+    total_price: 2450.00
+    notes: ""
+
+  - id: "BK-0006"
+    hotel_id: "gothic-quarter"
+    guest_name: "Alice Martin"
+    guest_email: "alice.martin@gravitee.io"
+    room_type: "deluxe"
+    check_in_offset_days: -5
+    check_out_offset_days: -1
+    guests: 2
+    status: "completed"
+    total_price: 1040.00
+    notes: "Weekend getaway."
+
+  - id: "BK-0007"
+    hotel_id: "canal-house"
+    guest_name: "Alice Martin"
+    guest_email: "alice.martin@gravitee.io"
+    room_type: "suite"
+    check_in_offset_days: 20
+    check_out_offset_days: 25
+    guests: 2
+    status: "confirmed"
+    total_price: 2400.00
+    notes: "Birthday celebration."
+
+  - id: "BK-0008"
+    hotel_id: "bondi-surf-lodge"
+    guest_name: "Bob Smith"
+    guest_email: "bob.smith@gravitee.io"
+    room_type: "deluxe"
+    check_in_offset_days: 15
+    check_out_offset_days: 25
+    guests: 2
+    status: "confirmed"
+    total_price: 2400.00
+    notes: "Surfing holiday."

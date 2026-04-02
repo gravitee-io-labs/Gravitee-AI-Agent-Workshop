@@ -1,0 +1,888 @@
+openapi: 3.1.0
+info:
+  title: ACME Hotel API
+  description: A comprehensive hotel booking API providing hotel search, detailed
+    information, and full booking management. Designed to be consumed by developers
+    and MCP tool servers.
+  version: 1.0.0
+paths:
+  /health:
+    get:
+      tags:
+      - System
+      summary: Health check
+      description: Returns API health status. Used by container orchestration and
+        load balancers.
+      operationId: health_health_get
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema: {}
+  /hotels:
+    get:
+      tags:
+      - Hotels
+      summary: Search hotels
+      description: Search and filter hotels across all cities. Returns hotel summaries
+        (without full reviews). All filters are optional and combine with AND logic.
+        Use `q` for free-text search across name, city, country, and description.
+      operationId: search_hotels_hotels_get
+      parameters:
+      - name: q
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          description: Free-text search across name, city, country, and description
+          title: Q
+        description: Free-text search across name, city, country, and description
+      - name: city
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          description: Filter by city name (case-insensitive)
+          examples:
+          - Paris
+          title: City
+        description: Filter by city name (case-insensitive)
+      - name: country
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          description: Filter by country (case-insensitive)
+          examples:
+          - France
+          title: Country
+        description: Filter by country (case-insensitive)
+      - name: min_price
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: number
+            minimum: 0
+          - type: 'null'
+          description: Minimum nightly price (USD) across any room type
+          title: Min Price
+        description: Minimum nightly price (USD) across any room type
+      - name: max_price
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: number
+            minimum: 0
+          - type: 'null'
+          description: Maximum nightly price (USD) across any room type
+          title: Max Price
+        description: Maximum nightly price (USD) across any room type
+      - name: min_rating
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: number
+            maximum: 5
+            minimum: 0
+          - type: 'null'
+          description: Minimum guest rating (0–5)
+          title: Min Rating
+        description: Minimum guest rating (0–5)
+      - name: stars
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: integer
+            maximum: 5
+            minimum: 1
+          - type: 'null'
+          description: Exact star rating (1–5)
+          title: Stars
+        description: Exact star rating (1–5)
+      - name: amenity
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: array
+            items:
+              type: string
+          - type: 'null'
+          description: Required amenities (all must be present)
+          examples:
+          - - spa
+            - swimming_pool
+          title: Amenity
+        description: Required amenities (all must be present)
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/HotelSummary'
+                title: Response Search Hotels Hotels Get
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /hotels/{hotel_id}:
+    get:
+      tags:
+      - Hotels
+      summary: Get hotel details
+      description: Returns full hotel details including room types, reviews, and contact
+        information.
+      operationId: get_hotel_hotels__hotel_id__get
+      parameters:
+      - name: hotel_id
+        in: path
+        required: true
+        schema:
+          type: string
+          title: Hotel Id
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Hotel'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /hotels/{hotel_id}/reviews:
+    get:
+      tags:
+      - Hotels
+      summary: Get hotel reviews
+      description: Returns all guest reviews for a specific hotel.
+      operationId: get_hotel_reviews_hotels__hotel_id__reviews_get
+      parameters:
+      - name: hotel_id
+        in: path
+        required: true
+        schema:
+          type: string
+          title: Hotel Id
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Review'
+                title: Response Get Hotel Reviews Hotels  Hotel Id  Reviews Get
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /bookings:
+    get:
+      tags:
+      - Bookings
+      summary: List bookings
+      description: List all bookings, optionally filtered by guest email. In production
+        the Gravitee gateway injects the authenticated user identity.
+      operationId: list_bookings_bookings_get
+      parameters:
+      - name: guest_email
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          description: Filter by guest email address
+          examples:
+          - john.doe@gravitee.io
+          title: Guest Email
+        description: Filter by guest email address
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Booking'
+                title: Response List Bookings Bookings Get
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+    post:
+      tags:
+      - Bookings
+      summary: Create a booking
+      description: Create a new hotel room booking. The total price is automatically
+        calculated from the room type nightly rate and stay duration. Validates hotel
+        existence, room type, dates, and guest capacity.
+      operationId: create_booking_bookings_post
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/BookingCreate'
+      responses:
+        '201':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Booking'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /bookings/{booking_id}:
+    get:
+      tags:
+      - Bookings
+      summary: Get booking details
+      description: Returns full details of a specific booking by its reference ID.
+      operationId: get_booking_bookings__booking_id__get
+      parameters:
+      - name: booking_id
+        in: path
+        required: true
+        schema:
+          type: string
+          title: Booking Id
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Booking'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+    patch:
+      tags:
+      - Bookings
+      summary: Update a booking
+      description: Modify an existing booking. Only confirmed bookings can be updated.
+        Send only the fields you want to change. The total price is automatically
+        recalculated if dates or room type change.
+      operationId: update_booking_bookings__booking_id__patch
+      parameters:
+      - name: booking_id
+        in: path
+        required: true
+        schema:
+          type: string
+          title: Booking Id
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/BookingUpdate'
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Booking'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+    delete:
+      tags:
+      - Bookings
+      summary: Cancel a booking
+      description: Cancel an existing booking. Only confirmed bookings can be cancelled.
+        Returns the updated booking with status 'cancelled'.
+      operationId: cancel_booking_bookings__booking_id__delete
+      parameters:
+      - name: booking_id
+        in: path
+        required: true
+        schema:
+          type: string
+          title: Booking Id
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Booking'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+components:
+  schemas:
+    Booking:
+      properties:
+        id:
+          type: string
+          title: Id
+          description: Booking reference
+          examples:
+          - BK-0001
+        hotel_id:
+          type: string
+          title: Hotel Id
+          description: Hotel identifier
+          examples:
+          - grand-london
+        hotel_name:
+          type: string
+          title: Hotel Name
+          description: Hotel name (denormalised for convenience)
+          examples:
+          - The Grand London
+        guest_name:
+          type: string
+          title: Guest Name
+          description: Guest full name
+          examples:
+          - John Doe
+        guest_email:
+          type: string
+          format: email
+          title: Guest Email
+          description: Guest email address
+          examples:
+          - john.doe@gravitee.io
+        room_type:
+          type: string
+          title: Room Type
+          description: Room type booked
+          examples:
+          - deluxe
+        check_in:
+          type: string
+          format: date
+          title: Check In
+          description: Check-in date
+          examples:
+          - '2025-06-15'
+        check_out:
+          type: string
+          format: date
+          title: Check Out
+          description: Check-out date
+          examples:
+          - '2025-06-22'
+        guests:
+          type: integer
+          minimum: 1.0
+          title: Guests
+          description: Number of guests
+          examples:
+          - 2
+        status:
+          $ref: '#/components/schemas/BookingStatus'
+          description: Booking status
+          examples:
+          - confirmed
+        total_price:
+          type: number
+          title: Total Price
+          description: Total price in USD
+          examples:
+          - 3360.0
+        notes:
+          type: string
+          title: Notes
+          description: Special requests or notes
+          default: ''
+        created_at:
+          type: string
+          format: date-time
+          title: Created At
+          description: Booking creation timestamp
+      type: object
+      required:
+      - id
+      - hotel_id
+      - hotel_name
+      - guest_name
+      - guest_email
+      - room_type
+      - check_in
+      - check_out
+      - guests
+      - status
+      - total_price
+      - created_at
+      title: Booking
+      description: A hotel room booking.
+    BookingCreate:
+      properties:
+        hotel_id:
+          type: string
+          title: Hotel Id
+          description: Hotel identifier
+          examples:
+          - grand-london
+        guest_name:
+          type: string
+          title: Guest Name
+          description: Guest full name
+          examples:
+          - John Doe
+        guest_email:
+          type: string
+          format: email
+          title: Guest Email
+          description: Guest email address
+          examples:
+          - john.doe@gravitee.io
+        room_type:
+          type: string
+          title: Room Type
+          description: Room type to book
+          examples:
+          - deluxe
+        check_in:
+          type: string
+          format: date
+          title: Check In
+          description: Check-in date (YYYY-MM-DD)
+          examples:
+          - '2025-06-15'
+        check_out:
+          type: string
+          format: date
+          title: Check Out
+          description: Check-out date (YYYY-MM-DD)
+          examples:
+          - '2025-06-22'
+        guests:
+          type: integer
+          minimum: 1.0
+          title: Guests
+          description: Number of guests
+          default: 1
+          examples:
+          - 2
+        notes:
+          type: string
+          title: Notes
+          description: Special requests or notes
+          default: ''
+          examples:
+          - Late check-out requested.
+      type: object
+      required:
+      - hotel_id
+      - guest_name
+      - guest_email
+      - room_type
+      - check_in
+      - check_out
+      title: BookingCreate
+      description: Request body to create a new booking.
+    BookingStatus:
+      type: string
+      enum:
+      - confirmed
+      - completed
+      - cancelled
+      title: BookingStatus
+    BookingUpdate:
+      properties:
+        room_type:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Room Type
+          description: New room type
+          examples:
+          - suite
+        check_in:
+          anyOf:
+          - type: string
+            format: date
+          - type: 'null'
+          title: Check In
+          description: New check-in date
+          examples:
+          - '2025-06-16'
+        check_out:
+          anyOf:
+          - type: string
+            format: date
+          - type: 'null'
+          title: Check Out
+          description: New check-out date
+          examples:
+          - '2025-06-23'
+        guests:
+          anyOf:
+          - type: integer
+            minimum: 1.0
+          - type: 'null'
+          title: Guests
+          description: Updated guest count
+          examples:
+          - 3
+        notes:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Notes
+          description: Updated notes
+      type: object
+      title: BookingUpdate
+      description: Request body to modify an existing booking. All fields optional.
+    HTTPValidationError:
+      properties:
+        detail:
+          items:
+            $ref: '#/components/schemas/ValidationError'
+          type: array
+          title: Detail
+      type: object
+      title: HTTPValidationError
+    Hotel:
+      properties:
+        id:
+          type: string
+          title: Id
+          description: Unique hotel identifier
+          examples:
+          - grand-london
+        name:
+          type: string
+          title: Name
+          description: Hotel name
+          examples:
+          - The Grand London
+        city:
+          type: string
+          title: City
+          description: City
+          examples:
+          - London
+        country:
+          type: string
+          title: Country
+          description: Country
+          examples:
+          - United Kingdom
+        address:
+          type: string
+          title: Address
+          description: Full street address
+        stars:
+          type: integer
+          maximum: 5.0
+          minimum: 1.0
+          title: Stars
+          description: Star rating (1–5)
+          examples:
+          - 5
+        description:
+          type: string
+          title: Description
+          description: Detailed hotel description
+        check_in_time:
+          type: string
+          title: Check In Time
+          description: Check-in time (HH:MM)
+          examples:
+          - '15:00'
+        check_out_time:
+          type: string
+          title: Check Out Time
+          description: Check-out time (HH:MM)
+          examples:
+          - '11:00'
+        amenities:
+          items:
+            type: string
+          type: array
+          title: Amenities
+          description: List of amenities
+          examples:
+          - - free_wifi
+            - spa
+            - restaurant
+        room_types:
+          items:
+            $ref: '#/components/schemas/RoomType'
+          type: array
+          title: Room Types
+          description: Available room categories
+        rating:
+          type: number
+          maximum: 5.0
+          minimum: 0.0
+          title: Rating
+          description: Average guest rating
+          examples:
+          - 4.8
+        review_count:
+          type: integer
+          title: Review Count
+          description: Total number of reviews
+          examples:
+          - 2847
+        reviews:
+          items:
+            $ref: '#/components/schemas/Review'
+          type: array
+          title: Reviews
+          description: Selected guest reviews
+        contact:
+          $ref: '#/components/schemas/HotelContact'
+      type: object
+      required:
+      - id
+      - name
+      - city
+      - country
+      - address
+      - stars
+      - description
+      - check_in_time
+      - check_out_time
+      - amenities
+      - room_types
+      - rating
+      - review_count
+      - reviews
+      - contact
+      title: Hotel
+      description: Full hotel details including rooms, reviews and contact info.
+    HotelContact:
+      properties:
+        phone:
+          type: string
+          title: Phone
+          description: Phone number
+          examples:
+          - +44 20 7123 4567
+        email:
+          type: string
+          title: Email
+          description: Reservation email
+          examples:
+          - reservations@grandlondon.com
+      type: object
+      required:
+      - phone
+      - email
+      title: HotelContact
+    HotelSummary:
+      properties:
+        id:
+          type: string
+          title: Id
+        name:
+          type: string
+          title: Name
+        city:
+          type: string
+          title: City
+        country:
+          type: string
+          title: Country
+        address:
+          type: string
+          title: Address
+        stars:
+          type: integer
+          title: Stars
+        description:
+          type: string
+          title: Description
+        check_in_time:
+          type: string
+          title: Check In Time
+        check_out_time:
+          type: string
+          title: Check Out Time
+        amenities:
+          items:
+            type: string
+          type: array
+          title: Amenities
+        room_types:
+          items:
+            $ref: '#/components/schemas/RoomType'
+          type: array
+          title: Room Types
+        rating:
+          type: number
+          title: Rating
+        review_count:
+          type: integer
+          title: Review Count
+        contact:
+          $ref: '#/components/schemas/HotelContact'
+      type: object
+      required:
+      - id
+      - name
+      - city
+      - country
+      - address
+      - stars
+      - description
+      - check_in_time
+      - check_out_time
+      - amenities
+      - room_types
+      - rating
+      - review_count
+      - contact
+      title: HotelSummary
+      description: Lightweight hotel listing without reviews.
+    Review:
+      properties:
+        author:
+          type: string
+          title: Author
+          description: Reviewer name
+          examples:
+          - Sarah M.
+        rating:
+          type: integer
+          maximum: 5.0
+          minimum: 1.0
+          title: Rating
+          description: Rating from 1 to 5
+          examples:
+          - 5
+        title:
+          type: string
+          title: Title
+          description: Review title
+          examples:
+          - Absolutely stunning
+        comment:
+          type: string
+          title: Comment
+          description: Review text
+        date:
+          type: string
+          title: Date
+          description: Review date (YYYY-MM-DD)
+          examples:
+          - '2024-11-15'
+      type: object
+      required:
+      - author
+      - rating
+      - title
+      - comment
+      - date
+      title: Review
+    RoomType:
+      properties:
+        type:
+          type: string
+          title: Type
+          description: Room type key (e.g. standard, deluxe, suite)
+          examples:
+          - deluxe
+        name:
+          type: string
+          title: Name
+          description: Display name
+          examples:
+          - Park View Deluxe
+        description:
+          type: string
+          title: Description
+          description: Room description
+          examples:
+          - Spacious 45m² room with panoramic views.
+        price_per_night:
+          type: number
+          title: Price Per Night
+          description: Nightly rate in USD
+          examples:
+          - 480.0
+        capacity:
+          type: integer
+          title: Capacity
+          description: Maximum number of guests
+          examples:
+          - 2
+        count:
+          type: integer
+          title: Count
+          description: Total rooms of this type
+          examples:
+          - 15
+      type: object
+      required:
+      - type
+      - name
+      - description
+      - price_per_night
+      - capacity
+      - count
+      title: RoomType
+    ValidationError:
+      properties:
+        loc:
+          items:
+            anyOf:
+            - type: string
+            - type: integer
+          type: array
+          title: Location
+        msg:
+          type: string
+          title: Message
+        type:
+          type: string
+          title: Error Type
+        input:
+          title: Input
+        ctx:
+          type: object
+          title: Context
+      type: object
+      required:
+      - loc
+      - msg
+      - type
+      title: ValidationError

@@ -17,9 +17,37 @@ services:
     networks:
       - southbound
 
+  ### Redis (used by APIM Gateway for semantic caching)
+  redis:
+    image: redis:${REDIS_VERSION:-8.6.2-alpine3.23} # https://hub.docker.com/_/redis/tags?name=8.6
+    container_name: gio-apim-redis
+    restart: always
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+    networks:
+      - southbound
+
+  ### RedisInsight (Redis UI)
+  redisinsight:
+    image: redis/redisinsight:${REDISINSIGHT_VERSION:-3.2.0} # https://hub.docker.com/r/redis/redisinsight/tags?name=3.2
+    container_name: gio-apim-redisinsight
+    restart: unless-stopped
+    ports:
+      - "5540:5540"
+    depends_on:
+      redis:
+        condition: service_healthy
+    networks:
+      - southbound
+
   ### Elasticsearch
   elasticsearch:
-    image: docker.elastic.co/elasticsearch/elasticsearch:${ELASTIC_VERSION:-9.2.5} # https://www.docker.elastic.co/r/elasticsearch/elasticsearch
+    image: docker.elastic.co/elasticsearch/elasticsearch:${ELASTIC_VERSION:-9.2.5}
     container_name: gio-apim-elasticsearch
     restart: always
     ports:
@@ -403,12 +431,12 @@ services:
   #   networks:
   #     - southbound
 
-  ### Hotel Booking Fake API
-  hotel-booking-api:
+  ### ACME Hotel API
+  acme-hotel-api:
     build:
-      context: ./hotel-booking-api
+      context: ./acme-hotel-api
       dockerfile: Dockerfile
-    container_name: hotel-booking-api
+    container_name: acme-hotel-api
     restart: unless-stopped
     ports:
       - "8000:8000"
@@ -446,7 +474,7 @@ services:
       dockerfile: ./hotel-booking-a2a-agent/Dockerfile
     container_name: hotel-booking-a2a-agent
     depends_on:
-      hotel-booking-api:
+      acme-hotel-api:
         condition: service_healthy
       apim-gateway:
         condition: service_healthy

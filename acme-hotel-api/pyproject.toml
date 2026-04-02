@@ -1,0 +1,25 @@
+[build-system]
+requires = ["hatchling>=1.25.0"]
+build-backend = "hatchling.build"
+
+[project]
+name = "acme-hotel-api"
+version = "1.0.0"
+description = "ACME Hotel API — hotel search and booking management"
+requires-python = ">=3.12"
+dependencies = [
+  "fastapi",
+  "uvicorn",
+  "pydantic",
+  "pyyaml",
+  "email-validator",
+]
+
+[project.scripts]
+acme-hotel-api = "acme_hotel_api.main:main"
+
+[tool.hatch.build.targets.wheel]
+packages = ["acme_hotel_api"]
+
+[tool.hatch.build.targets.wheel.force-include]
+"acme_hotel_api/data" = "acme_hotel_api/data"
