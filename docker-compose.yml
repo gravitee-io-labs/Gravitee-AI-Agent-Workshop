@@ -47,7 +47,7 @@ services:
 
   ### Elasticsearch
   elasticsearch:
-    image: docker.elastic.co/elasticsearch/elasticsearch:${ELASTIC_VERSION:-9.2.5}
+    image: docker.elastic.co/elasticsearch/elasticsearch:${ELASTIC_VERSION:-9.2.5} # https://www.docker.elastic.co/r/elasticsearch/elasticsearch
     container_name: gio-apim-elasticsearch
     restart: always
     ports:
@@ -467,12 +467,12 @@ services:
     networks:
       - northbound
 
-  ### A2A Agent
-  hotel-booking-a2a-agent:
+  ### Hotel Agent (A2A)
+  hotel-agent:
     build:
       context: .
-      dockerfile: ./hotel-booking-a2a-agent/Dockerfile
-    container_name: hotel-booking-a2a-agent
+      dockerfile: ./hotel-agent/Dockerfile
+    container_name: hotel-agent
     depends_on:
       acme-hotel-api:
         condition: service_healthy
@@ -484,10 +484,9 @@ services:
       - LLM_TEMPERATURE=0.3
       - MCP_HTTP_URLS=http://gio-apim-gateway:8082/hotels/mcp
       - AGENT_SERVER_PORT=8001
-      - OIDC_DISCOVERY_URL=http://am-gateway:8092/gravitee/oidc/.well-known/openid-configuration
       - AM_TOKEN_URL=http://gio-am-gateway:8092/gravitee/oauth/token
-      - AM_CLIENT_ID=hotel-booking-agent
-      - AM_CLIENT_SECRET=hotel-booking-agent
+      - AM_CLIENT_ID=acme-hotel-agent
+      - AM_CLIENT_SECRET=acme-hotel-agent
     ports:
       - "8001:8001"
     restart: unless-stopped
