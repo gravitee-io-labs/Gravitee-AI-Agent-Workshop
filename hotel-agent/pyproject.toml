@@ -3,9 +3,9 @@ requires = ["hatchling>=1.25.0"]
 build-backend = "hatchling.build"
 
 [project]
-name = "a2a-agent"
+name = "hotel-agent"
 version = "1.0.0"
-description = "Generic A2A Agent that discovers and uses MCP tools"
+description = "ACME Hotel Booking Agent — manages hotel search and reservations via MCP tools"
 requires-python = ">=3.12"
 dependencies = [
   "a2a-sdk",
@@ -17,7 +17,7 @@ dependencies = [
 ]
 
 [project.scripts]
-a2a-agent = "agent.main:main"
+hotel-agent = "agent.main:main"
 
 [tool.hatch.build.targets.wheel]
 packages = ["agent"]

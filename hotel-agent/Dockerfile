@@ -5,10 +5,10 @@ ENV PYTHONUNBUFFERED=1 \
 
 WORKDIR /app
 
-COPY ./hotel-booking-a2a-agent /app
+COPY ./hotel-agent /app
 
 RUN pip install .
 
 EXPOSE 8080
 
-CMD ["a2a-agent"]
+CMD ["hotel-agent"]

@@ -40,19 +40,23 @@ load_dotenv()
 #  Configuration (all from environment)
 # ---------------------------------------------------------------------------
 AGENT_SERVER_PORT = int(os.getenv("AGENT_SERVER_PORT", "8080"))
-AGENT_NAME = os.getenv("AGENT_NAME", "MCP Agent")
-AGENT_DESCRIPTION = os.getenv("AGENT_DESCRIPTION", "AI agent that discovers and uses MCP tools")
+AGENT_NAME = os.getenv("AGENT_NAME", "ACME Hotel Agent")
+AGENT_DESCRIPTION = os.getenv(
+    "AGENT_DESCRIPTION",
+    "AI-powered hotel booking assistant. Searches hotels, manages reservations, "
+    "and helps guests with all aspects of their stay.",
+)
 
 MCP_HTTP_URLS = os.getenv("MCP_HTTP_URLS", os.getenv("MCP_HTTP_URL", ""))
-OIDC_DISCOVERY_URL = os.getenv("OIDC_DISCOVERY_URL", "")
 AM_TOKEN_URL = os.getenv("AM_TOKEN_URL", "")
 AM_CLIENT_ID = os.getenv("AM_CLIENT_ID", "")
 AM_CLIENT_SECRET = os.getenv("AM_CLIENT_SECRET", "")
 
 SYSTEM_PROMPT = os.getenv(
-    "SYSTEM_PROMPT",
-    "You are a helpful AI assistant. Use the available tools when they match the user's intent. "
-    "Whenever possible, personalize your responses using the user's first name.",
+    "You are a Hotel booking assistant. "
+    "Help guests search for hotels, check availability, make reservations, and manage their bookings. "
+    "Use the available tools when they match the user's intent. "
+    "Be friendly, concise, and whenever possible, personalize your responses using the guest's first name.",
 )
 
 logger = get_agent_logger(__name__)
@@ -67,7 +71,11 @@ CONVERSATION_TTL_SECS = 3600
 
 
 class ConversationStore:
-    """In-memory conversation history keyed by context ID."""
+    """In-memory conversation history keyed by context ID.
+
+    Stores OpenAI-format message dicts, including tool_calls and tool roles
+    so the LLM retains full context across turns.
+    """
 
     def __init__(self):
         self._store: OrderedDict[str, List[Dict[str, Any]]] = OrderedDict()
@@ -79,12 +87,24 @@ class ConversationStore:
         return list(self._store.get(cid, []))
 
     def add(self, cid: str, role: str, text: str):
+        """Add a simple text message (user or assistant)."""
+        self._append(cid, {"role": role, "content": text})
+
+    def add_raw(self, cid: str, messages: List[Dict[str, Any]]):
+        """Add raw OpenAI-format messages (e.g. tool_calls, tool results)."""
+        for msg in messages:
+            self._append(cid, msg)
+
+    def count(self, cid: str) -> int:
+        return len(self._store.get(cid, []))
+
+    def _append(self, cid: str, message: Dict[str, Any]):
         if cid not in self._store:
             self._store[cid] = []
             while len(self._store) > MAX_CONVERSATIONS:
                 k, _ = self._store.popitem(last=False)
                 self._ts.pop(k, None)
-        self._store[cid].append({"role": role, "content": text})
+        self._store[cid].append(message)
         if len(self._store[cid]) > MAX_HISTORY_MESSAGES:
             self._store[cid] = self._store[cid][-MAX_HISTORY_MESSAGES:]
         self._ts[cid] = time.time()
@@ -94,7 +114,6 @@ class ConversationStore:
         for k in [k for k, ts in self._ts.items() if now - ts > CONVERSATION_TTL_SECS]:
             self._store.pop(k, None)
             self._ts.pop(k, None)
-
 
 conversations = ConversationStore()
 
@@ -136,7 +155,6 @@ class MCPAgent:
         )
         self.llm = LLMClient()
         self.auth = AuthService(
-            oidc_discovery_url=OIDC_DISCOVERY_URL,
             am_token_url=AM_TOKEN_URL,
             am_client_id=AM_CLIENT_ID,
             am_client_secret=AM_CLIENT_SECRET,
@@ -145,7 +163,7 @@ class MCPAgent:
 
     async def initialize(self):
         await self.mcp.connect_all(max_retries=3, connection_timeout=15)
-        if OIDC_DISCOVERY_URL:
+        if AM_TOKEN_URL:
             await self.auth.initialize()
         self._ready = True
         logger.info("Agent initialized")
@@ -155,29 +173,39 @@ class MCPAgent:
         message: str,
         authorization: Optional[str] = None,
         history: Optional[List[Dict[str, Any]]] = None,
-    ) -> str:
-        """Process a user message: discover tools, call LLM, execute tool, return result."""
-        tools = await self.mcp.list_all_tools()
-        logger.info(f"Available tools: {len(tools)}")
+    ) -> tuple[str, List[Dict[str, Any]]]:
+        """Process a user message: discover tools, call LLM, execute tool, return result.
 
+        Returns:
+            (response_text, tool_messages) — tool_messages are the OpenAI-format
+            dicts for the tool interaction (assistant tool_call + tool result)
+            that should be stored in the conversation for future context.
+        """
+        # Step 1: Discover MCP tools
+        tools = await self.mcp.list_all_tools()
+        logger.info(f"Step 1 — MCP tools discovered: {len(tools)}")
+
+        # Step 2: Ask LLM which tool to use
+        logger.info("Step 2 — Asking LLM for tool selection…")
         try:
             content, tool_calls = await self.llm.process_query(
                 message, tools,
                 system_prompt=SYSTEM_PROMPT,
                 conversation_history=history,
             )
-        except LLMRequestBlockedError as e:
-            return "Your request was blocked because it was deemed invalid or unsafe."
+        except LLMRequestBlockedError:
+            return "Your request was blocked because it was deemed invalid or unsafe.", []
 
         # No tool selected — return the LLM's direct response
         if not tool_calls:
-            return content or "I couldn't determine how to help. Could you provide more details?"
+            logger.info("Step 2 — LLM responded directly (no tool call)")
+            return (content or "I couldn't determine how to help. Could you provide more details?"), []
 
-        # Execute the first tool call
+        # Step 3: Execute the selected MCP tool
         tc = tool_calls[0]
         tool_name = tc["function"]["name"]
         tool_args = tc["function"]["arguments"]
-        logger.info(f"Executing: {tool_name}({json.dumps(tool_args)[:200]})")
+        logger.info(f"Step 3 — Executing MCP tool: {tool_name}({json.dumps(tool_args)[:200]})")
 
         result, _ = await self.mcp.call_tool(tool_name, tool_args)
 
@@ -185,27 +213,53 @@ class MCPAgent:
         if self._is_error(result):
             if authorization:
                 try:
-                    token, email = await self.auth.process_authorization_for_tool(authorization)
+                    token = await self.auth.process_authorization_for_tool(authorization)
                     result, _ = await self.mcp.call_tool(
                         tool_name, tool_args,
-                        extra_headers={"Authorization": f"Bearer {token}", "sub-email": email},
+                        extra_headers={"Authorization": f"Bearer {token}"},
                     )
                 except AuthenticationError:
-                    return "Authentication required. Please sign in and try again."
+                    return "Authentication required. Please sign in and try again.", []
             else:
-                return "Authentication required. Please sign in and try again."
+                return "Authentication required. Please sign in and try again.", []
 
-        # Let the LLM format the tool result into a human-readable response
+        logger.info(f"Step 3 — Tool result received ({len(str(result))} chars)")
+
+        # Build tool interaction messages for conversation memory
+        result_str = json.dumps(result) if isinstance(result, (dict, list)) else str(result)
+        tool_messages = [
+            {
+                "role": "assistant",
+                "content": None,
+                "tool_calls": [{
+                    "id": tc.get("id", "call_0"),
+                    "type": "function",
+                    "function": {
+                        "name": tool_name,
+                        "arguments": json.dumps(tool_args),
+                    },
+                }],
+            },
+            {
+                "role": "tool",
+                "tool_call_id": tc.get("id", "call_0"),
+                "content": result_str,
+            },
+        ]
+
+        # Step 4: Send tool result to LLM for final response generation
+        logger.info("Step 4 — Asking LLM to generate response from tool result…")
         try:
-            return await self.llm.process_tool_result(
+            response = await self.llm.process_tool_result(
                 message, tc, result,
                 system_prompt=SYSTEM_PROMPT,
                 conversation_history=history,
             )
-        except LLMRequestBlockedError as e:
-            return "Your request was blocked because it was deemed invalid or unsafe."
+            return response, tool_messages
+        except LLMRequestBlockedError:
+            return "Your request was blocked because it was deemed invalid or unsafe.", tool_messages
         except LLMRateLimitError:
-            return self._extract_text(result)
+            return self._extract_text(result), tool_messages
 
     async def cleanup(self):
         await self.mcp.cleanup()
@@ -251,6 +305,8 @@ class AgentRequestHandler(RequestHandler):
 
             authorization = self._get_authorization(context)
             context_id = self._get_context_id(params)
+            logger.info("=" * 70)
+            logger.info(f"New request — context={context_id[:8]}…")
 
             # Check for elicitation response first
             elicitation_resp = self._get_elicitation_response(params)
@@ -266,7 +322,9 @@ class AgentRequestHandler(RequestHandler):
                 task = _pending_tasks.pop(eid, None)
                 if task:
                     try:
-                        response_text = await asyncio.wait_for(task, timeout=120)
+                        response_text, tool_msgs = await asyncio.wait_for(task, timeout=120)
+                        if tool_msgs:
+                            conversations.add_raw(context_id, tool_msgs)
                     except asyncio.TimeoutError:
                         response_text = "The request timed out."
                 else:
@@ -280,6 +338,7 @@ class AgentRequestHandler(RequestHandler):
             if not user_text:
                 raise ValueError("No message content provided.")
 
+            logger.info(f"User: {user_text[:150]}")
             conversations.add(context_id, "user", user_text)
             history = conversations.get(context_id)
 
@@ -313,7 +372,12 @@ class AgentRequestHandler(RequestHandler):
                 )
             else:
                 elicitation_wait.cancel()
-                response_text = tool_task.result()
+                response_text, tool_msgs = tool_task.result()
+
+                # Store tool interaction in conversation for future turns
+                if tool_msgs:
+                    conversations.add_raw(context_id, tool_msgs)
+
                 conversations.add(context_id, "assistant", response_text)
                 return self._message(response_text)
 
@@ -417,10 +481,14 @@ def create_agent_card() -> AgentCard:
         url=f"http://localhost:{AGENT_SERVER_PORT}",
         capabilities=AgentCapabilities(streaming=True, pushNotifications=False, stateTransitionHistory=True),
         skills=[AgentSkill(
-            id="mcp-tools",
-            name="mcp-tools",
-            description="Discovers and uses MCP tools to fulfill user requests",
-            tags=["mcp", "tools"],
+            id="hotel-booking",
+            name="hotel-booking",
+            description=(
+                "Search hotels by city, price, rating, and amenities. "
+                "Create, modify, and cancel reservations. "
+                "View booking details and hotel reviews."
+            ),
+            tags=["hotel", "booking", "reservation", "travel"],
         )],
         defaultInputModes=["text/plain"],
         defaultOutputModes=["text/plain"],

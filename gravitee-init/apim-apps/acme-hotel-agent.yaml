@@ -1,0 +1,10 @@
+# ACME Hotel Agent Application Configuration for APIM
+# This application is used by the AI Agent to subscribe to APIM APIs
+
+name: "ACME Hotel Agent"
+description: "ACME Hotel Booking AI Agent"
+
+settings:
+  app:
+    type: "SIMPLE"
+    client_id: "acme-hotel-agent"
