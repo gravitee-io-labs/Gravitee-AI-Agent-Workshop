@@ -226,6 +226,7 @@ app = FastAPI(
 # ── Health ────────────────────────────────────────────────────────────────
 
 @app.get("/health", tags=["System"], summary="Health check",
+         operation_id="getHealthStatus",
          description="Returns API health status. Used by container orchestration and load balancers.")
 async def health():
     return {"status": "healthy"}
@@ -238,6 +239,7 @@ async def health():
     response_model=list[HotelSummary],
     tags=["Hotels"],
     summary="Search hotels",
+    operation_id="searchHotels",
     description=(
         "Search and filter hotels across all cities. Returns hotel summaries "
         "(without full reviews). All filters are optional and combine with AND logic. "
@@ -296,6 +298,7 @@ async def search_hotels(
     response_model=Hotel,
     tags=["Hotels"],
     summary="Get hotel details",
+    operation_id="getHotelById",
     description="Returns full hotel details including room types, reviews, and contact information.",
 )
 async def get_hotel(hotel_id: str):
@@ -310,6 +313,7 @@ async def get_hotel(hotel_id: str):
     response_model=list[Review],
     tags=["Hotels"],
     summary="Get hotel reviews",
+    operation_id="getHotelReviews",
     description="Returns all guest reviews for a specific hotel.",
 )
 async def get_hotel_reviews(hotel_id: str):
@@ -326,6 +330,7 @@ async def get_hotel_reviews(hotel_id: str):
     response_model=list[Booking],
     tags=["Bookings"],
     summary="List bookings",
+    operation_id="listBookings",
     description=(
         "List all bookings, optionally filtered by guest email. "
         "In production the Gravitee gateway injects the authenticated user identity."
@@ -345,6 +350,7 @@ async def list_bookings(
     response_model=Booking,
     tags=["Bookings"],
     summary="Get booking details",
+    operation_id="getBookingById",
     description="Returns full details of a specific booking by its reference ID.",
 )
 async def get_booking(booking_id: str):
@@ -360,6 +366,7 @@ async def get_booking(booking_id: str):
     status_code=201,
     tags=["Bookings"],
     summary="Create a booking",
+    operation_id="createBooking",
     description=(
         "Create a new hotel room booking. The total price is automatically "
         "calculated from the room type nightly rate and stay duration. "
@@ -408,6 +415,7 @@ async def create_booking(body: BookingCreate):
     response_model=Booking,
     tags=["Bookings"],
     summary="Update a booking",
+    operation_id="updateBooking",
     description=(
         "Modify an existing booking. Only confirmed bookings can be updated. "
         "Send only the fields you want to change. The total price is "
@@ -458,6 +466,7 @@ async def update_booking(booking_id: str, body: BookingUpdate):
     response_model=Booking,
     tags=["Bookings"],
     summary="Cancel a booking",
+    operation_id="cancelBooking",
     description="Cancel an existing booking. Only confirmed bookings can be cancelled. Returns the updated booking with status 'cancelled'.",
 )
 async def cancel_booking(booking_id: str):

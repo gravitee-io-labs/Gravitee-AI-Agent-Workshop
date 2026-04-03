@@ -13,7 +13,7 @@ paths:
       summary: Health check
       description: Returns API health status. Used by container orchestration and
         load balancers.
-      operationId: health_health_get
+      operationId: getHealthStatus
       responses:
         '200':
           description: Successful Response
@@ -28,7 +28,7 @@ paths:
       description: Search and filter hotels across all cities. Returns hotel summaries
         (without full reviews). All filters are optional and combine with AND logic.
         Use `q` for free-text search across name, city, country, and description.
-      operationId: search_hotels_hotels_get
+      operationId: searchHotels
       parameters:
       - name: q
         in: query
@@ -134,7 +134,7 @@ paths:
                 type: array
                 items:
                   $ref: '#/components/schemas/HotelSummary'
-                title: Response Search Hotels Hotels Get
+                title: Response Searchhotels
         '422':
           description: Validation Error
           content:
@@ -148,7 +148,7 @@ paths:
       summary: Get hotel details
       description: Returns full hotel details including room types, reviews, and contact
         information.
-      operationId: get_hotel_hotels__hotel_id__get
+      operationId: getHotelById
       parameters:
       - name: hotel_id
         in: path
@@ -175,7 +175,7 @@ paths:
       - Hotels
       summary: Get hotel reviews
       description: Returns all guest reviews for a specific hotel.
-      operationId: get_hotel_reviews_hotels__hotel_id__reviews_get
+      operationId: getHotelReviews
       parameters:
       - name: hotel_id
         in: path
@@ -192,7 +192,7 @@ paths:
                 type: array
                 items:
                   $ref: '#/components/schemas/Review'
-                title: Response Get Hotel Reviews Hotels  Hotel Id  Reviews Get
+                title: Response Gethotelreviews
         '422':
           description: Validation Error
           content:
@@ -206,7 +206,7 @@ paths:
       summary: List bookings
       description: List all bookings, optionally filtered by guest email. In production
         the Gravitee gateway injects the authenticated user identity.
-      operationId: list_bookings_bookings_get
+      operationId: listBookings
       parameters:
       - name: guest_email
         in: query
@@ -229,7 +229,7 @@ paths:
                 type: array
                 items:
                   $ref: '#/components/schemas/Booking'
-                title: Response List Bookings Bookings Get
+                title: Response Listbookings
         '422':
           description: Validation Error
           content:
@@ -243,7 +243,7 @@ paths:
       description: Create a new hotel room booking. The total price is automatically
         calculated from the room type nightly rate and stay duration. Validates hotel
         existence, room type, dates, and guest capacity.
-      operationId: create_booking_bookings_post
+      operationId: createBooking
       requestBody:
         required: true
         content:
@@ -269,7 +269,7 @@ paths:
       - Bookings
       summary: Get booking details
       description: Returns full details of a specific booking by its reference ID.
-      operationId: get_booking_bookings__booking_id__get
+      operationId: getBookingById
       parameters:
       - name: booking_id
         in: path
@@ -297,7 +297,7 @@ paths:
       description: Modify an existing booking. Only confirmed bookings can be updated.
         Send only the fields you want to change. The total price is automatically
         recalculated if dates or room type change.
-      operationId: update_booking_bookings__booking_id__patch
+      operationId: updateBooking
       parameters:
       - name: booking_id
         in: path
@@ -330,7 +330,7 @@ paths:
       summary: Cancel a booking
       description: Cancel an existing booking. Only confirmed bookings can be cancelled.
         Returns the updated booking with status 'cancelled'.
-      operationId: cancel_booking_bookings__booking_id__delete
+      operationId: cancelBooking
       parameters:
       - name: booking_id
         in: path
