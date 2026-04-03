@@ -1,0 +1,30 @@
+# Acme Hotel Website — Single Page Application (Authorization Code + PKCE)
+name: "Acme Hotel Website SPA"
+description: "Acme Hotel Website Single Page Application"
+type: "BROWSER"
+
+clientId: "gravitee-hotels"
+clientSecret: "gravitee-hotels"
+
+redirectUris:
+  - "http://localhost:8002/"
+  - "https://oauth.pstmn.io/v1/callback"
+
+scopes:
+  - "openid"
+  - "profile"
+  - "email"
+
+oauth:
+  grantTypes:
+    - "authorization_code"
+  tokenEndpointAuthMethod: "none"
+  pkce: true
+  tokenValidity:
+    accessToken: 7200
+    refreshToken: 14400
+    idToken: 14400
+  tokenCustomClaims:
+    - tokenType: "access_token"
+      claimName: "email"
+      claimValue: "{#context.attributes['user']['email']}"

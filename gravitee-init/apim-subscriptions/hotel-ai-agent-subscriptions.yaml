@@ -1,7 +1,7 @@
-# Subscription definitions for ACME Hotel Agent
+# Subscription definitions for Hotels AI Agent
 # This file defines which APIs and plans the application subscribes to
 
 subscriptions:
-  - application: "ACME Hotel Agent"
+  - application: "Hotels AI Agent"
     api: "ACME Hotels API"
     plan: "Bookings Management"

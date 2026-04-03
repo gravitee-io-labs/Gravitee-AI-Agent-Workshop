@@ -1,0 +1,25 @@
+# Hotels AI Agent — Token Exchange (RFC 8693)
+name: "Hotels AI Agent"
+description: "Hotels AI Agent App"
+type: "AGENT"
+
+clientId: "hotel-ai-agent"
+clientSecret: "hotel-ai-agent"
+
+redirectUris:
+  - "http://unused.unused"
+
+agentCardUrl: "http://apim-gateway:8082/bookings-agent/.well-known/agent-card.json"
+
+oauth:
+  grantTypes:
+    - "urn:ietf:params:oauth:grant-type:token-exchange"
+  tokenEndpointAuthMethod: "client_secret_basic"
+  pkce: false
+  tokenExchange:
+    inherited: true
+    scopeHandling: "downscoping"
+  tokenValidity:
+    accessToken: 7200
+    refreshToken: 14400
+    idToken: 14400

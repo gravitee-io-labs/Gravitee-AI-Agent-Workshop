@@ -485,8 +485,8 @@ services:
       - MCP_HTTP_URLS=http://gio-apim-gateway:8082/hotels/mcp
       - AGENT_SERVER_PORT=8001
       - AM_TOKEN_URL=http://gio-am-gateway:8092/gravitee/oauth/token
-      - AM_CLIENT_ID=acme-hotel-agent
-      - AM_CLIENT_SECRET=acme-hotel-agent
+      - AM_CLIENT_ID=hotel-ai-agent
+      - AM_CLIENT_SECRET=hotel-ai-agent
     ports:
       - "8001:8001"
     restart: unless-stopped

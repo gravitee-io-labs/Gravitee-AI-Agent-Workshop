@@ -1,0 +1,10 @@
+# Hotels AI Agent Application Configuration for APIM
+# This application is used by the AI Agent to subscribe to APIM APIs
+
+name: "Hotels AI Agent"
+description: "Hotels AI Agent App"
+
+settings:
+  app:
+    type: "SIMPLE"
+    client_id: "hotel-ai-agent"
