@@ -806,32 +806,27 @@ async function handleOAuthCallback() {
         const tokenData = await tokenResponse.json();
         config.accessToken = tokenData.access_token;
         const idToken = tokenData.id_token;
-        
-        // Fetch user info
-        const userInfoResponse = await fetch(config.oidcConfig.userinfo_endpoint, {
-            headers: {
-                'Authorization': `Bearer ${config.accessToken}`
-            }
-        });
-        
-        if (userInfoResponse.ok) {
-            const userInfo = await userInfoResponse.json();
-            config.userInfo = {
-                email: userInfo.preferred_username,
-                given_name: userInfo.given_name,
-                family_name: userInfo.family_name
-            };
-            
-            // Store in localStorage
-            localStorage.setItem('access_token', config.accessToken);
-            if (idToken) {
-                localStorage.setItem('id_token', idToken);
-            }
-            localStorage.setItem('user_info', JSON.stringify(config.userInfo));
-            
-            updateUserDisplay();
-            console.log('Successfully logged in:', config.userInfo);
+
+        // Extract user info from id_token (JWT)
+        if (!idToken) {
+            throw new Error('No id_token received. Ensure scopes include openid profile email.');
         }
+
+        const idTokenPayload = parseJwt(idToken);
+        config.userInfo = {
+            email: idTokenPayload.email,
+            given_name: idTokenPayload.given_name,
+            family_name: idTokenPayload.family_name
+        };
+
+        // Store in localStorage
+        localStorage.setItem('access_token', config.accessToken);
+        localStorage.setItem('id_token', idToken);
+        localStorage.setItem('user_info', JSON.stringify(config.userInfo));
+
+        updateUserDisplay();
+        scheduleAutoLogout();
+        console.log('Successfully logged in:', config.userInfo);
         
         // Clean up
         sessionStorage.removeItem('code_verifier');
@@ -850,13 +845,25 @@ async function handleOAuthCallback() {
 async function checkStoredAuth() {
     const token = localStorage.getItem('access_token');
     const userInfo = localStorage.getItem('user_info');
-    
+
     if (token && userInfo) {
+        // Check if access_token is expired
+        const tokenPayload = parseJwt(token);
+        if (tokenPayload.exp && tokenPayload.exp * 1000 <= Date.now()) {
+            console.log('Stored access_token is expired, clearing auth');
+            localStorage.removeItem('access_token');
+            localStorage.removeItem('id_token');
+            localStorage.removeItem('user_info');
+            updateUserDisplay();
+            return;
+        }
+
         config.accessToken = token;
         config.userInfo = JSON.parse(userInfo);
         updateUserDisplay();
+        scheduleAutoLogout();
         console.log('Restored auth from storage');
-        
+
         // Load OIDC config in background for logout functionality
         if (!config.oidcConfig) {
             try {
@@ -875,10 +882,16 @@ async function checkStoredAuth() {
 }
 
 function logout() {
+    // Clear auto-logout timer
+    if (autoLogoutTimer) {
+        clearTimeout(autoLogoutTimer);
+        autoLogoutTimer = null;
+    }
+
     // Get the end_session_endpoint from OIDC config
     const endSessionEndpoint = config.oidcConfig?.end_session_endpoint;
     const idToken = localStorage.getItem('id_token');
-    
+
     // Clear local state first
     config.accessToken = null;
     config.userInfo = null;
@@ -931,6 +944,44 @@ function updateUserDisplay() {
         elements.userMenu?.classList.add('hidden');
         elements.userDropdown?.classList.add('hidden');
     }
+}
+
+// JWT Helper
+function parseJwt(token) {
+    const base64Url = token.split('.')[1];
+    const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
+    const jsonPayload = decodeURIComponent(
+        atob(base64).split('').map(c => '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2)).join('')
+    );
+    return JSON.parse(jsonPayload);
+}
+
+// Auto-logout when access_token expires
+let autoLogoutTimer = null;
+
+function scheduleAutoLogout() {
+    if (autoLogoutTimer) {
+        clearTimeout(autoLogoutTimer);
+        autoLogoutTimer = null;
+    }
+
+    if (!config.accessToken) return;
+
+    const tokenPayload = parseJwt(config.accessToken);
+    if (!tokenPayload.exp) return;
+
+    const expiresInMs = tokenPayload.exp * 1000 - Date.now();
+    if (expiresInMs <= 0) {
+        console.log('Access token already expired, logging out');
+        logout();
+        return;
+    }
+
+    console.log(`Access token expires in ${Math.round(expiresInMs / 1000)}s, auto-logout scheduled`);
+    autoLogoutTimer = setTimeout(() => {
+        console.log('Access token expired, auto-logout triggered');
+        logout();
+    }, expiresInMs);
 }
 
 // PKCE Helper Functions

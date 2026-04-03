@@ -449,12 +449,12 @@ services:
     networks:
       - southbound
 
-  ### Hotel Website
-  hotel-website:
+  ### ACME Hotel Website
+  acme-hotel-website:
     build:
-      context: ./hotel-website
+      context: ./acme-hotel-website
       dockerfile: Dockerfile
-    container_name: hotel-website
+    container_name: acme-hotel-website
     restart: unless-stopped
     ports:
       - "8002:80"

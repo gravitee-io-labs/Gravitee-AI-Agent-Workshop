@@ -1,5 +1,5 @@
 {
-  "name": "gravitee-hotels-website",
+  "name": "acme-hotel-website",
   "version": "1.0.0",
   "description": "AI-powered hotel booking website with Gravitee chatbot integration",
   "scripts": {
