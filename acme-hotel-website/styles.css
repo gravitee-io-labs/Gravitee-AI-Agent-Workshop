@@ -252,6 +252,7 @@ body {
 .feature-icon {
     font-size: 3rem;
     margin-bottom: 1rem;
+    color: var(--primary-blue);
 }
 
 .feature-card h3 {
@@ -445,14 +446,12 @@ body {
     display: flex;
     align-items: center;
     justify-content: center;
-    font-size: 0.65rem;
-    font-weight: 700;
+    font-size: 1.3rem;
     color: var(--primary-blue);
 }
 
 .bot-emoji {
-    font-size: 0.55rem;
-    font-weight: 700;
+    font-size: 1.2rem;
     color: var(--primary-blue);
 }
 
@@ -572,6 +571,34 @@ body {
     30% {
         transform: translateY(-10px);
     }
+}
+
+/* Chat Suggestions */
+.chat-suggestions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+    padding: 0.75rem 1rem 0;
+    border-top: 1px solid var(--light-blue);
+}
+
+.suggestion-btn {
+    padding: 0.4rem 0.75rem;
+    background: var(--light-blue);
+    border: 1px solid var(--primary-blue);
+    border-radius: 16px;
+    font-family: 'Kanit', sans-serif;
+    font-size: 0.8rem;
+    font-weight: 400;
+    color: var(--primary-blue);
+    cursor: pointer;
+    transition: all 0.2s;
+    white-space: nowrap;
+}
+
+.suggestion-btn:hover {
+    background: var(--primary-blue);
+    color: var(--white);
 }
 
 /* Chat Input */
@@ -745,7 +772,15 @@ body {
     font-size: 1.2rem;
     font-weight: 600;
     margin-bottom: 1rem;
-    color: var (--dark-brown);
+    color: var(--dark-navy);
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.connection-section h3 i {
+    font-size: 1.4rem;
+    color: var(--primary-blue);
 }
 
 .connection-header {

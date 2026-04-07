@@ -462,7 +462,6 @@ services:
       - AGENT_CARD_URL=http://localhost:8082/bookings-agent/.well-known/agent-card.json
       - OIDC_URL=http://localhost:8092/gravitee/oidc/.well-known/openid-configuration
       - CLIENT_ID=gravitee-hotels
-      - CLIENT_SECRET=gravitee-hotels
       - REDIRECT_URI=http://localhost:8002/
     networks:
       - northbound

@@ -3,7 +3,6 @@ let config = {
     agentCardUrl: window.APP_CONFIG?.agentCardUrl || 'http://localhost:8082/bookings-agent/.well-known/agent-card.json',
     oidcUrl: window.APP_CONFIG?.oidcUrl || 'http://localhost:8092/gravitee/oidc/.well-known/openid-configuration',
     clientId: window.APP_CONFIG?.clientId || 'gravitee-hotels',
-    clientSecret: window.APP_CONFIG?.clientSecret || 'gravitee-hotels',
     redirectUri: window.APP_CONFIG?.redirectUri || 'http://localhost:8002/',
     agentUrl: null,
     oidcConfig: null,
@@ -53,7 +52,6 @@ const elements = {
     agentCardUrl: document.getElementById('agentCardUrl'),
     oidcUrl: document.getElementById('oidcUrl'),
     clientId: document.getElementById('clientId'),
-    clientSecret: document.getElementById('clientSecret'),
     connectAgentBtn: document.getElementById('connectAgentBtn'),
     testOidcBtn: document.getElementById('testOidcBtn'),
     agentConnectionStatus: document.getElementById('agentConnectionStatus'),
@@ -137,6 +135,17 @@ function initializeEventListeners() {
         });
     }
     
+    // Suggestion buttons
+    document.querySelectorAll('.suggestion-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+            const msg = btn.getAttribute('data-message');
+            if (msg && config.isConnected) {
+                elements.chatInput.value = msg;
+                sendMessage();
+            }
+        });
+    });
+
     // Auth
     if (elements.signInBtn) elements.signInBtn.addEventListener('click', login);
     if (elements.userMenuBtn) elements.userMenuBtn.addEventListener('click', toggleUserDropdown);
@@ -180,13 +189,11 @@ function openSettings() {
     elements.agentCardUrl.placeholder = config.agentCardUrl;
     elements.oidcUrl.placeholder = config.oidcUrl;
     elements.clientId.placeholder = config.clientId;
-    elements.clientSecret.placeholder = config.clientSecret;
-    
+
     // Set values
     elements.agentCardUrl.value = config.agentCardUrl;
     elements.oidcUrl.value = config.oidcUrl;
     elements.clientId.value = config.clientId;
-    elements.clientSecret.value = config.clientSecret;
     
     updateAgentConnectionStatus();
     updateOidcConnectionStatus();
@@ -200,7 +207,6 @@ async function saveSettings() {
     config.agentCardUrl = elements.agentCardUrl.value.trim();
     config.oidcUrl = elements.oidcUrl.value.trim();
     config.clientId = elements.clientId.value.trim();
-    config.clientSecret = elements.clientSecret.value.trim();
     saveConfigToStorage();
     showDebugInfo(elements.agentDebugInfo, 'Settings saved successfully', 'success');
 }
@@ -236,7 +242,7 @@ async function testAgentConnection() {
         updateAgentConnectionStatus('connected');
         enableChat();
         
-        const debugMsg = `✅ Successfully connected to agent!\n\nAgent Name: ${agentCard.name}\nAgent URL: ${agentCard.url}\nVersion: ${agentCard.version}`;
+        const debugMsg = `[OK] Successfully connected to agent!\n\nAgent Name: ${agentCard.name}\nAgent URL: ${agentCard.url}\nVersion: ${agentCard.version}`;
         showDebugInfo(elements.agentDebugInfo, debugMsg, 'success');
         
         console.log('Connected to agent:', agentCard);
@@ -246,7 +252,7 @@ async function testAgentConnection() {
         updateAgentConnectionStatus('failed');
         disableChat();
         
-        const debugMsg = `❌ Connection failed:\n\n${error.message}\n\nURL: ${url}\n\nPlease verify:\n- The URL is correct\n- The agent is running\n- CORS is properly configured`;
+        const debugMsg = `[ERROR] Connection failed:\n\n${error.message}\n\nURL: ${url}\n\nPlease verify:\n- The URL is correct\n- The agent is running\n- CORS is properly configured`;
         showDebugInfo(elements.agentDebugInfo, debugMsg, 'error');
     } finally {
         elements.connectAgentBtn.disabled = false;
@@ -282,7 +288,7 @@ async function testOidcConnection() {
         
         updateOidcConnectionStatus('connected');
         
-        const debugMsg = `✅ Successfully connected to OIDC provider!\n\nIssuer: ${oidcConfig.issuer}\nAuthorization Endpoint: ${oidcConfig.authorization_endpoint}\nToken Endpoint: ${oidcConfig.token_endpoint}`;
+        const debugMsg = `[OK] Successfully connected to OIDC provider!\n\nIssuer: ${oidcConfig.issuer}\nAuthorization Endpoint: ${oidcConfig.authorization_endpoint}\nToken Endpoint: ${oidcConfig.token_endpoint}`;
         showDebugInfo(elements.oidcDebugInfo, debugMsg, 'success');
         
         console.log('Connected to OIDC:', oidcConfig);
@@ -290,7 +296,7 @@ async function testOidcConnection() {
         console.error('OIDC connection error:', error);
         updateOidcConnectionStatus('failed');
         
-        const debugMsg = `❌ Connection failed:\n\n${error.message}\n\nURL: ${url}\n\nPlease verify:\n- The URL is correct\n- The OIDC provider is running\n- CORS is properly configured`;
+        const debugMsg = `[ERROR] Connection failed:\n\n${error.message}\n\nURL: ${url}\n\nPlease verify:\n- The URL is correct\n- The OIDC provider is running\n- CORS is properly configured`;
         showDebugInfo(elements.oidcDebugInfo, debugMsg, 'error');
     } finally {
         elements.testOidcBtn.disabled = false;
@@ -368,29 +374,28 @@ function showDebugInfo(element, message, type = 'error') {
 }
 
 // Agent Connection
+let agentRetryInterval = null;
+
 async function connectToAgent() {
     const startTime = Date.now();
     let requestId = null;
-    
+
     try {
-        // Add to debug panel
         requestId = addDebugRequest({
             method: 'GET',
             url: config.agentCardUrl,
             headers: { 'Accept': 'application/json' },
             requestBody: null
         });
-        
-        // Fetch agent card
+
         const response = await fetch(config.agentCardUrl);
         const duration = Date.now() - startTime;
-        
-        // Extract response headers
+
         const responseHeaders = {};
         response.headers.forEach((value, key) => {
             responseHeaders[key] = value;
         });
-        
+
         if (!response.ok) {
             updateDebugRequest(requestId, {
                 status: response.status,
@@ -400,28 +405,33 @@ async function connectToAgent() {
             });
             throw new Error(`Failed to fetch agent card: ${response.statusText}`);
         }
-        
+
         const agentCard = await response.json();
-        
-        // Update debug panel with success
+
         updateDebugRequest(requestId, {
             status: response.status,
             duration: duration,
             responseHeaders: responseHeaders,
             responseBody: agentCard
         });
-        
+
         config.agentUrl = agentCard.url;
         config.isConnected = true;
-        
+
+        // Stop retry on success
+        if (agentRetryInterval) {
+            clearInterval(agentRetryInterval);
+            agentRetryInterval = null;
+        }
+
         updateAgentConnectionStatus('connected');
         enableChat();
-        
+
         console.log('Connected to agent:', agentCard.name);
         return agentCard;
     } catch (error) {
         const duration = Date.now() - startTime;
-        
+
         if (requestId) {
             updateDebugRequest(requestId, {
                 status: 0,
@@ -429,7 +439,7 @@ async function connectToAgent() {
                 responseBody: { error: error.message }
             });
         }
-        
+
         config.isConnected = false;
         updateAgentConnectionStatus('disconnected');
         disableChat();
@@ -437,17 +447,38 @@ async function connectToAgent() {
     }
 }
 
+function startAgentRetry() {
+    if (agentRetryInterval) return;
+
+    elements.chatStatus.textContent = 'Connecting...';
+
+    // Try immediately first
+    connectToAgent().catch(() => {
+        console.log('Agent not available, retrying every 5s...');
+        elements.chatStatus.textContent = 'Reconnecting...';
+    });
+
+    // Then retry every 5 seconds
+    agentRetryInterval = setInterval(() => {
+        if (config.isConnected) {
+            clearInterval(agentRetryInterval);
+            agentRetryInterval = null;
+            return;
+        }
+        console.log('Retrying agent connection...');
+        connectToAgent().catch(() => {
+            elements.chatStatus.textContent = 'Reconnecting...';
+        });
+    }, 5000);
+}
+
 // Chat Functions
 function openChat() {
     elements.chatWindow.classList.remove('hidden');
     elements.chatWidgetBtn.style.display = 'none';
-    
-    // Connect to agent if not connected
+
     if (!config.isConnected) {
-        connectToAgent().catch(error => {
-            console.error('Auto-connect failed:', error);
-            addMessage('agent', 'Failed to connect to AI Agent. Please check your settings.');
-        });
+        startAgentRetry();
     }
 }
 
@@ -632,18 +663,16 @@ function addMessage(sender, content) {
     avatarDiv.className = 'message-avatar';
     
     if (sender === 'agent') {
-        const img = document.createElement('img');
-        img.src = 'assets/gravitee-logo/Mark.svg';
-        img.alt = 'Bot';
-        avatarDiv.appendChild(img);
+        avatarDiv.innerHTML = '<i class="ph ph-robot" style="font-size: 1.2rem; color: var(--primary-blue);"></i>';
+        avatarDiv.style.background = 'var(--light-blue)';
     } else {
-        // User icon SVG
-        avatarDiv.innerHTML = `
-            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path>
-                <circle cx="12" cy="7" r="4"></circle>
-            </svg>
-        `;
+        const initials = getUserInitials();
+        if (initials) {
+            avatarDiv.textContent = initials;
+            avatarDiv.style.fontSize = '0.8rem';
+        } else {
+            avatarDiv.innerHTML = '<i class="ph ph-user" style="font-size: 1.1rem;"></i>';
+        }
     }
     
     const contentDiv = document.createElement('div');
@@ -674,10 +703,8 @@ function showTypingIndicator() {
     
     const avatarDiv = document.createElement('div');
     avatarDiv.className = 'message-avatar';
-    const img = document.createElement('img');
-    img.src = 'assets/gravitee-logo/Mark.svg';
-    img.alt = 'Bot';
-    avatarDiv.appendChild(img);
+    avatarDiv.innerHTML = '<i class="ph ph-robot" style="font-size: 1.2rem; color: var(--primary-blue);"></i>';
+    avatarDiv.style.background = 'var(--light-blue)';
     
     const contentDiv = document.createElement('div');
     contentDiv.className = 'message-content';
@@ -925,24 +952,42 @@ function logout() {
     }
 }
 
+function getUserInitials() {
+    if (!config.userInfo) return null;
+    const first = (config.userInfo.given_name || '').charAt(0).toUpperCase();
+    const last = (config.userInfo.family_name || '').charAt(0).toUpperCase();
+    return (first + last) || null;
+}
+
 function updateUserDisplay() {
+    const headerAvatar = document.getElementById('headerAvatar');
+
     if (config.userInfo && config.accessToken) {
-        // User is logged in
         elements.signInBtn?.classList.add('hidden');
         elements.userMenu?.classList.remove('hidden');
-        
+
         const firstName = config.userInfo.given_name || 'User';
         const lastName = config.userInfo.family_name || '';
         const lastInitial = lastName ? lastName.charAt(0).toUpperCase() : '';
         const displayName = `${firstName} ${lastInitial}${lastInitial ? '.' : ''}`;
-        
+
         elements.userDisplayName.textContent = displayName;
         elements.userDropdownEmail.textContent = config.userInfo.email || '';
+
+        // Show initials in header avatar
+        const initials = getUserInitials();
+        if (headerAvatar && initials) {
+            headerAvatar.innerHTML = `<span style="color: white; font-weight: 600; font-size: 0.85rem;">${initials}</span>`;
+        }
     } else {
-        // User is not logged in
         elements.signInBtn?.classList.remove('hidden');
         elements.userMenu?.classList.add('hidden');
         elements.userDropdown?.classList.add('hidden');
+
+        // Reset header avatar to icon
+        if (headerAvatar) {
+            headerAvatar.innerHTML = '<i class="ph ph-user" style="color: white; font-size: 1.1rem;"></i>';
+        }
     }
 }
 
@@ -1017,19 +1062,16 @@ function saveConfigToStorage() {
     localStorage.setItem('agent_card_url', config.agentCardUrl);
     localStorage.setItem('oidc_url', config.oidcUrl);
     localStorage.setItem('client_id', config.clientId);
-    localStorage.setItem('client_secret', config.clientSecret);
 }
 
 function loadConfigFromStorage() {
     const savedAgentCardUrl = localStorage.getItem('agent_card_url');
     const savedOidcUrl = localStorage.getItem('oidc_url');
     const savedClientId = localStorage.getItem('client_id');
-    const savedClientSecret = localStorage.getItem('client_secret');
-    
+
     if (savedAgentCardUrl) config.agentCardUrl = savedAgentCardUrl;
     if (savedOidcUrl) config.oidcUrl = savedOidcUrl;
     if (savedClientId) config.clientId = savedClientId;
-    if (savedClientSecret) config.clientSecret = savedClientSecret;
 }
 
 // Utility Functions
