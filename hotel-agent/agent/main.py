@@ -1,14 +1,4 @@
-"""
-Generic A2A Agent — discovers MCP tools and lets the LLM decide.
-
-No hardcoded business logic. The agent:
-  1. Connects to MCP servers and discovers available tools
-  2. Forwards user messages + tool definitions to the LLM
-  3. Executes whichever tool the LLM picks
-  4. Returns the LLM-formatted result
-
-Elicitation (form / URL mode) is supported transparently.
-"""
+"""ACME Hotel Agent — A2A 1.0 + MCP + RFC 8693 Token Exchange."""
 
 import os
 import uuid
@@ -16,11 +6,12 @@ import asyncio
 import json
 import logging
 import time
-from typing import Any, Dict, List, Optional
+from typing import Any
 from contextlib import asynccontextmanager
 from collections import OrderedDict
 
 from dotenv import load_dotenv
+from google.protobuf import struct_pb2
 
 from agent.mcp_client import MCPMultiClient
 from agent.llm_client import LLMClient, LLMRateLimitError, LLMRequestBlockedError
@@ -28,17 +19,17 @@ from agent.auth_service import AuthService, AuthenticationError
 from agent.logger import get_agent_logger
 
 from a2a.server.apps import A2AStarletteApplication
-from a2a.server.request_handlers.request_handler import RequestHandler
-from a2a.types import (
-    AgentCard, AgentSkill, AgentCapabilities,
-    Message, Role, TextPart, DataPart,
-)
+from a2a.server.request_handlers.default_request_handler import DefaultRequestHandler
+from a2a.server.agent_execution import AgentExecutor, RequestContext
+from a2a.server.events import EventQueue
+from a2a.server.tasks import InMemoryTaskStore
+from a2a.types import AgentCard, AgentSkill, AgentCapabilities, AgentInterface, Part
+from a2a.utils import new_agent_text_message, new_agent_parts_message
 
 load_dotenv()
 
-# ---------------------------------------------------------------------------
-#  Configuration (all from environment)
-# ---------------------------------------------------------------------------
+# --- Configuration ---
+
 AGENT_SERVER_PORT = int(os.getenv("AGENT_SERVER_PORT", "8080"))
 AGENT_NAME = os.getenv("AGENT_NAME", "ACME Hotel Agent")
 AGENT_DESCRIPTION = os.getenv(
@@ -46,13 +37,12 @@ AGENT_DESCRIPTION = os.getenv(
     "AI-powered hotel booking assistant. Searches hotels, manages reservations, "
     "and helps guests with all aspects of their stay.",
 )
-
 MCP_HTTP_URLS = os.getenv("MCP_HTTP_URLS", os.getenv("MCP_HTTP_URL", ""))
 AM_TOKEN_URL = os.getenv("AM_TOKEN_URL", "")
 AM_CLIENT_ID = os.getenv("AM_CLIENT_ID", "")
 AM_CLIENT_SECRET = os.getenv("AM_CLIENT_SECRET", "")
-
 SYSTEM_PROMPT = os.getenv(
+    "SYSTEM_PROMPT",
     "You are a Hotel booking assistant. "
     "Help guests search for hotels, check availability, make reservations, and manage their bookings. "
     "Use the available tools when they match the user's intent. "
@@ -61,44 +51,33 @@ SYSTEM_PROMPT = os.getenv(
 
 logger = get_agent_logger(__name__)
 
-
-# ---------------------------------------------------------------------------
-#  Conversation Store
-# ---------------------------------------------------------------------------
 MAX_CONVERSATIONS = 200
 MAX_HISTORY_MESSAGES = 40
 CONVERSATION_TTL_SECS = 3600
 
 
-class ConversationStore:
-    """In-memory conversation history keyed by context ID.
+# --- Conversation Store ---
 
-    Stores OpenAI-format message dicts, including tool_calls and tool roles
-    so the LLM retains full context across turns.
-    """
+class ConversationStore:
+    """In-memory, TTL-evicted conversation history (OpenAI message format)."""
 
     def __init__(self):
-        self._store: OrderedDict[str, List[Dict[str, Any]]] = OrderedDict()
-        self._ts: Dict[str, float] = {}
+        self._store: OrderedDict[str, list[dict[str, Any]]] = OrderedDict()
+        self._ts: dict[str, float] = {}
 
-    def get(self, cid: str) -> List[Dict[str, Any]]:
+    def get(self, cid: str) -> list[dict[str, Any]]:
         self._evict()
         self._ts[cid] = time.time()
         return list(self._store.get(cid, []))
 
     def add(self, cid: str, role: str, text: str):
-        """Add a simple text message (user or assistant)."""
         self._append(cid, {"role": role, "content": text})
 
-    def add_raw(self, cid: str, messages: List[Dict[str, Any]]):
-        """Add raw OpenAI-format messages (e.g. tool_calls, tool results)."""
+    def add_raw(self, cid: str, messages: list[dict[str, Any]]):
         for msg in messages:
             self._append(cid, msg)
 
-    def count(self, cid: str) -> int:
-        return len(self._store.get(cid, []))
-
-    def _append(self, cid: str, message: Dict[str, Any]):
+    def _append(self, cid: str, message: dict[str, Any]):
         if cid not in self._store:
             self._store[cid] = []
             while len(self._store) > MAX_CONVERSATIONS:
@@ -115,26 +94,27 @@ class ConversationStore:
             self._store.pop(k, None)
             self._ts.pop(k, None)
 
+
 conversations = ConversationStore()
 
 
-# ---------------------------------------------------------------------------
-#  Elicitation Manager  (async bridge: MCP callback <-> A2A request/response)
-# ---------------------------------------------------------------------------
+# --- Elicitation Manager ---
+
 class ElicitationManager:
+    """Async bridge between MCP elicitation callbacks and A2A request/response."""
 
     def __init__(self):
-        self.pending_queue: asyncio.Queue[Dict[str, Any]] = asyncio.Queue()
-        self._futures: Dict[str, asyncio.Future] = {}
+        self.pending_queue: asyncio.Queue[dict[str, Any]] = asyncio.Queue()
+        self._futures: dict[str, asyncio.Future] = {}
 
-    async def request(self, data: Dict[str, Any]) -> Dict[str, Any]:
+    async def request(self, data: dict[str, Any]) -> dict[str, Any]:
         eid = data.setdefault("elicitationId", str(uuid.uuid4()))
-        future: asyncio.Future[Dict[str, Any]] = asyncio.get_event_loop().create_future()
+        future: asyncio.Future[dict[str, Any]] = asyncio.get_event_loop().create_future()
         self._futures[eid] = future
         await self.pending_queue.put(data)
         return await future
 
-    def resolve(self, eid: str, response: Dict[str, Any]):
+    def resolve(self, eid: str, response: dict[str, Any]):
         future = self._futures.pop(eid, None)
         if future and not future.done():
             future.set_result(response)
@@ -143,22 +123,14 @@ class ElicitationManager:
 elicitation_mgr = ElicitationManager()
 
 
-# ---------------------------------------------------------------------------
-#  Generic MCP Agent
-# ---------------------------------------------------------------------------
+# --- MCP Agent (4-phase pipeline) ---
+
 class MCPAgent:
 
     def __init__(self):
-        self.mcp = MCPMultiClient(
-            mcp_urls=MCP_HTTP_URLS,
-            elicitation_callback=elicitation_mgr.request,
-        )
+        self.mcp = MCPMultiClient(mcp_urls=MCP_HTTP_URLS, elicitation_callback=elicitation_mgr.request)
         self.llm = LLMClient()
-        self.auth = AuthService(
-            am_token_url=AM_TOKEN_URL,
-            am_client_id=AM_CLIENT_ID,
-            am_client_secret=AM_CLIENT_SECRET,
-        )
+        self.auth = AuthService(am_token_url=AM_TOKEN_URL, am_client_id=AM_CLIENT_ID, am_client_secret=AM_CLIENT_SECRET)
         self._ready = False
 
     async def initialize(self):
@@ -168,110 +140,67 @@ class MCPAgent:
         self._ready = True
         logger.info("Agent initialized")
 
+    async def exchange_token(self, authorization: str | None) -> str | None:
+        """Phase 1 — RFC 8693 token exchange (delegation), or fall back to agent token."""
+        if not AM_TOKEN_URL:
+            return None
+        if not authorization:
+            return self.auth.agent_token
+        try:
+            return await self.auth.process_authorization_for_tool(authorization)
+        except AuthenticationError as e:
+            logger.warning(f"Token exchange failed: {e} — falling back to agent token")
+            return self.auth.agent_token
+
     async def process(
-        self,
-        message: str,
-        authorization: Optional[str] = None,
-        history: Optional[List[Dict[str, Any]]] = None,
-    ) -> tuple[str, List[Dict[str, Any]]]:
-        """Process a user message: discover tools, call LLM, execute tool, return result.
+        self, message: str, token: str | None = None, history: list[dict] | None = None,
+    ) -> tuple[str, list[dict[str, Any]]]:
+        """Phases 2-4: LLM reasoning -> MCP tool execution -> LLM formatting."""
+        mcp_headers = {"Authorization": f"Bearer {token}"} if token else None
 
-        Returns:
-            (response_text, tool_messages) — tool_messages are the OpenAI-format
-            dicts for the tool interaction (assistant tool_call + tool result)
-            that should be stored in the conversation for future context.
-        """
-        # Step 1: Discover MCP tools
+        # Phase 2 — Reasoning
         tools = await self.mcp.list_all_tools()
-        logger.info(f"Step 1 — MCP tools discovered: {len(tools)}")
-
-        # Step 2: Ask LLM which tool to use
-        logger.info("Step 2 — Asking LLM for tool selection…")
+        logger.info(f"Phase 2 — {len(tools)} tools, asking LLM…")
         try:
             content, tool_calls = await self.llm.process_query(
-                message, tools,
-                system_prompt=SYSTEM_PROMPT,
-                conversation_history=history,
+                message, tools, system_prompt=SYSTEM_PROMPT, conversation_history=history,
             )
         except LLMRequestBlockedError:
             return "Your request was blocked because it was deemed invalid or unsafe.", []
 
-        # No tool selected — return the LLM's direct response
         if not tool_calls:
-            logger.info("Step 2 — LLM responded directly (no tool call)")
             return (content or "I couldn't determine how to help. Could you provide more details?"), []
 
-        # Step 3: Execute the selected MCP tool
+        # Phase 3 — Execution
         tc = tool_calls[0]
-        tool_name = tc["function"]["name"]
-        tool_args = tc["function"]["arguments"]
-        logger.info(f"Step 3 — Executing MCP tool: {tool_name}({json.dumps(tool_args)[:200]})")
+        tool_name, tool_args = tc["function"]["name"], tc["function"]["arguments"]
+        logger.info(f"Phase 3 — {tool_name}({json.dumps(tool_args)[:200]})")
 
-        result, _ = await self.mcp.call_tool(tool_name, tool_args)
-
-        # Retry with auth if tool returned an error
+        result, _ = await self.mcp.call_tool(tool_name, tool_args, extra_headers=mcp_headers)
         if self._is_error(result):
-            if authorization:
-                try:
-                    token = await self.auth.process_authorization_for_tool(authorization)
-                    result, _ = await self.mcp.call_tool(
-                        tool_name, tool_args,
-                        extra_headers={"Authorization": f"Bearer {token}"},
-                    )
-                except AuthenticationError:
-                    return "Authentication required. Please sign in and try again.", []
-            else:
-                return "Authentication required. Please sign in and try again.", []
+            return f"The operation failed: {self._extract_text(result)}", []
 
-        logger.info(f"Step 3 — Tool result received ({len(str(result))} chars)")
+        tool_messages = self._build_tool_messages(tc, tool_name, tool_args, result)
 
-        # Build tool interaction messages for conversation memory
-        result_str = json.dumps(result) if isinstance(result, (dict, list)) else str(result)
-        tool_messages = [
-            {
-                "role": "assistant",
-                "content": None,
-                "tool_calls": [{
-                    "id": tc.get("id", "call_0"),
-                    "type": "function",
-                    "function": {
-                        "name": tool_name,
-                        "arguments": json.dumps(tool_args),
-                    },
-                }],
-            },
-            {
-                "role": "tool",
-                "tool_call_id": tc.get("id", "call_0"),
-                "content": result_str,
-            },
-        ]
-
-        # Step 4: Send tool result to LLM for final response generation
-        logger.info("Step 4 — Asking LLM to generate response from tool result…")
+        # Phase 4 — LLM formats result
         try:
             response = await self.llm.process_tool_result(
-                message, tc, result,
-                system_prompt=SYSTEM_PROMPT,
-                conversation_history=history,
+                message, tc, result, system_prompt=SYSTEM_PROMPT, conversation_history=history,
             )
             return response, tool_messages
         except LLMRequestBlockedError:
             return "Your request was blocked because it was deemed invalid or unsafe.", tool_messages
-        except LLMRateLimitError:
+        except Exception as e:
+            logger.error(f"Phase 4 — LLM failed ({type(e).__name__}: {e}), returning raw result")
             return self._extract_text(result), tool_messages
 
     async def cleanup(self):
         await self.mcp.cleanup()
         await self.auth.cleanup()
 
-    # -- helpers ------------------------------------------------------------ #
-
     @staticmethod
     def _is_error(result: Any) -> bool:
-        if isinstance(result, dict):
-            return result.get("isError", False)
-        return getattr(result, "isError", False)
+        return result.get("isError", False) if isinstance(result, dict) else getattr(result, "isError", False)
 
     @staticmethod
     def _extract_text(result: Any) -> str:
@@ -285,201 +214,165 @@ class MCPAgent:
                     return "\n".join(texts)
         return str(result)
 
+    @staticmethod
+    def _build_tool_messages(tc: dict, name: str, args: dict, result: Any) -> list[dict]:
+        call_id = tc.get("id", "call_0")
+        result_str = json.dumps(result) if isinstance(result, (dict, list)) else str(result)
+        return [
+            {"role": "assistant", "content": None, "tool_calls": [
+                {"id": call_id, "type": "function", "function": {"name": name, "arguments": json.dumps(args)}}
+            ]},
+            {"role": "tool", "tool_call_id": call_id, "content": result_str},
+        ]
 
-# ---------------------------------------------------------------------------
-#  A2A Request Handler
-# ---------------------------------------------------------------------------
-_pending_tasks: Dict[str, asyncio.Task] = {}
+
+# --- Protobuf helpers ---
+
+def _to_value(d: dict) -> struct_pb2.Value:
+    val = struct_pb2.Value()
+    val.struct_value.update(d)
+    return val
 
 
-class AgentRequestHandler(RequestHandler):
+def _to_struct(d: dict) -> struct_pb2.Struct:
+    s = struct_pb2.Struct()
+    s.update(d)
+    return s
 
-    def __init__(self):
-        self.agent = MCPAgent()
-        super().__init__()
 
-    async def on_message_send(self, params, context):
+# --- A2A Executor ---
+
+_pending_tasks: dict[str, asyncio.Task] = {}
+
+
+class HotelAgentExecutor(AgentExecutor):
+
+    def __init__(self, agent: MCPAgent):
+        self.agent = agent
+
+    async def execute(self, context: RequestContext, event_queue: EventQueue) -> None:
         try:
             if not self.agent._ready:
                 await self.agent.initialize()
 
+            context_id = context.context_id or str(uuid.uuid4())
+            logger.info("=" * 60)
+            logger.info(f"Request — context={context_id[:8]}…")
+
             authorization = self._get_authorization(context)
-            context_id = self._get_context_id(params)
-            logger.info("=" * 70)
-            logger.info(f"New request — context={context_id[:8]}…")
+            token = await self.agent.exchange_token(authorization)
 
-            # Check for elicitation response first
-            elicitation_resp = self._get_elicitation_response(params)
+            # Handle elicitation response
+            elicitation_resp = self._get_elicitation_response(context)
             if elicitation_resp:
-                eid = elicitation_resp.get("elicitationId")
-                content_data = elicitation_resp.get("content", {})
-                if content_data:
-                    summary = ", ".join(f"{k}: {v}" for k, v in content_data.items())
-                    conversations.add(context_id, "user", f"[Form response] {summary}")
+                response_text = await self._handle_elicitation(context_id, elicitation_resp)
+                await self._reply(event_queue, response_text, context_id, context.task_id)
+                return
 
-                elicitation_mgr.resolve(eid, elicitation_resp)
-
-                task = _pending_tasks.pop(eid, None)
-                if task:
-                    try:
-                        response_text, tool_msgs = await asyncio.wait_for(task, timeout=120)
-                        if tool_msgs:
-                            conversations.add_raw(context_id, tool_msgs)
-                    except asyncio.TimeoutError:
-                        response_text = "The request timed out."
-                else:
-                    response_text = "Thank you for providing the information."
-
-                conversations.add(context_id, "assistant", response_text)
-                return self._message(response_text)
-
-            # Normal user message
-            user_text = self._get_text(params)
+            # Handle normal message
+            user_text = context.get_user_input()
             if not user_text:
-                raise ValueError("No message content provided.")
+                await self._reply(event_queue, "No message content provided.", context_id, context.task_id)
+                return
 
             logger.info(f"User: {user_text[:150]}")
             conversations.add(context_id, "user", user_text)
             history = conversations.get(context_id)
 
-            # Start processing (may trigger elicitation)
-            tool_task = asyncio.create_task(
-                self.agent.process(user_text, authorization, history)
-            )
+            # Race: pipeline vs elicitation request
+            tool_task = asyncio.create_task(self.agent.process(user_text, token, history))
             elicitation_wait = asyncio.create_task(elicitation_mgr.pending_queue.get())
-
-            done, _ = await asyncio.wait(
-                [tool_task, elicitation_wait],
-                return_when=asyncio.FIRST_COMPLETED,
-            )
+            done, _ = await asyncio.wait({tool_task, elicitation_wait}, return_when=asyncio.FIRST_COMPLETED)
 
             if elicitation_wait in done:
-                # Elicitation requested — relay to frontend
                 elicitation_data = elicitation_wait.result()
                 eid = elicitation_data["elicitationId"]
                 _pending_tasks[eid] = tool_task
-
                 msg = elicitation_data.get("message", "Please provide the requested information.")
-                conversations.add(context_id, "assistant", f"[Elicitation: {elicitation_data.get('mode', 'form')}] {msg}")
-
-                return Message(
-                    messageId=str(uuid.uuid4()),
-                    role=Role.agent,
+                conversations.add(context_id, "assistant", f"[Elicitation] {msg}")
+                await event_queue.enqueue_event(new_agent_parts_message(
                     parts=[
-                        DataPart(data=elicitation_data, metadata={"type": "elicitation"}),
-                        TextPart(text=msg),
+                        Part(data=_to_value(elicitation_data), metadata=_to_struct({"type": "elicitation"})),
+                        Part(text=msg),
                     ],
-                )
+                    context_id=context_id, task_id=context.task_id,
+                ))
             else:
                 elicitation_wait.cancel()
                 response_text, tool_msgs = tool_task.result()
-
-                # Store tool interaction in conversation for future turns
                 if tool_msgs:
                     conversations.add_raw(context_id, tool_msgs)
-
                 conversations.add(context_id, "assistant", response_text)
-                return self._message(response_text)
+                await self._reply(event_queue, response_text, context_id, context.task_id)
 
-        except Exception as e:
-            logger.error(f"Error: {e}", exc_info=True)
-            return self._message(f"Sorry, I encountered an error: {e}")
+        except BaseException as e:
+            logger.error(f"Error ({type(e).__name__}): {e}", exc_info=True)
+            await self._reply(event_queue, "Sorry, I encountered an error. Please try again.",
+                              context.context_id, context.task_id)
 
-    async def on_message_send_stream(self, params, context):
-        yield await self.on_message_send(params, context)
+    async def cancel(self, context: RequestContext, event_queue: EventQueue) -> None:
+        await self._reply(event_queue, "Cancellation is not supported.", context.context_id, context.task_id)
 
-    # -- A2A stubs (not used) ----------------------------------------------- #
-    async def on_create_task(self, params, context=None):
-        raise NotImplementedError
-    async def on_get_task(self, params, context=None):
-        raise NotImplementedError
-    async def on_cancel_task(self, params, context=None):
-        raise NotImplementedError
-    async def on_list_tasks(self, params, context=None):
-        return []
-    async def on_set_task_push_notification_config(self, params, context=None):
-        raise NotImplementedError
-    async def on_get_task_push_notification_config(self, params, context=None):
-        raise NotImplementedError
-    async def on_resubscribe_to_task(self, params, context=None):
-        raise NotImplementedError
-    async def on_list_task_push_notification_config(self, params, context=None):
-        return []
-    async def on_delete_task_push_notification_config(self, params, context=None):
-        return None
-
-    # -- helpers ------------------------------------------------------------ #
+    # --- helpers ---
 
     @staticmethod
-    def _message(text: str) -> Message:
-        return Message(
-            messageId=str(uuid.uuid4()),
-            role=Role.agent,
-            parts=[TextPart(text=text)],
-        )
+    async def _reply(eq: EventQueue, text: str, context_id: str | None, task_id: str | None):
+        await eq.enqueue_event(new_agent_text_message(text, context_id=context_id, task_id=task_id))
 
     @staticmethod
-    def _get_authorization(context) -> Optional[str]:
-        if context and hasattr(context, 'state'):
-            state = context.state
-            if isinstance(state, dict) and 'headers' in state:
-                h = state['headers']
-                return h.get('authorization') or h.get('Authorization')
-        if context and hasattr(context, 'http_request'):
-            req = context.http_request
-            if hasattr(req, 'headers'):
-                return req.headers.get('Authorization') or req.headers.get('authorization')
+    async def _handle_elicitation(context_id: str, resp: dict[str, Any]) -> str:
+        eid = resp.get("elicitationId")
+        content_data = resp.get("content", {})
+        if content_data:
+            summary = ", ".join(f"{k}: {v}" for k, v in content_data.items())
+            conversations.add(context_id, "user", f"[Form response] {summary}")
+
+        elicitation_mgr.resolve(eid, resp)
+
+        task = _pending_tasks.pop(eid, None)
+        if task:
+            try:
+                response_text, tool_msgs = await asyncio.wait_for(task, timeout=120)
+                if tool_msgs:
+                    conversations.add_raw(context_id, tool_msgs)
+            except asyncio.TimeoutError:
+                response_text = "The request timed out."
+        else:
+            response_text = "Thank you for providing the information."
+
+        conversations.add(context_id, "assistant", response_text)
+        return response_text
+
+    @staticmethod
+    def _get_authorization(context: RequestContext) -> str | None:
+        if context.call_context:
+            headers = context.call_context.state.get("headers", {})
+            return headers.get("authorization") or headers.get("Authorization")
         return None
 
     @staticmethod
-    def _get_context_id(params) -> str:
-        msg = params.message
-        for attr in ('context_id', 'contextId'):
-            val = getattr(msg, attr, None)
-            if val:
-                return str(val)
-        mid = getattr(msg, 'message_id', None) or getattr(msg, 'messageId', None)
-        return str(mid) if mid else str(uuid.uuid4())
-
-    @staticmethod
-    def _unwrap(part):
-        return part.root if hasattr(part, 'root') else part
-
-    @staticmethod
-    def _get_text(params) -> str:
-        for raw in (params.message.parts or []):
-            part = AgentRequestHandler._unwrap(raw)
-            if hasattr(part, 'text') and part.text:
-                return part.text
-            if isinstance(part, dict) and 'text' in part:
-                return part['text']
-        return ""
-
-    @staticmethod
-    def _get_elicitation_response(params) -> Optional[Dict[str, Any]]:
-        for raw in (params.message.parts or []):
-            part = AgentRequestHandler._unwrap(raw)
-            if hasattr(part, 'data') and hasattr(part, 'metadata'):
-                meta = part.metadata or {}
-                if isinstance(meta, dict) and meta.get("type") == "elicitation_response":
-                    return part.data
-            if isinstance(part, dict):
-                meta = part.get("metadata", {})
-                if isinstance(meta, dict) and meta.get("type") == "elicitation_response":
-                    return part.get("data", {})
+    def _get_elicitation_response(context: RequestContext) -> dict[str, Any] | None:
+        if not context.message or not context.message.parts:
+            return None
+        for part in context.message.parts:
+            if part.HasField("data") and part.metadata:
+                if dict(part.metadata).get("type") == "elicitation_response":
+                    return dict(part.data.struct_value)
         return None
 
 
-# ---------------------------------------------------------------------------
-#  Application
-# ---------------------------------------------------------------------------
+# --- Agent Card ---
+
 def create_agent_card() -> AgentCard:
     return AgentCard(
         name=AGENT_NAME,
         version="1.0.0",
         description=AGENT_DESCRIPTION,
-        url=f"http://localhost:{AGENT_SERVER_PORT}",
-        capabilities=AgentCapabilities(streaming=True, pushNotifications=False, stateTransitionHistory=True),
+        supported_interfaces=[AgentInterface(
+            url=f"http://localhost:{AGENT_SERVER_PORT}",
+            protocol_binding="JSONRPC",
+        )],
+        capabilities=AgentCapabilities(streaming=True),
         skills=[AgentSkill(
             id="hotel-booking",
             name="hotel-booking",
@@ -490,20 +383,23 @@ def create_agent_card() -> AgentCard:
             ),
             tags=["hotel", "booking", "reservation", "travel"],
         )],
-        defaultInputModes=["text/plain"],
-        defaultOutputModes=["text/plain"],
-        protocolVersion="0.3.0",
-        preferredTransport="JSONRPC",
+        default_input_modes=["text/plain"],
+        default_output_modes=["text/plain"],
     )
 
 
-_agent_instance: Optional[MCPAgent] = None
-
+# --- Application ---
 
 def create_app():
-    handler = AgentRequestHandler()
-    app = A2AStarletteApplication(agent_card=create_agent_card(), http_handler=handler)
-    return app.build(), handler.agent
+    agent = MCPAgent()
+    handler = DefaultRequestHandler(
+        agent_executor=HotelAgentExecutor(agent),
+        task_store=InMemoryTaskStore(),
+    )
+    a2a_app = A2AStarletteApplication(
+        agent_card=create_agent_card(), http_handler=handler, enable_v0_3_compat=True,
+    )
+    return a2a_app.build(), agent
 
 
 def main():
@@ -512,8 +408,6 @@ def main():
 
     @asynccontextmanager
     async def lifespan(app):
-        global _agent_instance
-        _agent_instance = agent
         await agent.initialize()
         logger.info("Agent ready")
         yield

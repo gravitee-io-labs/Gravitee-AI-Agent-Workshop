@@ -1,7 +1,6 @@
-"""MCP Client with elicitation support."""
+"""MCP Client with elicitation support and automatic reconnection."""
 import asyncio
 import json
-import logging
 import os
 import uuid
 from typing import Any, Awaitable, Callable, Dict, List, Optional
@@ -31,7 +30,7 @@ ElicitationCallbackT = Callable[[Dict[str, Any]], Awaitable[Dict[str, Any]]]
 
 
 class MCPClient:
-    """Single MCP server connection with elicitation support."""
+    """Single MCP server connection with elicitation support and auto-reconnect."""
 
     def __init__(self, mcp_url: str, retry_interval: int = MCP_RETRY_INTERVAL,
                  elicitation_callback: Optional[ElicitationCallbackT] = None):
@@ -96,32 +95,53 @@ class MCPClient:
                 logger.warning(f"Connection to {self.mcp_http_url} failed: {e}. Retrying in {self.retry_interval}s...")
                 try:
                     await self.exit_stack.aclose()
-                    self.exit_stack = AsyncExitStack()
                 except Exception:
                     pass
+                self.exit_stack = AsyncExitStack()
+                self.session = None
+                self.is_connected = False
                 await asyncio.sleep(self.retry_interval)
 
+    async def reconnect(self):
+        """Tear down the broken session and establish a fresh connection."""
+        logger.warning(f"Reconnecting to {self.mcp_http_url}…")
+        try:
+            await self.exit_stack.aclose()
+        except BaseException:
+            pass
+        self.exit_stack = AsyncExitStack()
+        self.session = None
+        self.is_connected = False
+        await self.connect(max_retries=3)
+
     async def list_tools(self) -> List[Dict[str, Any]]:
-        if not self.session or not self.is_connected:
-            raise RuntimeError("Not connected to MCP server")
-        tools_response = await self.session.list_tools()
-        return [{
-            "type": "function",
-            "function": {
-                "name": tool.name,
-                "description": tool.description,
-                "parameters": tool.inputSchema,
-            },
-        } for tool in tools_response.tools]
+        """List tools, reconnecting automatically if the session is broken."""
+        for attempt in range(2):
+            try:
+                if not self.session or not self.is_connected:
+                    raise RuntimeError("Not connected")
+                tools_response = await self.session.list_tools()
+                return [{
+                    "type": "function",
+                    "function": {
+                        "name": tool.name,
+                        "description": tool.description,
+                        "parameters": tool.inputSchema,
+                    },
+                } for tool in tools_response.tools]
+            except BaseException as e:
+                if attempt == 0:
+                    logger.warning(f"list_tools failed ({type(e).__name__}: {e}), reconnecting…")
+                    await self.reconnect()
+                else:
+                    raise RuntimeError(f"list_tools failed after reconnect: {e}") from e
 
     async def call_tool(self, tool_name: str, arguments: Dict[str, Any],
                         extra_headers: Optional[Dict[str, str]] = None) -> tuple[Any, Dict[str, str]]:
-        if not self.session or not self.is_connected:
-            raise RuntimeError("Not connected to MCP server")
-
+        """Call a tool via direct HTTP (with headers) or MCP session (with auto-reconnect)."""
         logger.info(f"Calling tool: {tool_name}")
 
-        # Use direct HTTP when extra headers are needed (e.g. Authorization)
+        # Direct HTTP path — stateless, no session issues, used when headers needed
         if HAS_HTTPX and extra_headers:
             try:
                 async with httpx.AsyncClient() as client:
@@ -147,16 +167,26 @@ class MCPClient:
             except Exception as e:
                 logger.warning(f"Direct HTTP failed, falling back to session: {e}")
 
-        # MCP session path (supports elicitation callbacks)
-        result = await self.session.call_tool(tool_name, arguments)
-        result_dict = {
-            "content": [
-                {"type": c.type, "text": c.text if hasattr(c, 'text') else str(c)}
-                for c in result.content
-            ] if result.content else [],
-            "isError": result.isError if hasattr(result, 'isError') else False,
-        }
-        return result_dict, {}
+        # MCP session path (supports elicitation callbacks), with auto-reconnect
+        for attempt in range(2):
+            try:
+                if not self.session or not self.is_connected:
+                    raise RuntimeError("Not connected")
+                result = await self.session.call_tool(tool_name, arguments)
+                result_dict = {
+                    "content": [
+                        {"type": c.type, "text": c.text if hasattr(c, 'text') else str(c)}
+                        for c in result.content
+                    ] if result.content else [],
+                    "isError": result.isError if hasattr(result, 'isError') else False,
+                }
+                return result_dict, {}
+            except BaseException as e:
+                if attempt == 0:
+                    logger.warning(f"call_tool session failed ({type(e).__name__}: {e}), reconnecting…")
+                    await self.reconnect()
+                else:
+                    raise RuntimeError(f"call_tool failed after reconnect: {e}") from e
 
     async def cleanup(self):
         try:
@@ -167,7 +197,7 @@ class MCPClient:
 
 
 class MCPMultiClient:
-    """Manages multiple MCP server connections."""
+    """Manages multiple MCP server connections with auto-reconnect."""
 
     def __init__(self, mcp_urls: Optional[List[str] | str] = None,
                  retry_interval: int = MCP_RETRY_INTERVAL,
@@ -208,7 +238,7 @@ class MCPMultiClient:
             try:
                 all_tools.extend(await client.list_tools())
             except Exception as e:
-                logger.error(f"Failed to list tools from {url}: {e}")
+                logger.error(f"Failed to list tools from {url} (even after reconnect): {e}")
         return all_tools
 
     async def call_tool(self, tool_name: str, arguments: Dict[str, Any],
