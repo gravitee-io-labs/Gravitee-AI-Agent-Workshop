@@ -23,7 +23,6 @@ class LLMRateLimitError(Exception):
 
 
 class LLMRequestBlockedError(Exception):
-    """Raised when the gateway rejects the request (e.g. prompt security validation)."""
     pass
 
 
@@ -120,16 +119,12 @@ class LLMClient:
         tool_call: dict[str, Any],
         tool_result: Any,
         system_prompt: str | None = None,
-        conversation_history: list[dict[str, Any]] | None = None,
     ) -> str:
-        """Send tool result back to LLM for a human-readable response."""
+        """Format a tool result into a human-readable response."""
         messages = []
         if system_prompt:
             messages.append({"role": "system", "content": system_prompt})
-        if conversation_history:
-            messages.extend(conversation_history)
-        else:
-            messages.append({"role": "user", "content": original_query})
+        messages.append({"role": "user", "content": original_query})
 
         messages.extend([
             {

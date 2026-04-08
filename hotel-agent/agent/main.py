@@ -199,7 +199,7 @@ class MCPAgent:
         # Step 4 — Reflect, LLM formats result for user, given the tool response
         try:
             response = await self.llm.process_tool_result(
-                message, tc, result, system_prompt=SYSTEM_PROMPT, conversation_history=history,
+                message, tc, result, system_prompt=SYSTEM_PROMPT,
             )
             logger.info(f"Step 4 - LLM formatting: successfully formatted the tool result for user response.")
             return response, tool_messages
