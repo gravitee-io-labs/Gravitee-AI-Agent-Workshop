@@ -19,6 +19,7 @@ from agent.auth_service import AuthService, AuthenticationError
 from agent.logger import get_agent_logger
 
 from a2a.server.apps import A2AStarletteApplication
+from a2a.server.apps.jsonrpc.jsonrpc_app import DefaultCallContextBuilder
 from a2a.server.request_handlers.default_request_handler import DefaultRequestHandler
 from a2a.server.agent_execution import AgentExecutor, RequestContext
 from a2a.server.events import EventQueue
@@ -123,7 +124,7 @@ class ElicitationManager:
 elicitation_mgr = ElicitationManager()
 
 
-# --- MCP Agent (4-phase pipeline) ---
+# --- MCP Agent (4-steps pipeline) ---
 
 class MCPAgent:
 
@@ -140,27 +141,34 @@ class MCPAgent:
         self._ready = True
         logger.info("Agent initialized")
 
-    async def exchange_token(self, authorization: str | None) -> str | None:
-        """Phase 1 — RFC 8693 token exchange (delegation), or fall back to agent token."""
+    async def get_mcp_token(self, authorization: str | None) -> str | None:
+        """Auth — Resolve the token to use for ALL MCP calls.
+
+        - No AM configured → None (no auth)
+        - User token present → RFC 8693 exchange (delegation), fallback to agent token
+        - No user token → agent's own token (auto-refreshed if expired)
+        """
         if not AM_TOKEN_URL:
             return None
-        if not authorization:
-            return self.auth.agent_token
-        try:
-            return await self.auth.process_authorization_for_tool(authorization)
-        except AuthenticationError as e:
-            logger.warning(f"Token exchange failed: {e} — falling back to agent token")
-            return self.auth.agent_token
+        if authorization:
+            try:
+                delegated = await self.auth.process_authorization_for_tool(authorization)
+                logger.info("Using delegated token (RFC 8693 exchange)")
+                return delegated
+            except AuthenticationError as e:
+                logger.warning(f"Token exchange failed: {e} — falling back to agent token")
+        return await self.auth.ensure_agent_token()
 
     async def process(
         self, message: str, token: str | None = None, history: list[dict] | None = None,
     ) -> tuple[str, list[dict[str, Any]]]:
-        """Phases 2-4: LLM reasoning -> MCP tool execution -> LLM formatting."""
         mcp_headers = {"Authorization": f"Bearer {token}"} if token else None
 
-        # Phase 2 — Reasoning
-        tools = await self.mcp.list_all_tools()
-        logger.info(f"Phase 2 — {len(tools)} tools, asking LLM…")
+        # Step 1 — MCP Tools Discovery
+        tools = await self.mcp.list_all_tools(extra_headers=mcp_headers)
+        logger.info(f"Step 1 - MCP Tools Discovery: {len(tools)} tools availables.")
+        
+        # Step 2 — LLM decides which tool to call
         try:
             content, tool_calls = await self.llm.process_query(
                 message, tools, system_prompt=SYSTEM_PROMPT, conversation_history=history,
@@ -169,29 +177,37 @@ class MCPAgent:
             return "Your request was blocked because it was deemed invalid or unsafe.", []
 
         if not tool_calls:
+            logger.info("Step 2 - LLM reasoning: LLM did not select any tool.")
             return (content or "I couldn't determine how to help. Could you provide more details?"), []
-
-        # Phase 3 — Execution
+        else:
+            logger.info(f"Step 2 - LLM reasoning: LLM selected {len(tool_calls)} tool(s): {', '.join([tc['function']['name'] for tc in tool_calls])}")
+            
+        # Step 3 — Execution of the selected tool (currently only supports the 1st one).
         tc = tool_calls[0]
         tool_name, tool_args = tc["function"]["name"], tc["function"]["arguments"]
-        logger.info(f"Phase 3 — {tool_name}({json.dumps(tool_args)[:200]})")
+        logger.info(f"Step 3 - Tool Execution: {tool_name}({json.dumps(tool_args)[:200]})")
 
         result, _ = await self.mcp.call_tool(tool_name, tool_args, extra_headers=mcp_headers)
         if self._is_error(result):
+            logger.error(f"Step 3 - Tool Execution: {tool_name} failed with error: {self._extract_text(result)}")
             return f"The operation failed: {self._extract_text(result)}", []
+        else:
+            logger.info(f"Step 3 - Tool Execution: {tool_name} succeeded.")
 
         tool_messages = self._build_tool_messages(tc, tool_name, tool_args, result)
 
-        # Phase 4 — LLM formats result
+        # Step 4 — Reflect, LLM formats result for user, given the tool response
         try:
             response = await self.llm.process_tool_result(
                 message, tc, result, system_prompt=SYSTEM_PROMPT, conversation_history=history,
             )
+            logger.info(f"Step 4 - LLM formatting: successfully formatted the tool result for user response.")
             return response, tool_messages
         except LLMRequestBlockedError:
+            logger.warning("Step 4 - LLM call failed because the response was blocked by safety filters.")
             return "Your request was blocked because it was deemed invalid or unsafe.", tool_messages
         except Exception as e:
-            logger.error(f"Phase 4 — LLM failed ({type(e).__name__}: {e}), returning raw result")
+            logger.error(f"Step 4 — LLM call failed ({type(e).__name__}: {e}), returning raw result")
             return self._extract_text(result), tool_messages
 
     async def cleanup(self):
@@ -257,10 +273,9 @@ class HotelAgentExecutor(AgentExecutor):
 
             context_id = context.context_id or str(uuid.uuid4())
             logger.info("=" * 60)
-            logger.info(f"Request — context={context_id[:8]}…")
 
             authorization = self._get_authorization(context)
-            token = await self.agent.exchange_token(authorization)
+            token = await self.agent.get_mcp_token(authorization)
 
             # Handle elicitation response
             elicitation_resp = self._get_elicitation_response(context)
@@ -275,7 +290,7 @@ class HotelAgentExecutor(AgentExecutor):
                 await self._reply(event_queue, "No message content provided.", context_id, context.task_id)
                 return
 
-            logger.info(f"User: {user_text[:150]}")
+            logger.info(f"User prompt: {user_text[:150]}")
             conversations.add(context_id, "user", user_text)
             history = conversations.get(context_id)
 
@@ -397,7 +412,9 @@ def create_app():
         task_store=InMemoryTaskStore(),
     )
     a2a_app = A2AStarletteApplication(
-        agent_card=create_agent_card(), http_handler=handler, enable_v0_3_compat=True,
+        agent_card=create_agent_card(), http_handler=handler,
+        context_builder=DefaultCallContextBuilder(),
+        enable_v0_3_compat=True,
     )
     return a2a_app.build(), agent
 

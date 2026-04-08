@@ -114,8 +114,43 @@ class MCPClient:
         self.is_connected = False
         await self.connect(max_retries=3)
 
-    async def list_tools(self) -> List[Dict[str, Any]]:
-        """List tools, reconnecting automatically if the session is broken."""
+    async def list_tools(self, extra_headers: Optional[Dict[str, str]] = None) -> List[Dict[str, Any]]:
+        """List tools with auth headers via direct HTTP, or MCP session as fallback."""
+        # Direct HTTP path — used when auth headers are needed
+        if HAS_HTTPX and extra_headers:
+            try:
+                async with httpx.AsyncClient() as client:
+                    mcp_request = {
+                        "jsonrpc": "2.0", "id": 1,
+                        "method": "tools/list",
+                        "params": {},
+                    }
+                    request_headers = {
+                        "Content-Type": "application/json",
+                        "Accept": "application/json, text/event-stream",
+                    }
+                    request_headers.update(extra_headers)
+                    response = await client.post(
+                        self.mcp_http_url.rstrip('/'), json=mcp_request,
+                        headers=request_headers, timeout=30.0,
+                    )
+                    if response.status_code == 200:
+                        data = response.json()
+                        if "error" in data:
+                            raise RuntimeError(data["error"].get("message", "Unknown error"))
+                        tools = data.get("result", {}).get("tools", [])
+                        return [{
+                            "type": "function",
+                            "function": {
+                                "name": t["name"],
+                                "description": t.get("description", ""),
+                                "parameters": t.get("inputSchema", {}),
+                            },
+                        } for t in tools]
+            except Exception as e:
+                logger.warning(f"Direct HTTP list_tools failed, falling back to session: {e}")
+
+        # MCP session fallback with auto-reconnect
         for attempt in range(2):
             try:
                 if not self.session or not self.is_connected:
@@ -232,11 +267,11 @@ class MCPMultiClient:
             raise RuntimeError("Failed to connect to any MCP servers")
         logger.info(f"Connected to {len(self.clients)}/{len(self.mcp_urls)} MCP server(s)")
 
-    async def list_all_tools(self) -> List[Dict[str, Any]]:
+    async def list_all_tools(self, extra_headers: Optional[Dict[str, str]] = None) -> List[Dict[str, Any]]:
         all_tools = []
         for url, client in self.clients.items():
             try:
-                all_tools.extend(await client.list_tools())
+                all_tools.extend(await client.list_tools(extra_headers))
             except Exception as e:
                 logger.error(f"Failed to list tools from {url} (even after reconnect): {e}")
         return all_tools

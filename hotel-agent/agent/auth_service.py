@@ -1,5 +1,6 @@
 """Authentication service using OAuth 2.0 Token Exchange (RFC 8693) with delegation."""
 import base64
+import time
 from typing import Optional
 
 import httpx
@@ -8,21 +9,19 @@ from agent.logger import get_agent_logger
 
 logger = get_agent_logger(__name__)
 
+TOKEN_EXPIRY_MARGIN_SECS = 30
+
 
 class AuthenticationError(Exception):
     pass
 
 
 class AuthService:
-    """Exchanges a user's access token for a delegated agent token via RFC 8693.
+    """Manages agent token lifecycle and RFC 8693 token exchange (delegation).
 
-    Delegation flow (RFC 8693 §1.1):
-      1. On startup, the agent obtains its own access token via client_credentials.
-         This token represents the agent's identity (the "actor").
-      2. When a user request arrives, the agent exchanges the user's token
-         (subject_token) together with its own token (actor_token).
-      3. AM returns a delegated token with an `act` claim, proving the agent
-         acts on behalf of the user — not impersonating them.
+    - Agent token obtained via client_credentials, auto-refreshed before expiry.
+    - User requests trigger token exchange: user token (subject) + agent token (actor)
+      → delegated token with `act` claim.
     """
 
     def __init__(self, am_token_url: str, am_client_id: str, am_client_secret: str):
@@ -34,20 +33,28 @@ class AuthService:
             f"{am_client_id}:{am_client_secret}".encode()
         ).decode()
         self._agent_token: Optional[str] = None
+        self._agent_token_expires_at: float = 0
 
     @property
     def agent_token(self) -> Optional[str]:
-        """The agent's own access token (obtained via client_credentials)."""
         return self._agent_token
 
+    def _is_agent_token_expired(self) -> bool:
+        return time.time() >= (self._agent_token_expires_at - TOKEN_EXPIRY_MARGIN_SECS)
+
     async def initialize(self):
-        """Obtain the agent's own access token via client_credentials."""
         logger.info(f"AuthService initializing (endpoint: {self.am_token_url})")
         await self._refresh_agent_token()
-        logger.info("AuthService ready — agent token acquired (actor for delegation)")
+        logger.info("AuthService ready — agent token acquired")
+
+    async def ensure_agent_token(self) -> str:
+        """Return a valid agent token, refreshing if expired."""
+        if not self._agent_token or self._is_agent_token_expired():
+            logger.info("Agent token expired or missing, refreshing...")
+            await self._refresh_agent_token()
+        return self._agent_token
 
     async def _refresh_agent_token(self):
-        """Get or refresh the agent's own token via client_credentials grant."""
         try:
             response = await self._http_client.post(
                 self.am_token_url,
@@ -58,32 +65,28 @@ class AuthService:
                 },
             )
             response.raise_for_status()
-            self._agent_token = response.json().get("access_token")
+            data = response.json()
+            self._agent_token = data.get("access_token")
             if not self._agent_token:
                 raise AuthenticationError("No access_token in client_credentials response")
-            logger.info("Agent token (actor) refreshed successfully")
+            expires_in = data.get("expires_in", 3600)
+            self._agent_token_expires_at = time.time() + expires_in
+            logger.info(f"Agent token refreshed (expires in {expires_in}s)")
         except httpx.HTTPStatusError as e:
             logger.error(f"Failed to obtain agent token: {e.response.status_code} — {e.response.text}")
             raise AuthenticationError(f"Failed to obtain agent token: {e}")
+        except AuthenticationError:
+            raise
         except Exception as e:
             logger.error(f"Failed to obtain agent token: {e}")
             raise AuthenticationError(f"Failed to obtain agent token: {e}")
 
     async def exchange_token(self, subject_token: str) -> str:
-        """Exchange a user access token for a delegated token (RFC 8693).
+        """Exchange a user token for a delegated token (RFC 8693).
 
-        Sends both subject_token (user) and actor_token (agent) to signal
-        delegation. The resulting token carries an `act` claim identifying
-        the agent as the acting party.
-
-        Args:
-            subject_token: The user's access token (from the web app).
-
-        Returns:
-            A delegated access token issued on behalf of the user.
+        Uses the agent's own token as actor_token, ensuring it's fresh.
         """
-        if not self._agent_token:
-            await self._refresh_agent_token()
+        agent_token = await self.ensure_agent_token()
 
         try:
             response = await self._http_client.post(
@@ -92,7 +95,7 @@ class AuthService:
                     "grant_type": "urn:ietf:params:oauth:grant-type:token-exchange",
                     "subject_token": subject_token,
                     "subject_token_type": "urn:ietf:params:oauth:token-type:access_token",
-                    "actor_token": self._agent_token,
+                    "actor_token": agent_token,
                     "actor_token_type": "urn:ietf:params:oauth:token-type:access_token",
                 },
                 headers={
@@ -113,6 +116,8 @@ class AuthService:
         except httpx.HTTPStatusError as e:
             logger.error(f"Token exchange failed: {e.response.status_code} — {e.response.text}")
             raise AuthenticationError(f"Token exchange failed: {e}")
+        except AuthenticationError:
+            raise
         except Exception as e:
             logger.error(f"Token exchange error: {e}")
             raise AuthenticationError(f"Token exchange error: {e}")
