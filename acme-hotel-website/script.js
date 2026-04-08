@@ -1,9 +1,9 @@
 // Configuration
 let config = {
-    agentCardUrl: window.APP_CONFIG?.agentCardUrl || 'http://localhost:8082/bookings-agent/.well-known/agent-card.json',
-    oidcUrl: window.APP_CONFIG?.oidcUrl || 'http://localhost:8092/gravitee/oidc/.well-known/openid-configuration',
-    clientId: window.APP_CONFIG?.clientId || 'gravitee-hotels',
-    redirectUri: window.APP_CONFIG?.redirectUri || 'http://localhost:8002/',
+    agentCardUrl: window.APP_CONFIG?.agentCardUrl,
+    oidcUrl: window.APP_CONFIG?.oidcUrl,
+    clientId: window.APP_CONFIG?.clientId,
+    redirectUri: window.APP_CONFIG?.redirectUri,
     agentUrl: null,
     oidcConfig: null,
     isConnected: false,
