@@ -384,8 +384,8 @@ body {
     position: fixed;
     bottom: calc(2rem + 50px); /* Above collapsed debug panel */
     right: 2rem;
-    width: 400px;
-    height: 600px;
+    width: 600px;
+    height: 800px;
     background: var(--white);
     border-radius: 16px;
     box-shadow: 0 8px 40px var(--shadow-lg);
@@ -398,7 +398,7 @@ body {
 .chat-window.maximized {
     width: calc(100vw - 4rem);
     height: calc(100vh - 4rem);
-    bottom: 2rem;
+    bottom: 3rem;
     right: 2rem;
 }
 
