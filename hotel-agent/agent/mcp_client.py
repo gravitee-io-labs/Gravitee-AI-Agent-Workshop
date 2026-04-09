@@ -23,6 +23,20 @@ try:
 except ImportError:
     HAS_HTTPX = False
 
+
+def _parse_sse_response(text: str) -> Optional[dict]:
+    """Extract JSON-RPC result from an SSE stream body."""
+    for line in text.splitlines():
+        if line.startswith("data:"):
+            payload = line[len("data:"):].strip()
+            if not payload:
+                continue
+            try:
+                return json.loads(payload)
+            except json.JSONDecodeError:
+                continue
+    return None
+
 MCP_HTTP_URLS_DEFAULT = os.getenv("MCP_HTTP_URLS", os.getenv("MCP_HTTP_URL", ""))
 MCP_RETRY_INTERVAL = int(os.getenv("MCP_RETRY_INTERVAL", "5"))
 
@@ -116,7 +130,7 @@ class MCPClient:
 
     async def list_tools(self, extra_headers: Optional[Dict[str, str]] = None) -> List[Dict[str, Any]]:
         """List tools with auth headers via direct HTTP, or MCP session as fallback."""
-        # Direct HTTP path — used when auth headers are needed
+        # Direct HTTP path — handles both JSON and SSE responses
         if HAS_HTTPX and extra_headers:
             try:
                 async with httpx.AsyncClient() as client:
@@ -130,12 +144,25 @@ class MCPClient:
                         "Accept": "application/json, text/event-stream",
                     }
                     request_headers.update(extra_headers)
-                    response = await client.post(
-                        self.mcp_http_url.rstrip('/'), json=mcp_request,
-                        headers=request_headers, timeout=30.0,
-                    )
-                    if response.status_code == 200:
-                        data = response.json()
+
+                    async with client.stream(
+                        "POST", self.mcp_http_url.rstrip('/'),
+                        json=mcp_request, headers=request_headers, timeout=30.0,
+                    ) as response:
+                        if response.status_code != 200:
+                            raise RuntimeError(f"HTTP {response.status_code}")
+
+                        content_type = response.headers.get("content-type", "")
+                        body = await response.aread()
+                        body_text = body.decode("utf-8")
+
+                        if "text/event-stream" in content_type:
+                            data = _parse_sse_response(body_text)
+                            if not data:
+                                raise RuntimeError("No JSON-RPC result in SSE stream")
+                        else:
+                            data = json.loads(body_text)
+
                         if "error" in data:
                             raise RuntimeError(data["error"].get("message", "Unknown error"))
                         tools = data.get("result", {}).get("tools", [])
@@ -176,7 +203,7 @@ class MCPClient:
         """Call a tool via direct HTTP (with headers) or MCP session (with auto-reconnect)."""
         logger.info(f"Calling tool: {tool_name}")
 
-        # Direct HTTP path — stateless, no session issues, used when headers needed
+        # Direct HTTP path — stateless, handles both JSON and SSE responses
         if HAS_HTTPX and extra_headers:
             try:
                 async with httpx.AsyncClient() as client:
@@ -190,12 +217,26 @@ class MCPClient:
                         "Accept": "application/json, text/event-stream",
                     }
                     request_headers.update(extra_headers)
-                    response = await client.post(
-                        self.mcp_http_url.rstrip('/'), json=mcp_request,
-                        headers=request_headers, timeout=30.0,
-                    )
-                    if response.status_code == 200:
-                        data = response.json()
+
+                    # Stream the response to handle SSE (Streamable HTTP MCP)
+                    async with client.stream(
+                        "POST", self.mcp_http_url.rstrip('/'),
+                        json=mcp_request, headers=request_headers, timeout=60.0,
+                    ) as response:
+                        if response.status_code != 200:
+                            raise RuntimeError(f"HTTP {response.status_code}")
+
+                        content_type = response.headers.get("content-type", "")
+                        body = await response.aread()
+                        body_text = body.decode("utf-8")
+
+                        if "text/event-stream" in content_type:
+                            data = _parse_sse_response(body_text)
+                            if not data:
+                                raise RuntimeError("No JSON-RPC result in SSE stream")
+                        else:
+                            data = json.loads(body_text)
+
                         if "error" in data:
                             raise RuntimeError(data["error"].get("message", "Unknown error"))
                         return data.get("result", {}), dict(response.headers)

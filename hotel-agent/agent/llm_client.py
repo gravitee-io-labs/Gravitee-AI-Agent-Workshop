@@ -76,7 +76,7 @@ class LLMClient:
         }
         if available_tools:
             params["tools"] = available_tools
-            params["tool_choice"] = "auto"
+            params["tool_choice"] = "required"
 
         try:
             response = self.client.chat.completions.create(**params)

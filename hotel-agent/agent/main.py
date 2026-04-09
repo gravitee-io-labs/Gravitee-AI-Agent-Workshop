@@ -160,7 +160,7 @@ class MCPAgent:
         return await self.auth.ensure_agent_token()
 
     async def process(
-        self, message: str, token: str | None = None, history: list[dict] | None = None,
+        self, message: str, token: str | None = None,
     ) -> tuple[str, list[dict[str, Any]]]:
         mcp_headers = {"Authorization": f"Bearer {token}"} if token else None
 
@@ -168,10 +168,10 @@ class MCPAgent:
         tools = await self.mcp.list_all_tools(extra_headers=mcp_headers)
         logger.info(f"Step 1 - MCP Tools Discovery: {len(tools)} tools availables.")
         
-        # Step 2 — LLM decides which tool to call
+        # Step 2 — LLM decides which tool to call (no history — just current message + tools)
         try:
             content, tool_calls = await self.llm.process_query(
-                message, tools, system_prompt=SYSTEM_PROMPT, conversation_history=history,
+                message, tools, system_prompt=SYSTEM_PROMPT,
             )
         except LLMRequestBlockedError:
             return "Your request was blocked because it was deemed invalid or unsafe.", []
@@ -292,10 +292,9 @@ class HotelAgentExecutor(AgentExecutor):
 
             logger.info(f"User prompt: {user_text[:150]}")
             conversations.add(context_id, "user", user_text)
-            history = conversations.get(context_id)
 
             # Race: pipeline vs elicitation request
-            tool_task = asyncio.create_task(self.agent.process(user_text, token, history))
+            tool_task = asyncio.create_task(self.agent.process(user_text, token))
             elicitation_wait = asyncio.create_task(elicitation_mgr.pending_queue.get())
             done, _ = await asyncio.wait({tool_task, elicitation_wait}, return_when=asyncio.FIRST_COMPLETED)
 
