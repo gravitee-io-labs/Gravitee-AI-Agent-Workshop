@@ -179,6 +179,20 @@ body {
     word-break: break-word;
 }
 
+.user-dropdown-session {
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+    padding: 0.4rem 0;
+    font-size: 0.8rem;
+    color: #999;
+    margin-bottom: 0.5rem;
+}
+
+.user-dropdown-session i {
+    font-size: 0.9rem;
+}
+
 .user-dropdown-logout {
     width: 100%;
     padding: 0.5rem 1rem;

@@ -32,6 +32,10 @@
                     </button>
                     <div id="userDropdown" class="user-dropdown hidden">
                         <div class="user-dropdown-email" id="userDropdownEmail">user@example.com</div>
+                        <div class="user-dropdown-session" id="userSessionInfo">
+                            <i class="ph ph-clock"></i>
+                            <span id="userSessionTime"></span>
+                        </div>
                         <button id="logoutBtn" class="btn btn-secondary user-dropdown-logout">Logout</button>
                     </div>
                 </div>
@@ -256,6 +260,24 @@
                 <small>Send a message to see the API calls</small>
             </div>
             <div class="debug-panel-list" id="debugPanelList"></div>
+        </div>
+    </div>
+
+    <!-- Session Expired Modal -->
+    <div id="sessionExpiredModal" class="modal hidden">
+        <div class="modal-overlay" id="sessionExpiredOverlay"></div>
+        <div class="modal-content" style="max-width: 420px;">
+            <div class="modal-header">
+                <h2><i class="ph ph-lock-simple" style="margin-right: 0.5rem;"></i>Session Expired</h2>
+            </div>
+            <div class="modal-body" style="text-align: center; padding: 2rem 1.5rem;">
+                <p style="color: var(--text-secondary); margin-bottom: 0.5rem;">Your session has expired or is no longer valid.</p>
+                <p style="color: var(--text-secondary);">Please sign in again to continue.</p>
+            </div>
+            <div class="modal-footer" style="justify-content: center;">
+                <button class="btn btn-secondary" id="sessionExpiredCloseBtn">Close</button>
+                <button class="btn btn-primary" id="sessionExpiredSignInBtn">Sign In</button>
+            </div>
         </div>
     </div>
 

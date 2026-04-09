@@ -148,9 +148,21 @@ function initializeEventListeners() {
 
     // Auth
     if (elements.signInBtn) elements.signInBtn.addEventListener('click', login);
-    if (elements.userMenuBtn) elements.userMenuBtn.addEventListener('click', toggleUserDropdown);
+    if (elements.userMenuBtn) elements.userMenuBtn.addEventListener('click', () => {
+        toggleUserDropdown();
+        updateSessionTimeDisplay();
+    });
     if (elements.logoutBtn) elements.logoutBtn.addEventListener('click', logout);
-    
+
+    // Session expired modal
+    const sessionExpiredCloseBtn = document.getElementById('sessionExpiredCloseBtn');
+    const sessionExpiredSignInBtn = document.getElementById('sessionExpiredSignInBtn');
+    if (sessionExpiredCloseBtn) sessionExpiredCloseBtn.addEventListener('click', closeSessionExpiredModal);
+    if (sessionExpiredSignInBtn) sessionExpiredSignInBtn.addEventListener('click', () => {
+        closeSessionExpiredModal();
+        login();
+    });
+
     // Close dropdown when clicking outside
     document.addEventListener('click', (e) => {
         if (!elements.userMenu?.contains(e.target)) {
@@ -853,6 +865,7 @@ async function handleOAuthCallback() {
 
         updateUserDisplay();
         scheduleAutoLogout();
+        startTokenValidityCheck();
         console.log('Successfully logged in:', config.userInfo);
         
         // Clean up
@@ -877,11 +890,8 @@ async function checkStoredAuth() {
         // Check if access_token is expired
         const tokenPayload = parseJwt(token);
         if (tokenPayload.exp && tokenPayload.exp * 1000 <= Date.now()) {
-            console.log('Stored access_token is expired, clearing auth');
-            localStorage.removeItem('access_token');
-            localStorage.removeItem('id_token');
-            localStorage.removeItem('user_info');
-            updateUserDisplay();
+            console.log('Stored access_token is expired');
+            showSessionExpired();
             return;
         }
 
@@ -889,6 +899,7 @@ async function checkStoredAuth() {
         config.userInfo = JSON.parse(userInfo);
         updateUserDisplay();
         scheduleAutoLogout();
+        startTokenValidityCheck();
         console.log('Restored auth from storage');
 
         // Load OIDC config in background for logout functionality
@@ -909,11 +920,12 @@ async function checkStoredAuth() {
 }
 
 function logout() {
-    // Clear auto-logout timer
+    // Clear timers
     if (autoLogoutTimer) {
         clearTimeout(autoLogoutTimer);
         autoLogoutTimer = null;
     }
+    stopTokenValidityCheck();
 
     // Get the end_session_endpoint from OIDC config
     const endSessionEndpoint = config.oidcConfig?.end_session_endpoint;
@@ -1003,6 +1015,7 @@ function parseJwt(token) {
 
 // Auto-logout when access_token expires
 let autoLogoutTimer = null;
+let tokenCheckInterval = null;
 
 function scheduleAutoLogout() {
     if (autoLogoutTimer) {
@@ -1017,16 +1030,116 @@ function scheduleAutoLogout() {
 
     const expiresInMs = tokenPayload.exp * 1000 - Date.now();
     if (expiresInMs <= 0) {
-        console.log('Access token already expired, logging out');
-        logout();
+        console.log('Access token already expired');
+        showSessionExpired();
         return;
     }
 
     console.log(`Access token expires in ${Math.round(expiresInMs / 1000)}s, auto-logout scheduled`);
     autoLogoutTimer = setTimeout(() => {
-        console.log('Access token expired, auto-logout triggered');
-        logout();
+        console.log('Access token expired');
+        showSessionExpired();
     }, expiresInMs);
+}
+
+async function validateToken() {
+    if (!config.accessToken) {
+        stopTokenValidityCheck();
+        return;
+    }
+
+    // Check JWT expiry locally
+    try {
+        const payload = parseJwt(config.accessToken);
+        if (payload.exp && payload.exp * 1000 <= Date.now()) {
+            console.log('Token validity check: token expired');
+            showSessionExpired();
+            return;
+        }
+    } catch (e) {
+        console.log('Token validity check: invalid token');
+        showSessionExpired();
+        return;
+    }
+
+    // Validate token against OIDC userinfo endpoint
+    if (config.oidcConfig?.userinfo_endpoint) {
+        try {
+            const r = await fetch(config.oidcConfig.userinfo_endpoint, {
+                headers: { 'Authorization': `Bearer ${config.accessToken}` }
+            });
+            if (r.status === 401 || r.status === 403) {
+                console.log('Token validity check: token rejected by provider');
+                showSessionExpired();
+            }
+        } catch (e) {
+            // Network error — don't log out, could be transient
+            console.warn('Token validity check: network error', e.message);
+        }
+    }
+}
+
+function startTokenValidityCheck() {
+    stopTokenValidityCheck();
+    validateToken();
+    tokenCheckInterval = setInterval(validateToken, 15000);
+}
+
+function stopTokenValidityCheck() {
+    if (tokenCheckInterval) {
+        clearInterval(tokenCheckInterval);
+        tokenCheckInterval = null;
+    }
+}
+
+function showSessionExpired() {
+    stopTokenValidityCheck();
+    if (autoLogoutTimer) {
+        clearTimeout(autoLogoutTimer);
+        autoLogoutTimer = null;
+    }
+
+    // Clear auth state
+    config.accessToken = null;
+    config.userInfo = null;
+    localStorage.removeItem('access_token');
+    localStorage.removeItem('id_token');
+    localStorage.removeItem('user_info');
+    updateUserDisplay();
+
+    // Show modal
+    document.getElementById('sessionExpiredModal')?.classList.remove('hidden');
+}
+
+function closeSessionExpiredModal() {
+    document.getElementById('sessionExpiredModal')?.classList.add('hidden');
+}
+
+function updateSessionTimeDisplay() {
+    const el = document.getElementById('userSessionTime');
+    if (!el || !config.accessToken) return;
+
+    try {
+        const payload = parseJwt(config.accessToken);
+        if (!payload.iat) { el.textContent = ''; return; }
+
+        const issuedAt = new Date(payload.iat * 1000);
+        const now = new Date();
+        const diffMs = now - issuedAt;
+        const diffMin = Math.floor(diffMs / 60000);
+        const diffHrs = Math.floor(diffMin / 60);
+        const remMin = diffMin % 60;
+
+        let duration;
+        if (diffMin < 1) duration = 'just now';
+        else if (diffHrs === 0) duration = `${diffMin}m`;
+        else duration = `${diffHrs}h ${remMin}m`;
+
+        const timeStr = issuedAt.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' });
+        el.textContent = `Session started ${timeStr} (${duration} ago)`;
+    } catch (e) {
+        el.textContent = '';
+    }
 }
 
 // PKCE Helper Functions
