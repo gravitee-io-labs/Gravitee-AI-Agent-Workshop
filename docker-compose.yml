@@ -119,7 +119,6 @@ services:
     volumes:
       - ./apim-gateway-models:/opt/graviteeio-gateway/models
       - ./apim-additional-plugins:/opt/graviteeio-gateway/additional-plugins
-      - ./apim-gateway-config/gravitee.yml:/opt/graviteeio-gateway/config/gravitee.yml
     environment:
       ### LICENSE
       - gravitee_license_key=${GRAVITEE_LICENSE}
@@ -152,6 +151,19 @@ services:
       - gravitee_reporters_tcp_host=agent-live-graph
       - gravitee_reporters_tcp_port=9001
       - gravitee_reporters_tcp_output=json
+      ### GROOVY WHITELIST (classes needed for Groovy policy scripts)
+      - gravitee_groovy_whitelist_mode=append
+      - gravitee_groovy_whitelist_list_0=class java.net.URL
+      - gravitee_groovy_whitelist_list_1=class java.net.URLConnection
+      - gravitee_groovy_whitelist_list_2=class java.net.HttpURLConnection
+      - gravitee_groovy_whitelist_list_3=class sun.net.www.protocol.http.HttpURLConnection
+      - gravitee_groovy_whitelist_list_4=class java.io.OutputStream
+      - gravitee_groovy_whitelist_list_5=class java.io.OutputStreamWriter
+      - gravitee_groovy_whitelist_list_6=class java.io.BufferedWriter
+      - gravitee_groovy_whitelist_list_7=class java.io.InputStream
+      - gravitee_groovy_whitelist_list_8=class java.io.InputStreamReader
+      - gravitee_groovy_whitelist_list_9=class java.io.BufferedReader
+      - gravitee_groovy_whitelist_list_10=class sun.net.www.http.PosterOutputStream
     networks:
       - southbound
       - northbound
