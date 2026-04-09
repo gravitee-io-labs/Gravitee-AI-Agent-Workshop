@@ -1,20 +1,20 @@
 [build-system]
-requires = ["hatchling>=1.25.0"]
+requires = ["hatchling>=1.29.0"]
 build-backend = "hatchling.build"
 
 [project]
 name = "hotel-agent"
 version = "1.0.0"
 description = "ACME Hotel Booking Agent — manages hotel search and reservations via MCP tools"
-requires-python = ">=3.12"
+requires-python = ">=3.14"
 dependencies = [
   "a2a-sdk[sql]>=1.0.0a0",
-  "packaging",
-  "mcp",
-  "openai",
-  "python-dotenv",
-  "httpx",
-  "uvicorn",
+  "packaging>=26.0",
+  "mcp>=1.27.0",
+  "openai>=2.31.0",
+  "python-dotenv>=1.2.2",
+  "httpx>=0.28.1",
+  "uvicorn>=0.44.0",
 ]
 
 [project.scripts]
