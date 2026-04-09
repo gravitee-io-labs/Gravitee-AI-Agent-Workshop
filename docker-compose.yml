@@ -164,6 +164,7 @@ services:
       - gravitee_groovy_whitelist_list_8=class java.io.InputStreamReader
       - gravitee_groovy_whitelist_list_9=class java.io.BufferedReader
       - gravitee_groovy_whitelist_list_10=class sun.net.www.http.PosterOutputStream
+      - gravitee_groovy_whitelist_list_11=class java.lang.StringBuilder
     networks:
       - southbound
       - northbound
