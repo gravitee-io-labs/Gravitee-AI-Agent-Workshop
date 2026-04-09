@@ -10,17 +10,17 @@ resourceIdentifiers:
   - "http://localhost:8082/hotels/mcp"
 
 # OAuth2 Client Credentials for the MCP Server
-clientId: "hotel-bookings-mcp"
-clientSecret: "hotel-bookings-mcp"
+clientId: "hotel-mcp"
+clientSecret: "hotel-mcp"
 
 # MCP Tools (features) exposed by this server
 tools:
-  - key: "getAccommodations"
-    description: "Get available accommodations from the hotel booking system"
+  - key: "searchHotels"
+    description: "Search and filter hotels across all cities."
     type: "MCP_TOOL"
     scopes: []
 
-  - key: "getBookings"
-    description: "Get bookings for a user from the hotel booking system"
+  - key: "listBookings"
+    description: "Returns a list of bookings."
     type: "MCP_TOOL"
     scopes: []

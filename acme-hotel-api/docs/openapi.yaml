@@ -95,9 +95,9 @@ paths:
             maximum: 5
             minimum: 0
           - type: 'null'
-          description: Minimum guest rating (0–5)
+          description: "Minimum guest rating (0\u20135)"
           title: Min Rating
-        description: Minimum guest rating (0–5)
+        description: "Minimum guest rating (0\u20135)"
       - name: stars
         in: query
         required: false
@@ -107,9 +107,9 @@ paths:
             maximum: 5
             minimum: 1
           - type: 'null'
-          description: Exact star rating (1–5)
+          description: "Exact star rating (1\u20135)"
           title: Stars
-        description: Exact star rating (1–5)
+        description: "Exact star rating (1\u20135)"
       - name: amenity
         in: query
         required: false
@@ -204,31 +204,18 @@ paths:
       tags:
       - Bookings
       summary: List bookings
-      description: List all bookings, optionally filtered by guest email. In production
-        the Gravitee gateway injects the authenticated user identity.
+      description: Returns bookings for the authenticated user, identified by the
+        X-User-Email header.
       operationId: listBookings
-      parameters:
-      - name: guest_email
-        in: query
-        required: false
-        schema:
-          anyOf:
-          - type: string
-          - type: 'null'
-          description: Filter by guest email address
-          examples:
-          - john.doe@gravitee.io
-          title: Guest Email
-        description: Filter by guest email address
       responses:
         '200':
           description: Successful Response
           content:
             application/json:
               schema:
-                type: array
                 items:
                   $ref: '#/components/schemas/Booking'
+                type: array
                 title: Response Listbookings
         '422':
           description: Validation Error
@@ -245,11 +232,11 @@ paths:
         existence, room type, dates, and guest capacity.
       operationId: createBooking
       requestBody:
-        required: true
         content:
           application/json:
             schema:
               $ref: '#/components/schemas/BookingCreate'
+        required: true
       responses:
         '201':
           description: Successful Response
@@ -385,7 +372,7 @@ components:
           title: Guest Email
           description: Guest email address
           examples:
-          - john.doe@gravitee.io
+          - john.doe@example.com
         room_type:
           type: string
           title: Room Type
@@ -470,7 +457,7 @@ components:
           title: Guest Email
           description: Guest email address
           examples:
-          - john.doe@gravitee.io
+          - john.doe@example.com
         room_type:
           type: string
           title: Room Type
@@ -613,7 +600,7 @@ components:
           maximum: 5.0
           minimum: 1.0
           title: Stars
-          description: Star rating (1–5)
+          description: "Star rating (1\u20135)"
           examples:
           - 5
         description:
@@ -832,7 +819,7 @@ components:
           title: Description
           description: Room description
           examples:
-          - Spacious 45m² room with panoramic views.
+          - "Spacious 45m\xB2 room with panoramic views."
         price_per_night:
           type: number
           title: Price Per Night
@@ -886,3 +873,4 @@ components:
       - msg
       - type
       title: ValidationError
+

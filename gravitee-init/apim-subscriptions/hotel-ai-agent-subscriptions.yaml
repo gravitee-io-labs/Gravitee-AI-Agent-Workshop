@@ -4,4 +4,7 @@
 subscriptions:
   - application: "Hotels AI Agent"
     api: "ACME Hotels API"
-    plan: "Bookings Management"
+    plan: "AI Agent"
+  # - application: "Hotels AI Agent"
+  #   api: "ACME Hotels MCP Proxy"
+  #   plan: "Secured"

@@ -1,10 +1,4 @@
-"""
-ACME Hotel API — a rich demo hotel booking API.
-
-Hotels are loaded from YAML at startup. Bookings are seeded from YAML
-and then managed in memory (no external database needed).
-Security is handled by the Gravitee API Gateway — this API is intentionally open.
-"""
+"""ACME Hotel API — hotel search and booking management."""
 
 from __future__ import annotations
 
@@ -16,7 +10,7 @@ from pathlib import Path
 from typing import Optional
 
 import yaml
-from fastapi import FastAPI, HTTPException, Query
+from fastapi import FastAPI, Header, HTTPException, Query
 from pydantic import BaseModel, Field, EmailStr
 
 logger = logging.getLogger("uvicorn.error")
@@ -99,7 +93,7 @@ class Booking(BaseModel):
     hotel_id: str = Field(..., description="Hotel identifier", examples=["grand-london"])
     hotel_name: str = Field(..., description="Hotel name (denormalised for convenience)", examples=["The Grand London"])
     guest_name: str = Field(..., description="Guest full name", examples=["John Doe"])
-    guest_email: EmailStr = Field(..., description="Guest email address", examples=["john.doe@gravitee.io"])
+    guest_email: EmailStr = Field(..., description="Guest email address", examples=["john.doe@example.com"])
     room_type: str = Field(..., description="Room type booked", examples=["deluxe"])
     check_in: date = Field(..., description="Check-in date", examples=["2025-06-15"])
     check_out: date = Field(..., description="Check-out date", examples=["2025-06-22"])
@@ -114,7 +108,7 @@ class BookingCreate(BaseModel):
     """Request body to create a new booking."""
     hotel_id: str = Field(..., description="Hotel identifier", examples=["grand-london"])
     guest_name: str = Field(..., description="Guest full name", examples=["John Doe"])
-    guest_email: EmailStr = Field(..., description="Guest email address", examples=["john.doe@gravitee.io"])
+    guest_email: EmailStr = Field(..., description="Guest email address", examples=["john.doe@example.com"])
     room_type: str = Field(..., description="Room type to book", examples=["deluxe"])
     check_in: date = Field(..., description="Check-in date (YYYY-MM-DD)", examples=["2025-06-15"])
     check_out: date = Field(..., description="Check-out date (YYYY-MM-DD)", examples=["2025-06-22"])
@@ -331,18 +325,14 @@ async def get_hotel_reviews(hotel_id: str):
     tags=["Bookings"],
     summary="List bookings",
     operation_id="listBookings",
-    description=(
-        "List all bookings, optionally filtered by guest email. "
-        "In production the Gravitee gateway injects the authenticated user identity."
-    ),
+    description="Returns bookings for the authenticated user, identified by the X-User-Email header.",
 )
 async def list_bookings(
-    guest_email: Optional[str] = Query(None, description="Filter by guest email address", examples=["john.doe@gravitee.io"]),
+    x_user_email: Optional[str] = Header(None, alias="X-User-Email", include_in_schema=False),
 ):
-    bookings = list(_bookings.values())
-    if guest_email:
-        bookings = [b for b in bookings if b.guest_email.lower() == guest_email.lower()]
-    return bookings
+    if not x_user_email:
+        return []
+    return [b for b in _bookings.values() if b.guest_email.lower() == x_user_email.lower()]
 
 
 @app.get(

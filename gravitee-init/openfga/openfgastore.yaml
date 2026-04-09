@@ -24,18 +24,31 @@ model: |+
       define room: [room]
 
 tuples:
-  - user: hotel:grand-plaza
-    relation: hotel
-    object: booking:booking-001
-  - user: hotel:grand-plaza
-    relation: hotel
-    object: room:grand-plaza-101
+  # --- Hotel guest relationships ---
   - user: user:john.doe@gravitee.io
     relation: guest
-    object: hotel:grand-plaza
-  - user: room:grand-plaza-101
-    relation: room
-    object: booking:booking-001
+    object: hotel:grand-london
+  - user: user:john.doe@gravitee.io
+    relation: guest
+    object: hotel:chateau-paris
+  # Note: john.doe is NOT a guest at imperial-tokyo → BK-0005 won't pass can_view
+
+  # --- Booking ↔ Hotel relationships ---
+  - user: hotel:grand-london
+    relation: hotel
+    object: booking:BK-0001
+  - user: hotel:chateau-paris
+    relation: hotel
+    object: booking:BK-0002
+  - user: hotel:imperial-tokyo
+    relation: hotel
+    object: booking:BK-0005
+
+  # --- Booking ownership ---
   - user: user:john.doe@gravitee.io
     relation: owner
-    object: booking:booking-001
+    object: booking:BK-0001
+  - user: user:john.doe@gravitee.io
+    relation: owner
+    object: booking:BK-0002
+  # BK-0005 has no owner tuple for john.doe → FGA will deny can_view

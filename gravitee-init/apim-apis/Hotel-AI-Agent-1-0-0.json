@@ -1,0 +1,222 @@
+{
+  "api": {
+    "definitionVersion": "V4",
+    "type": "A2A_PROXY",
+    "listeners": [
+      {
+        "type": "HTTP",
+        "paths": [
+          {
+            "path": "/hotel-agent/",
+            "overrideAccess": false
+          }
+        ],
+        "pathMappings": [],
+        "cors": {
+          "allowCredentials": false,
+          "allowHeaders": [
+            "*"
+          ],
+          "allowMethods": [
+            "GET",
+            "POST",
+            "OPTIONS"
+          ],
+          "allowOrigin": [
+            "http://localhost:8002"
+          ],
+          "enabled": true,
+          "exposeHeaders": [],
+          "maxAge": -1,
+          "runPolicies": false
+        },
+        "entrypoints": [
+          {
+            "type": "a2a-proxy",
+            "qos": "NONE",
+            "configuration": {}
+          }
+        ],
+        "servers": []
+      }
+    ],
+    "endpointGroups": [
+      {
+        "name": "Hotel Agent Proxy group",
+        "type": "a2a-proxy",
+        "loadBalancer": {
+          "type": "ROUND_ROBIN"
+        },
+        "sharedConfiguration": "{\"proxy\":{\"useSystemProxy\":false,\"enabled\":false},\"http\":{\"keepAliveTimeout\":30000,\"keepAlive\":true,\"propagateClientHost\":false,\"followRedirects\":false,\"readTimeout\":10000,\"idleTimeout\":0,\"connectTimeout\":3000,\"useCompression\":true,\"maxConcurrentConnections\":20,\"version\":\"HTTP_1_1\",\"pipelining\":false},\"ssl\":{\"keyStore\":{\"type\":\"\"},\"hostnameVerifier\":true,\"trustStore\":{\"type\":\"\"},\"trustAll\":false}}",
+        "endpoints": [
+          {
+            "name": "Hotel Agent Proxy",
+            "type": "a2a-proxy",
+            "weight": 1,
+            "inheritConfiguration": true,
+            "configuration": {
+              "target": "http://hotel-agent:8001"
+            },
+            "sharedConfigurationOverride": "{}",
+            "services": {},
+            "secondary": false,
+            "tenants": []
+          }
+        ],
+        "services": {}
+      }
+    ],
+    "analytics": {
+      "enabled": true,
+      "logging": {
+        "content": {
+          "headers": true,
+          "messageHeaders": false,
+          "payload": true,
+          "messagePayload": false,
+          "messageMetadata": false
+        },
+        "phase": {
+          "request": true,
+          "response": true
+        },
+        "mode": {
+          "endpoint": true,
+          "entrypoint": true
+        }
+      },
+      "tracing": {
+        "enabled": false,
+        "verbose": false
+      }
+    },
+    "flowExecution": {
+      "mode": "DEFAULT",
+      "matchRequired": false
+    },
+    "flows": [],
+    "allowMultiJwtOauth2Subscriptions": false,
+    "name": "Hotel AI Agent",
+    "description": "Hotel AI Agent",
+    "apiVersion": "1.0.0",
+    "state": "STARTED",
+    "visibility": "PRIVATE",
+    "labels": [
+      "Hotel",
+      "AI Agent"
+    ],
+    "lifecycleState": "PUBLISHED",
+    "tags": [],
+    "categories": [],
+    "responseTemplates": {},
+    "resources": [],
+    "properties": []
+  },
+  "plans": [
+    {
+      "definitionVersion": "V4",
+      "flows": [
+        {
+          "name": "Agent Card",
+          "enabled": true,
+          "selectors": [
+            {
+              "type": "HTTP",
+              "path": "/.well-known/agent-card.json",
+              "pathOperator": "EQUALS",
+              "methods": [
+                "GET"
+              ]
+            }
+          ],
+          "request": [
+            {
+              "name": "Rate Limit",
+              "description": "Protect from Resource Exhaustion",
+              "enabled": true,
+              "policy": "rate-limit",
+              "configuration": {
+                "async": false,
+                "addHeaders": false,
+                "rate": {
+                  "useKeyOnly": false,
+                  "periodTime": 1,
+                  "limit": 10,
+                  "periodTimeUnit": "SECONDS",
+                  "key": ""
+                },
+                "errorStrategy": "FALLBACK_PASS_TROUGH"
+              }
+            }
+          ],
+          "response": [],
+          "subscribe": [],
+          "publish": [],
+          "entrypointConnect": [],
+          "interact": [],
+          "tags": []
+        },
+        {
+          "name": "Message sent to Agent",
+          "enabled": true,
+          "selectors": [
+            {
+              "type": "HTTP",
+              "path": "/",
+              "pathOperator": "EQUALS",
+              "methods": [
+                "POST"
+              ]
+            },
+            {
+              "type": "CONDITION",
+              "condition": "{#jsonPath(#request.content, '$.method') == 'message/send'}"
+            }
+          ],
+          "request": [
+            {
+              "name": "Rate Limit",
+              "description": "Protect from Resource Exhaustion",
+              "enabled": true,
+              "policy": "rate-limit",
+              "configuration": {
+                "async": false,
+                "addHeaders": false,
+                "rate": {
+                  "useKeyOnly": false,
+                  "periodTime": 1,
+                  "limit": 5,
+                  "periodTimeUnit": "SECONDS",
+                  "key": ""
+                },
+                "errorStrategy": "FALLBACK_PASS_TROUGH"
+              }
+            }
+          ],
+          "response": [],
+          "subscribe": [],
+          "publish": [],
+          "entrypointConnect": [],
+          "interact": [],
+          "tags": []
+        }
+      ],
+      "name": "Public Open Plan",
+      "description": "Public Open Plan, this is a public Agent",
+      "security": {
+        "type": "KEY_LESS",
+        "configuration": {}
+      },
+      "mode": "STANDARD",
+      "characteristics": [],
+      "commentRequired": false,
+      "excludedGroups": [],
+      "order": 1,
+      "status": "PUBLISHED",
+      "tags": [],
+      "type": "API",
+      "validation": "MANUAL"
+    }
+  ],
+  "apiPicture": "data:image/png;base64,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"
+}

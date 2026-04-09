@@ -118,9 +118,14 @@ services:
       retries: 10
     volumes:
       - ./apim-gateway-models:/opt/graviteeio-gateway/models
+      - ./apim-additional-plugins:/opt/graviteeio-gateway/additional-plugins
+      - ./apim-gateway-config/gravitee.yml:/opt/graviteeio-gateway/config/gravitee.yml
     environment:
       ### LICENSE
       - gravitee_license_key=${GRAVITEE_LICENSE}
+      ### Plugins Configuration
+      - gravitee_plugins_path_0=$${gravitee.home}/plugins
+      - gravitee_plugins_path_1=$${gravitee.home}/additional-plugins
       ### Internal API (Core Service)
       - gravitee_services_core_http_host=0.0.0.0
       - gravitee_services_metrics_enabled=true
@@ -173,9 +178,14 @@ services:
       interval: 2s
       timeout: 2s
       retries: 10
+    volumes:
+      - ./apim-additional-plugins:/opt/graviteeio-management-api/additional-plugins
     environment:
       ### LICENSE
       - gravitee_license_key=${GRAVITEE_LICENSE}
+      ### Plugins Configuration
+      - gravitee_plugins_path_0=$${gravitee.home}/plugins
+      - gravitee_plugins_path_1=$${gravitee.home}/additional-plugins
       ### Internal API (Core Service)
       - gravitee_services_core_http_host=0.0.0.0
       - gravitee_services_metrics_enabled=true
