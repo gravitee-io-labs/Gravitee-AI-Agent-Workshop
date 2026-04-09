@@ -15,6 +15,7 @@ from google.protobuf import struct_pb2
 
 from agent.mcp_client import MCPMultiClient, ToolError
 from agent.llm_client import LLMClient, LLMRateLimitError, LLMRequestBlockedError
+import math
 from agent.auth_service import AuthService, AuthenticationError
 from agent.logger import get_agent_logger
 
@@ -46,7 +47,7 @@ SYSTEM_PROMPT = os.getenv(
     "SYSTEM_PROMPT",
     "You are a Hotel booking assistant. "
     "Help guests search for hotels, check availability, make reservations, and manage their bookings. "
-    "Use the available tools when they match the user's intent. "
+    "Always use the available tools to retrieve data, never invent or fabricate information. "
     "Be friendly, concise, and whenever possible, personalize your responses using the guest's first name.",
 )
 
@@ -126,6 +127,18 @@ elicitation_mgr = ElicitationManager()
 
 # --- MCP Agent (4-steps pipeline) ---
 
+def _rate_limit_message(e: LLMRateLimitError) -> str:
+    """Build a user-friendly rate limit message from LLM headers."""
+    if e.reset:
+        try:
+            reset_epoch_s = int(e.reset) / 1000
+            wait = max(1, math.ceil(reset_epoch_s - time.time()))
+            return f"You're sending too many requests and have been rate limited. Please try again in {wait} seconds."
+        except (ValueError, TypeError):
+            pass
+    return "You're sending too many requests and have been rate limited. Please try again in a few seconds."
+
+
 class MCPAgent:
 
     def __init__(self):
@@ -173,6 +186,9 @@ class MCPAgent:
             content, tool_calls = await self.llm.process_query(
                 message, tools, system_prompt=SYSTEM_PROMPT,
             )
+        except LLMRateLimitError as e:
+            logger.warning(f"Step 2 - Rate limited (reset={e.reset})")
+            return _rate_limit_message(e), []
         except LLMRequestBlockedError:
             return "Your request was blocked because it was deemed invalid or unsafe.", []
 
@@ -205,6 +221,9 @@ class MCPAgent:
             )
             logger.info(f"Step 4 - LLM formatting: successfully formatted the tool result for user response.")
             return response, tool_messages
+        except LLMRateLimitError as e:
+            logger.warning(f"Step 4 - Rate limited (reset={e.reset})")
+            return _rate_limit_message(e), tool_messages
         except LLMRequestBlockedError:
             logger.warning("Step 4 - LLM call failed because the response was blocked by safety filters.")
             return "Your request was blocked because it was deemed invalid or unsafe.", tool_messages
