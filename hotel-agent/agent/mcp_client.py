@@ -40,6 +40,14 @@ def _parse_sse_response(text: str) -> Optional[dict]:
 MCP_HTTP_URLS_DEFAULT = os.getenv("MCP_HTTP_URLS", os.getenv("MCP_HTTP_URL", ""))
 MCP_RETRY_INTERVAL = int(os.getenv("MCP_RETRY_INTERVAL", "5"))
 
+
+class ToolError(Exception):
+    """Raised when an MCP tool call fails (HTTP error or isError result)."""
+
+    def __init__(self, message: str, status_code: int | None = None):
+        super().__init__(message)
+        self.status_code = status_code
+
 ElicitationCallbackT = Callable[[Dict[str, Any]], Awaitable[Dict[str, Any]]]
 
 
@@ -149,6 +157,8 @@ class MCPClient:
                         "POST", self.mcp_http_url.rstrip('/'),
                         json=mcp_request, headers=request_headers, timeout=30.0,
                     ) as response:
+                        if response.status_code in (401, 403):
+                            raise ToolError(f"HTTP {response.status_code}", response.status_code)
                         if response.status_code != 200:
                             raise RuntimeError(f"HTTP {response.status_code}")
 
@@ -223,6 +233,8 @@ class MCPClient:
                         "POST", self.mcp_http_url.rstrip('/'),
                         json=mcp_request, headers=request_headers, timeout=60.0,
                     ) as response:
+                        if response.status_code in (401, 403):
+                            raise ToolError(f"HTTP {response.status_code}", response.status_code)
                         if response.status_code != 200:
                             raise RuntimeError(f"HTTP {response.status_code}")
 
@@ -240,6 +252,8 @@ class MCPClient:
                         if "error" in data:
                             raise RuntimeError(data["error"].get("message", "Unknown error"))
                         return data.get("result", {}), dict(response.headers)
+            except ToolError:
+                raise
             except Exception as e:
                 logger.warning(f"Direct HTTP failed, falling back to session: {e}")
 
@@ -257,6 +271,8 @@ class MCPClient:
                     "isError": result.isError if hasattr(result, 'isError') else False,
                 }
                 return result_dict, {}
+            except ToolError:
+                raise
             except BaseException as e:
                 if attempt == 0:
                     logger.warning(f"call_tool session failed ({type(e).__name__}: {e}), reconnecting…")
@@ -322,14 +338,12 @@ class MCPMultiClient:
         last_error = None
         for url, client in self.clients.items():
             try:
-                result, headers = await client.call_tool(tool_name, arguments, extra_headers)
-                if isinstance(result, dict) and result.get("isError"):
-                    content = result.get("content", [])
-                    texts = " ".join(c.get("text", "") for c in content if isinstance(c, dict))
-                    if "unknown tool" in texts.lower():
-                        last_error = RuntimeError(texts)
-                        continue
-                return result, headers
+                return await client.call_tool(tool_name, arguments, extra_headers)
+            except ToolError as e:
+                if "unknown tool" in str(e).lower():
+                    last_error = e
+                    continue
+                raise
             except Exception as e:
                 last_error = e
                 continue

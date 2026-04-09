@@ -13,7 +13,7 @@ from collections import OrderedDict
 from dotenv import load_dotenv
 from google.protobuf import struct_pb2
 
-from agent.mcp_client import MCPMultiClient
+from agent.mcp_client import MCPMultiClient, ToolError
 from agent.llm_client import LLMClient, LLMRateLimitError, LLMRequestBlockedError
 from agent.auth_service import AuthService, AuthenticationError
 from agent.logger import get_agent_logger
@@ -187,12 +187,14 @@ class MCPAgent:
         tool_name, tool_args = tc["function"]["name"], tc["function"]["arguments"]
         logger.info(f"Step 3 - Tool Execution: {tool_name}({json.dumps(tool_args)[:200]})")
 
-        result, _ = await self.mcp.call_tool(tool_name, tool_args, extra_headers=mcp_headers)
-        if self._is_error(result):
-            logger.error(f"Step 3 - Tool Execution: {tool_name} failed with error: {self._extract_text(result)}")
-            return f"The operation failed: {self._extract_text(result)}", []
-        else:
-            logger.info(f"Step 3 - Tool Execution: {tool_name} succeeded.")
+        try:
+            result, _ = await self.mcp.call_tool(tool_name, tool_args, extra_headers=mcp_headers)
+        except ToolError as e:
+            logger.error(f"Step 3 - Tool Execution: {tool_name} failed ({e.status_code}): {e}")
+            if e.status_code in (401, 403):
+                return "You need to sign in to perform this action. Please log in and try again.", []
+            return f"Sorry, something went wrong: {e}", []
+        logger.info(f"Step 3 - Tool Execution: {tool_name} succeeded.")
 
         tool_messages = self._build_tool_messages(tc, tool_name, tool_args, result)
 
@@ -208,27 +210,11 @@ class MCPAgent:
             return "Your request was blocked because it was deemed invalid or unsafe.", tool_messages
         except Exception as e:
             logger.error(f"Step 4 — LLM call failed ({type(e).__name__}: {e}), returning raw result")
-            return self._extract_text(result), tool_messages
+            return json.dumps(result) if isinstance(result, (dict, list)) else str(result), tool_messages
 
     async def cleanup(self):
         await self.mcp.cleanup()
         await self.auth.cleanup()
-
-    @staticmethod
-    def _is_error(result: Any) -> bool:
-        return result.get("isError", False) if isinstance(result, dict) else getattr(result, "isError", False)
-
-    @staticmethod
-    def _extract_text(result: Any) -> str:
-        if isinstance(result, str):
-            return result
-        if isinstance(result, dict):
-            contents = result.get("content", [])
-            if isinstance(contents, list):
-                texts = [c.get("text", "") for c in contents if isinstance(c, dict) and c.get("type") == "text"]
-                if texts:
-                    return "\n".join(texts)
-        return str(result)
 
     @staticmethod
     def _build_tool_messages(tc: dict, name: str, args: dict, result: Any) -> list[dict]:
