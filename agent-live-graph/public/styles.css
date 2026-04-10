@@ -45,7 +45,6 @@
   --mono: 'JetBrains Mono', 'SF Mono', 'Fira Code', monospace;
   --radius: 10px;
   --radius-sm: 6px;
-  --speed: 1;
 }
 
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
@@ -89,42 +88,9 @@ header {
   background: var(--border-mid);
 }
 
-.header-right { display: flex; align-items: center; gap: 14px; }
+.header-right { display: flex; align-items: center; gap: 10px; }
 
-/* ── Mode Toggle ───────────────────────────────────────────── */
-.mode-toggle {
-  display: flex;
-  background: var(--bg);
-  border: 1px solid var(--border-mid);
-  border-radius: 20px;
-  padding: 2px;
-  gap: 2px;
-}
-
-.mode-btn {
-  display: flex;
-  align-items: center;
-  gap: 5px;
-  padding: 5px 14px;
-  border-radius: 18px;
-  border: none;
-  background: transparent;
-  color: var(--text-3);
-  font-family: var(--sans);
-  font-size: 12px;
-  font-weight: 600;
-  cursor: pointer;
-  transition: all 0.2s;
-}
-
-.mode-btn:hover { color: var(--text-2); }
-
-.mode-btn.active {
-  background: var(--bg-surface);
-  color: var(--text);
-  box-shadow: 0 1px 3px rgba(0,0,0,0.08);
-}
-
+/* ── Connection Indicator ─────────────────────────────────── */
 .mode-dot {
   width: 7px;
   height: 7px;
@@ -155,14 +121,6 @@ header {
   font-weight: 700;
   color: var(--gateway);
 }
-
-.step-counter {
-  font-family: var(--mono);
-  font-size: 12px;
-  color: var(--text-3);
-}
-
-.step-counter span { color: var(--text-2); font-weight: 600; }
 
 /* ── Main ──────────────────────────────────────────────────── */
 main {
@@ -238,7 +196,6 @@ main {
   z-index: 5;
   padding: 0 0 80px;
   min-height: 100%;
-  /* Dashed lane lines as background — extends with content automatically */
   background-image:
     repeating-linear-gradient(180deg, rgba(107,114,128,0.10) 0, rgba(107,114,128,0.10) 4px, transparent 4px, transparent 12px),
     repeating-linear-gradient(180deg, rgba(124,58,237,0.13) 0, rgba(124,58,237,0.13) 4px, transparent 4px, transparent 12px),
@@ -334,13 +291,13 @@ main {
 .step-row.visible .arrow-particle { opacity: 1; }
 
 .step-arrow.dir-right .arrow-particle {
-  animation: particleR calc(0.5s / var(--speed)) ease-in-out forwards;
+  animation: particleR 0.5s ease-in-out forwards;
   background: var(--arrow-to);
   box-shadow: 0 0 8px var(--arrow-to);
 }
 
 .step-arrow.dir-left .arrow-particle {
-  animation: particleL calc(0.5s / var(--speed)) ease-in-out forwards;
+  animation: particleL 0.5s ease-in-out forwards;
   background: var(--arrow-to);
   box-shadow: 0 0 8px var(--arrow-to);
 }
@@ -359,7 +316,7 @@ main {
   100% { left: 0; opacity: 0; }
 }
 
-/* ── Content Zone (5-col grid — no overlapping) ────────────── */
+/* ── Content Zone (5-col grid) ────────────────────────────── */
 .content-zone {
   display: grid;
   grid-template-columns: repeat(5, 1fr);
@@ -421,7 +378,7 @@ main {
 
 .msg-hint i { font-size: 10px; }
 
-/* ── Policy Blocks (on Gateway lane line) ──────────────────── */
+/* ── Policy Blocks ────────────────────────────────────────── */
 .policy-group {
   display: flex;
   flex-direction: column;
@@ -458,7 +415,7 @@ main {
 }
 .policy-block.policy-fail i { color: var(--err); }
 
-/* ── Tool List (proper bullet list for discovered tools) ───── */
+/* ── Tool List ────────────────────────────────────────────── */
 .tool-list {
   list-style: none;
   margin: 6px 0 0;
@@ -484,10 +441,8 @@ main {
 
 .tool-list li i { color: var(--mcp); font-size: 12px; flex-shrink: 0; }
 
-/* ── Tool Call (function name + formatted args) ────────────── */
-.tool-call {
-  margin-top: 6px;
-}
+/* ── Tool Call ────────────────────────────────────────────── */
+.tool-call { margin-top: 6px; }
 
 .tc-name {
   display: flex;
@@ -532,7 +487,7 @@ main {
   font-weight: 600;
 }
 
-/* ── Plan Tag ──────────────────────────────────────────────── */
+/* ── Plan Tag ─────────────────────────────────────────────── */
 .plan-tag {
   font-size: 9px;
   font-weight: 600;
@@ -543,7 +498,7 @@ main {
   white-space: nowrap;
 }
 
-/* ── Badge (latency / status) ──────────────────────────────── */
+/* ── Badge ────────────────────────────────────────────────── */
 .badge {
   font-family: var(--mono);
   font-size: 9px;
@@ -557,7 +512,7 @@ main {
 .badge-warn { background: var(--warn-bg); color: var(--warn); border: 1px solid rgba(217,119,6,0.15); }
 .badge-err  { background: var(--err-bg);  color: var(--err);  border: 1px solid rgba(220,38,38,0.15); }
 
-/* ── Collapsible Flow Wrapper (per request) ─────────────── */
+/* ── Collapsible Flow Wrapper ─────────────────────────────── */
 .flow-wrapper {
   margin: 12px 0 0;
   opacity: 0;
@@ -592,8 +547,6 @@ main {
 
 .flow-summary::-webkit-details-marker { display: none; }
 .flow-summary::marker { display: none; content: ''; }
-
-.flow-body { /* transparent — lane lines show through from .steps parent */ }
 
 .flow-chevron {
   transition: transform 0.2s ease;
@@ -650,9 +603,7 @@ main {
 }
 
 /* ── Collapsible Step Groups ──────────────────────────────── */
-.step-group {
-  border: none;
-}
+.step-group { border: none; }
 
 .step-group-summary {
   list-style: none;
@@ -664,10 +615,9 @@ main {
 .step-group-summary::marker { display: none; content: ''; }
 
 .step-group-body {
-  overflow: hidden;
+  padding-top: 8px;
 }
 
-/* Chevron rotation */
 .divider-chevron {
   transition: transform 0.2s ease;
   flex-shrink: 0;
@@ -681,7 +631,7 @@ main {
   transform: rotate(0deg);
 }
 
-/* ── Section Divider ───────────────────────────────────────── */
+/* ── Section Divider ──────────────────────────────────────── */
 .step-divider {
   padding: 16px 8px 4px;
   opacity: 0;
@@ -781,8 +731,6 @@ footer {
   z-index: 50;
 }
 
-.footer-group { display: flex; align-items: center; gap: 10px; }
-
 .ctrl-btn {
   width: 34px;
   height: 34px;
@@ -802,17 +750,6 @@ footer {
   color: var(--text);
   border-color: var(--border-strong);
 }
-
-.ctrl-play {
-  width: 40px;
-  height: 40px;
-  border-radius: 50%;
-  background: var(--gateway);
-  border: none;
-  color: #fff;
-}
-
-.ctrl-play:hover { opacity: 0.9; }
 
 /* ── Live footer indicator ─────────────────────────────────── */
 .live-indicator { display: flex; align-items: center; gap: 8px; }
@@ -843,55 +780,6 @@ footer {
 }
 
 .live-label.has-events { color: var(--text-2); }
-
-/* ── Speed control ─────────────────────────────────────────── */
-.speed-control { display: flex; align-items: center; gap: 6px; margin-left: 8px; }
-
-.speed-control label { font-size: 10px; font-weight: 600; color: var(--text-3); }
-
-.speed-control input[type="range"] {
-  width: 72px;
-  height: 3px;
-  -webkit-appearance: none;
-  appearance: none;
-  background: var(--border-mid);
-  border-radius: 2px;
-  outline: none;
-}
-
-.speed-control input[type="range"]::-webkit-slider-thumb {
-  -webkit-appearance: none;
-  width: 12px;
-  height: 12px;
-  border-radius: 50%;
-  background: var(--gateway);
-  cursor: pointer;
-}
-
-#speedLabel {
-  font-family: var(--mono);
-  font-size: 11px;
-  font-weight: 600;
-  color: var(--text-2);
-  min-width: 20px;
-}
-
-.progress-bar {
-  flex: 1;
-  height: 2px;
-  background: var(--border);
-  border-radius: 2px;
-  margin-left: 12px;
-  overflow: hidden;
-}
-
-.progress-fill {
-  height: 100%;
-  width: 0%;
-  background: var(--gateway);
-  border-radius: 2px;
-  transition: width 0.3s;
-}
 
 /* ── Waiting / empty state ─────────────────────────────────── */
 .waiting-state {
@@ -950,13 +838,6 @@ footer {
   text-decoration: none;
   color: var(--text);
   transition: all 0.2s;
-  cursor: default;
-}
-
-a.waiting-card { cursor: pointer; }
-a.waiting-card:hover {
-  border-color: var(--gateway);
-  box-shadow: 0 2px 12px rgba(2,132,199,0.10);
 }
 
 .wc-icon {
@@ -998,31 +879,6 @@ a.waiting-card:hover {
   line-height: 1.5;
 }
 
-.wc-code {
-  display: block;
-  margin-top: 6px;
-  font-family: var(--mono);
-  font-size: 10px;
-  line-height: 1.6;
-  color: var(--text-2);
-  background: var(--bg);
-  border: 1px solid var(--border);
-  border-radius: var(--radius-sm);
-  padding: 8px 12px;
-  white-space: pre-wrap;
-  word-break: break-all;
-  user-select: all;
-}
-
-.wc-arrow {
-  flex-shrink: 0;
-  color: var(--text-3);
-  margin-top: 12px;
-  transition: transform 0.2s;
-}
-
-a.waiting-card:hover .wc-arrow { transform: translateX(2px); color: var(--gateway); }
-
 /* ── Detail Modal ──────────────────────────────────────────── */
 .modal-overlay {
   position: fixed;
@@ -1049,7 +905,6 @@ a.waiting-card:hover .wc-arrow { transform: translateX(2px); color: var(--gatewa
   border-radius: 14px;
   box-shadow: 0 20px 60px rgba(0,0,0,0.12);
   width: 90%;
-  max-width: 640px;
   max-height: 80vh;
   display: flex;
   flex-direction: column;
@@ -1128,13 +983,8 @@ a.waiting-card:hover .wc-arrow { transform: translateX(2px); color: var(--gatewa
   border-bottom-color: var(--gateway);
 }
 
-.modal-tab-content {
-  display: none;
-}
-
-.modal-tab-content.active {
-  display: block;
-}
+.modal-tab-content { display: none; }
+.modal-tab-content.active { display: block; }
 
 /* ── Pretty View ──────────────────────────────────────────── */
 .pv-section {

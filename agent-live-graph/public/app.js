@@ -1,12 +1,11 @@
 /**
  * Gravitee AI Agent Inspector — App
  *
- * Dual-mode sequence diagram:
- *   LIVE  — real events from the Gravitee Gateway TCP reporter via WebSocket
- *   DEMO  — scripted educational scenario (hardcoded steps)
+ * Live sequence diagram for real events from the Gravitee Gateway.
+ * Events arrive via WebSocket from the server (TCP reporter + OTel).
+ * Protocol detection and policy details are fully automatic.
  *
- * Both modes share the same grid-based rendering engine.
- * Light theme · No emojis · Click-to-popup details · Policy blocks on gateway lane
+ * Light theme · Click-to-popup details · Policy blocks on gateway lane
  */
 (() => {
   'use strict';
@@ -35,45 +34,24 @@
   /* ── DOM refs ───────────────────────────────────────────── */
   const stepsEl      = document.getElementById('stepsContainer');
   const graphArea    = document.getElementById('graphArea');
-  const modeToggle   = document.getElementById('modeToggle');
   const wsIndicator  = document.getElementById('wsIndicator');
-  const liveStats    = document.getElementById('liveStats');
   const eventCountEl = document.getElementById('eventCount');
-  const stepCounter  = document.getElementById('stepCounter');
-  const stepNumEl    = document.getElementById('stepNum');
-  const stepTotalEl  = document.getElementById('stepTotal');
-  const progressEl   = document.getElementById('progressFill');
   const livePulse    = document.getElementById('livePulse');
-  const liveLabel    = document.querySelector('.live-label');
-
-  const liveControls = document.getElementById('liveControls');
-  const demoControls = document.getElementById('demoControls');
+  const liveLabel    = document.getElementById('liveLabel');
   const btnClear     = document.getElementById('btnClear');
-  const btnPlay      = document.getElementById('btnPlay');
-  const btnStep      = document.getElementById('btnStep');
-  const btnReset     = document.getElementById('btnReset');
-  const speedRange   = document.getElementById('speedRange');
-  const speedLabelEl = document.getElementById('speedLabel');
-  const playIcon     = document.getElementById('playIcon');
-  const pauseIcon    = document.getElementById('pauseIcon');
   const detailModal  = document.getElementById('detailModal');
   const modalTitle   = document.getElementById('modalTitle');
   const modalBody    = document.getElementById('modalBody');
   const modalClose   = document.getElementById('modalClose');
 
   /* ── State ──────────────────────────────────────────────── */
-  let mode         = 'live';
   let ws           = null;
   let liveCount    = 0;
-  let demoPlaying  = false;
-  let demoSpeed    = 1;
-  let demoCursor   = 0;
-  let demoTimer    = null;
-  let currentGroup    = null;  // tracks current <details> group body for arrows
-  let currentFlowBody = null;  // tracks current flow wrapper body
+  let currentGroup    = null;   // tracks current <details> group body for arrows
+  let currentFlowBody = null;   // tracks current flow wrapper body
 
   /* ════════════════════════════════════════════════════════════
-   * SHARED RENDERING ENGINE
+   * RENDERING ENGINE
    * ════════════════════════════════════════════════════════════ */
 
   function renderStep(step) {
@@ -97,11 +75,10 @@
         </span>
         <div class="divider-line"></div>
       </div>`;
-
     return el;
   }
 
-  /* ── Arrow (grid-based, no overlapping) ─────────────────── */
+  /* ── Arrow (grid-based) ─────────────────────────────────── */
   function renderArrow(step) {
     const row = document.createElement('div');
     row.className = 'step-row';
@@ -109,7 +86,7 @@
     const fi = LANES[step.from];
     const ti = LANES[step.to];
 
-    /* ── Arrow zone (horizontal arrow with arrowhead + label + particle) ── */
+    /* Arrow zone */
     const arrowZone = document.createElement('div');
     arrowZone.className = 'arrow-zone';
 
@@ -126,7 +103,6 @@
       arrow.className = `step-arrow ${goRight ? 'dir-right' : 'dir-left'}`;
       arrow.style.cssText = `left:${minC}%;width:${maxC - minC}%;--arrow-from:${fColor};--arrow-to:${tColor}`;
 
-      // Label above the arrow
       if (step.label) {
         const lbl = document.createElement('span');
         lbl.className = 'arrow-label';
@@ -134,7 +110,6 @@
         arrow.appendChild(lbl);
       }
 
-      // Animated particle
       const particle = document.createElement('div');
       particle.className = 'arrow-particle';
       arrow.appendChild(particle);
@@ -144,7 +119,7 @@
 
     row.appendChild(arrowZone);
 
-    /* ── Content zone (5-column grid — message cards, policies, badges) ── */
+    /* Content zone (5-column grid) */
     const contentZone = document.createElement('div');
     contentZone.className = 'content-zone';
 
@@ -152,20 +127,16 @@
       const col = document.createElement('div');
       col.className = 'lane-col';
 
-      // Message card — placed in the target lane column
       if (step.message && LANES[step.message.lane] === i) {
         col.appendChild(createCard(step.message));
       }
 
-      // Gateway column — policies, plan, badge
       if (i === LANES.gateway) {
-        // Policy blocks (request arrows through gateway)
         if (step.policies && step.policies.length) {
           const pg = document.createElement('div');
           pg.className = 'policy-group';
           for (const p of step.policies) {
             const pb = document.createElement('div');
-            // Support both old string format and new {name, passed} format
             const pName = typeof p === 'string' ? p : p.name;
             const pPassed = typeof p === 'string' ? true : p.passed;
             pb.className = `policy-block ${pPassed ? 'policy-pass' : 'policy-fail'}`;
@@ -175,7 +146,6 @@
           col.appendChild(pg);
         }
 
-        // Plan tag
         if (step.plan) {
           const pt = document.createElement('div');
           pt.className = 'plan-tag';
@@ -183,7 +153,6 @@
           col.appendChild(pt);
         }
 
-        // Badge (response arrows — latency/status info)
         if (step.badge) {
           const bg = document.createElement('div');
           bg.className = `badge badge-${step.badge.type}`;
@@ -209,7 +178,6 @@
     text.textContent = msg.text;
     card.appendChild(text);
 
-    // Tool list — render as a proper bullet list
     if (msg.toolList && msg.toolList.length) {
       const ul = document.createElement('ul');
       ul.className = 'tool-list';
@@ -221,7 +189,6 @@
       card.appendChild(ul);
     }
 
-    // Tool call — render as function name + formatted args
     if (msg.toolCall) {
       const tc = document.createElement('div');
       tc.className = 'tool-call';
@@ -405,30 +372,22 @@
     return renderGenericView(obj);
   }
 
-  /* ── Lightweight Markdown → HTML ───────────────────────── */
+  /* ── Lightweight Markdown to HTML ───────────────────────── */
   function renderMarkdown(text) {
     if (!text) return '';
     let html = escapeHtml(text);
-    // Code blocks (```)
     html = html.replace(/```(\w*)\n([\s\S]*?)```/g, '<pre class="pv-pre">$2</pre>');
-    // Headers
     html = html.replace(/^### (.+)$/gm, '<strong class="md-h3">$1</strong>');
     html = html.replace(/^## (.+)$/gm, '<strong class="md-h2">$1</strong>');
     html = html.replace(/^# (.+)$/gm, '<strong class="md-h1">$1</strong>');
-    // Bold + italic
     html = html.replace(/\*\*\*(.+?)\*\*\*/g, '<strong><em>$1</em></strong>');
     html = html.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>');
     html = html.replace(/\*(.+?)\*/g, '<em>$1</em>');
-    // Inline code
     html = html.replace(/`([^`]+)`/g, '<code class="md-inline-code">$1</code>');
-    // List items (- or *)
     html = html.replace(/^[*-] (.+)$/gm, '<li>$1</li>');
     html = html.replace(/((?:<li>.*<\/li>\n?)+)/g, '<ul class="md-list">$1</ul>');
-    // Numbered lists
     html = html.replace(/^\d+\. (.+)$/gm, '<li>$1</li>');
-    // Paragraphs (double newline)
     html = html.replace(/\n\n/g, '</p><p>');
-    // Single newlines → <br>
     html = html.replace(/\n/g, '<br>');
     return '<p>' + html + '</p>';
   }
@@ -462,7 +421,7 @@
     graphArea.scrollTo({ top: graphArea.scrollHeight, behavior: 'smooth' });
   }
 
-  /* ── Foldable group helper ─────────────────────────────── */
+  /* ── Group state ────────────────────────────────────────── */
   function resetGroupState() { currentGroup = null; currentFlowBody = null; }
 
   /* ── Flow-level wrapper (collapsible per request) ─────── */
@@ -489,13 +448,13 @@
   function createFlowWrapper(summary) {
     const details = document.createElement('details');
     details.className = 'flow-wrapper';
-    details.open = true;
+    details.open = false;
 
     const s = document.createElement('summary');
     s.className = 'flow-summary';
 
     const statusClass = `flow-status-${summary.status || 'ok'}`;
-    const phasesStr = summary.phases.join(' \u00b7 '); // middle dot
+    const phasesStr = summary.phases.join(' \u00b7 ');
 
     s.innerHTML = `
       <svg class="flow-chevron" width="12" height="12" viewBox="0 0 10 10">
@@ -519,10 +478,9 @@
     const el = renderStep(step);
 
     if (step.type === 'divider') {
-      // Create a new collapsible group
       const details = document.createElement('details');
       details.className = 'step-group';
-      details.open = true;
+      details.open = false;
 
       const summary = document.createElement('summary');
       summary.className = 'step-group-summary';
@@ -540,7 +498,6 @@
       return el;
     }
 
-    // arrow → append to current group body (or container if no group)
     const target = currentGroup || container;
     target.appendChild(el);
     requestAnimationFrame(() => requestAnimationFrame(() => el.classList.add('visible')));
@@ -548,7 +505,7 @@
   }
 
   /* ════════════════════════════════════════════════════════════
-   * LIVE MODE — WebSocket consumer
+   * WEBSOCKET — Live event consumer
    * ════════════════════════════════════════════════════════════ */
 
   function connectWS() {
@@ -563,11 +520,8 @@
     ws.onmessage = (e) => {
       try {
         const msg = JSON.parse(e.data);
-        if (msg.type === 'live-steps' && mode === 'live') {
-          onLiveSteps(msg);
-        } else if (msg.type === 'tx-progress' && mode === 'live') {
-          onTxProgress(msg);
-        }
+        if (msg.type === 'live-steps')  onLiveSteps(msg);
+        if (msg.type === 'tx-progress') onTxProgress(msg);
       } catch (_) { /* ignore */ }
     };
 
@@ -579,27 +533,32 @@
     ws.onerror = () => ws.close();
   }
 
-  /* ── Single progress indicator ──────────────────────────── */
-  let progressEl_live = null;        // reference to the single progress DOM node
+  /* ── Transaction progress indicator ────────────────────── */
+  let progressIndicator = null;
 
   function onTxProgress(msg) {
+    if (!msg.buffered || msg.buffered <= 0) {
+      removeProgressIndicator();
+      return;
+    }
+
     const w = stepsEl.querySelector('.waiting-state');
     if (w) w.remove();
 
-    if (!progressEl_live) {
-      progressEl_live = document.createElement('div');
-      progressEl_live.className = 'tx-progress';
-      progressEl_live.innerHTML = `
+    if (!progressIndicator) {
+      progressIndicator = document.createElement('div');
+      progressIndicator.className = 'tx-progress';
+      progressIndicator.innerHTML = `
         <div class="txp-spinner"></div>
         <div class="txp-body">
           <span class="txp-label">Collecting gateway events</span>
           <span class="txp-count">${msg.buffered}</span>
         </div>`;
-      stepsEl.appendChild(progressEl_live);
+      stepsEl.appendChild(progressIndicator);
       requestAnimationFrame(() =>
-        requestAnimationFrame(() => progressEl_live && progressEl_live.classList.add('visible')));
+        requestAnimationFrame(() => progressIndicator && progressIndicator.classList.add('visible')));
     } else {
-      progressEl_live.querySelector('.txp-count').textContent = msg.buffered;
+      progressIndicator.querySelector('.txp-count').textContent = msg.buffered;
     }
 
     livePulse.classList.add('active');
@@ -609,37 +568,36 @@
   }
 
   function removeProgressIndicator() {
-    if (progressEl_live) {
-      progressEl_live.remove();
-      progressEl_live = null;
+    if (progressIndicator) {
+      progressIndicator.remove();
+      progressIndicator = null;
     }
   }
 
-  /* ── Staggered rendering queue for transaction batches ───── */
-  let liveQueue      = [];
-  let liveQueueTimer = null;
-  const LIVE_DELAY_DIVIDER = 200;
-  const LIVE_DELAY_ARROW   = 350;
+  /* ── Staggered rendering queue ──────────────────────────── */
+  let renderQueue = [];
+  let renderTimer = null;
+  const DELAY_DIVIDER = 200;
+  const DELAY_ARROW   = 350;
 
-  function drainLiveQueue() {
-    if (!liveQueue.length) { liveQueueTimer = null; return; }
+  function drainQueue() {
+    if (!renderQueue.length) { renderTimer = null; return; }
 
-    const step = liveQueue.shift();
+    const step = renderQueue.shift();
 
-    // Flow markers — create/close wrapper, then process next immediately
     if (step.type === 'flow-start') {
       const wrapper = createFlowWrapper(step.summary);
       stepsEl.appendChild(wrapper);
       currentFlowBody = wrapper.querySelector('.flow-body');
       currentGroup = null;
       requestAnimationFrame(() => requestAnimationFrame(() => wrapper.classList.add('visible')));
-      drainLiveQueue();
+      drainQueue();
       return;
     }
     if (step.type === 'flow-end') {
       currentFlowBody = null;
       currentGroup = null;
-      drainLiveQueue();
+      drainQueue();
       return;
     }
 
@@ -651,13 +609,13 @@
     eventCountEl.textContent = liveCount;
     scrollToBottom();
 
-    if (liveQueue.length) {
-      const next  = liveQueue[0];
+    if (renderQueue.length) {
+      const next  = renderQueue[0];
       const delay = (next.type === 'flow-start' || next.type === 'flow-end') ? 0
-                  : next.type === 'divider' ? LIVE_DELAY_DIVIDER : LIVE_DELAY_ARROW;
-      liveQueueTimer = setTimeout(drainLiveQueue, delay);
+                  : next.type === 'divider' ? DELAY_DIVIDER : DELAY_ARROW;
+      renderTimer = setTimeout(drainQueue, delay);
     } else {
-      liveQueueTimer = null;
+      renderTimer = null;
     }
   }
 
@@ -670,20 +628,21 @@
     const steps = msg.steps || [];
     const summary = extractFlowSummary(steps);
 
-    liveQueue.push({ type: 'flow-start', summary });
-    liveQueue.push(...steps);
-    liveQueue.push({ type: 'flow-end' });
+    renderQueue.push({ type: 'flow-start', summary });
+    renderQueue.push(...steps);
+    renderQueue.push({ type: 'flow-end' });
 
     livePulse.classList.add('active');
     liveLabel.textContent = `${msg.apiName || 'Event'} — ${new Date(msg.timestamp).toLocaleTimeString()}`;
     liveLabel.classList.add('has-events');
 
-    if (!liveQueueTimer) drainLiveQueue();
+    if (!renderTimer) drainQueue();
   }
 
-  function clearLive() {
-    if (liveQueueTimer) { clearTimeout(liveQueueTimer); liveQueueTimer = null; }
-    liveQueue = [];
+  /* ── Clear ──────────────────────────────────────────────── */
+  function clearAll() {
+    if (renderTimer) { clearTimeout(renderTimer); renderTimer = null; }
+    renderQueue = [];
     removeProgressIndicator();
     stepsEl.innerHTML = '';
     resetGroupState();
@@ -692,10 +651,10 @@
     livePulse.classList.remove('active');
     liveLabel.textContent = 'Waiting for gateway events...';
     liveLabel.classList.remove('has-events');
-    showLiveWaiting();
+    showWaiting();
   }
 
-  function showLiveWaiting() {
+  function showWaiting() {
     const w = document.createElement('div');
     w.className = 'waiting-state';
     w.innerHTML = `
@@ -703,7 +662,7 @@
       <p>Waiting for the Gravitee Gateway logs</p>
       <small>Send a request through the Gravitee Gateway and watch the full AI Agent flow appear here in real time.</small>
       <div class="waiting-options">
-        <a class="waiting-card" href="http://localhost:8002" target="_blank" rel="noopener">
+        <div class="waiting-card">
           <div class="wc-icon">
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
               <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" stroke-linejoin="round"/>
@@ -713,8 +672,7 @@
             <span class="wc-title">Chat on the ACME Hotels demo site</span>
             <span class="wc-desc">Open the workshop website and use the AI chatbot. Try simple queries, ask for private data, or trigger guardrails and rate limits.</span>
           </div>
-          <svg class="wc-arrow" width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M6 3l5 5-5 5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
-        </a>
+        </div>
         <div class="waiting-card wc-curl">
           <div class="wc-icon">
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
@@ -723,292 +681,19 @@
             </svg>
           </div>
           <div class="wc-body">
-            <span class="wc-title">Send a curl request</span>
-            <span class="wc-desc">Call the agent directly from your terminal:</span>
-            <code class="wc-code">curl -X POST http://localhost:8082/bookings-agent/ \\
-  -H "Content-Type: application/json" \\
-  -d '{"jsonrpc":"2.0","method":"message/send","params":{"message":{"role":"user","parts":[{"text":"Any hotels in Paris?"}]}}}'</code>
+            <span class="wc-title">Send a request via your agent client</span>
+            <span class="wc-desc">Call the agent through the Gravitee Gateway using any A2A-compatible client. The inspector will automatically detect the protocol and display the full flow.</span>
           </div>
         </div>
       </div>`;
     stepsEl.appendChild(w);
   }
 
-  /* ════════════════════════════════════════════════════════════
-   * DEMO MODE — scripted scenario (no emojis, clean labels)
-   * ════════════════════════════════════════════════════════════ */
+  /* ── Event listeners ────────────────────────────────────── */
+  btnClear.addEventListener('click', clearAll);
 
-  const SCENARIO = [
-    /* ── Phase 1 — User Request ── */
-    { type: 'divider', label: 'Phase 1 — User Request' },
-    {
-      type: 'arrow', from: 'client', to: 'gateway',
-      label: 'POST /bookings-agent/',
-      message: { lane: 'gateway', text: 'Hello, any hotels in Paris?' },
-      policies: [], plan: 'Keyless',
-    },
-    {
-      type: 'arrow', from: 'gateway', to: 'agent',
-      label: 'Forwarded',
-      message: { lane: 'agent', text: 'Processing request' },
-    },
-
-    /* ── Phase 2 — Tool Discovery ── */
-    { type: 'divider', label: 'Phase 2 — Tool Discovery' },
-    {
-      type: 'arrow', from: 'agent', to: 'gateway',
-      label: 'POST /hotels/mcp',
-      message: { lane: 'gateway', text: 'MCP tools/list request' },
-      policies: [], plan: 'Keyless',
-    },
-    {
-      type: 'arrow', from: 'gateway', to: 'agent',
-      label: '200 — 12ms',
-      message: { lane: 'agent', text: '2 tools discovered', toolList: ['getAccommodations', 'getBookings'] },
-      badge: { type: 'ok', text: '12ms / 3ms gw' },
-    },
-
-    /* ── Phase 3 — LLM Decision ── */
-    { type: 'divider', label: 'Phase 3 — LLM Decision' },
-    {
-      type: 'arrow', from: 'agent', to: 'gateway',
-      label: 'POST /llm-proxy/chat/completions',
-      message: { lane: 'gateway', text: 'Forwarding to LLM' },
-      policies: [
-        { name: 'AI Guardrails', passed: true },
-        { name: 'Token Rate Limit', passed: true },
-      ], plan: 'Keyless',
-    },
-    {
-      type: 'arrow', from: 'gateway', to: 'llm',
-      label: 'qwen3:0.6b',
-      message: { lane: 'llm', text: '4 messages + 2 tool definitions' },
-    },
-    {
-      type: 'arrow', from: 'llm', to: 'gateway',
-      label: '200',
-      message: { lane: 'gateway', text: 'Call getAccommodations' },
-    },
-    {
-      type: 'arrow', from: 'gateway', to: 'agent',
-      label: '200 — 320ms',
-      message: { lane: 'agent', text: 'Call getAccommodations' },
-      badge: { type: 'ok', text: '320ms / 850 tokens / 8ms gw' },
-    },
-
-    /* ── Phase 4 — Tool Execution ── */
-    { type: 'divider', label: 'Phase 4 — Tool Execution' },
-    {
-      type: 'arrow', from: 'agent', to: 'gateway',
-      label: 'POST /hotels/mcp',
-      message: { lane: 'gateway', text: 'MCP tools/call — getAccommodations', toolCall: { name: 'getAccommodations', args: { city: 'Paris' } } },
-      policies: [
-        { name: 'OAuth2', passed: true },
-        { name: 'MCP ACL', passed: true },
-      ], plan: 'OAuth2',
-    },
-    {
-      type: 'arrow', from: 'gateway', to: 'api',
-      label: 'GET /accommodations?city=Paris',
-      message: { lane: 'api', text: 'Get Accommodations' },
-    },
-    {
-      type: 'arrow', from: 'api', to: 'gateway',
-      label: '200',
-      message: { lane: 'gateway', text: '3 accommodations returned' },
-    },
-    {
-      type: 'arrow', from: 'gateway', to: 'agent',
-      label: '200 — 45ms',
-      message: { lane: 'agent', text: '3 accommodations returned' },
-      badge: { type: 'ok', text: '45ms / 6ms gw' },
-    },
-
-    /* ── Phase 5 — Format Response ── */
-    { type: 'divider', label: 'Phase 5 — Format Response' },
-    {
-      type: 'arrow', from: 'agent', to: 'gateway',
-      label: 'POST /llm-proxy/chat/completions',
-      message: { lane: 'gateway', text: 'Forwarding to LLM' },
-      policies: [
-        { name: 'AI Guardrails', passed: true },
-        { name: 'Token Rate Limit', passed: true },
-      ], plan: 'Keyless',
-    },
-    {
-      type: 'arrow', from: 'gateway', to: 'llm',
-      label: 'qwen3:0.6b',
-      message: { lane: 'llm', text: '6 messages (with tool results)' },
-    },
-    {
-      type: 'arrow', from: 'llm', to: 'gateway',
-      label: '200',
-      message: { lane: 'gateway', text: 'Text response — 140 tokens' },
-    },
-    {
-      type: 'arrow', from: 'gateway', to: 'agent',
-      label: '200 — 280ms',
-      message: { lane: 'agent', text: 'Text response — 140 tokens' },
-      badge: { type: 'ok', text: '280ms / 140 tokens / 5ms gw' },
-    },
-
-    /* ── Phase 6 — Response Delivered ── */
-    { type: 'divider', label: 'Phase 6 — Response Delivered' },
-    {
-      type: 'arrow', from: 'agent', to: 'gateway',
-      label: 'A2A response',
-      message: { lane: 'gateway', text: 'Agent response ready' },
-    },
-    {
-      type: 'arrow', from: 'gateway', to: 'client',
-      label: '200 — 2100ms',
-      message: { lane: 'client', text: 'Response delivered' },
-      badge: { type: 'ok', text: '2100ms total' },
-    },
-  ];
-
-  const totalDemoSteps = SCENARIO.length;
-
-  function demoShowNext() {
-    if (demoCursor >= totalDemoSteps) { demoStop(); return; }
-
-    // Create flow wrapper before the first step
-    if (demoCursor === 0 && !currentFlowBody) {
-      const summary = extractFlowSummary(SCENARIO);
-      const wrapper = createFlowWrapper(summary);
-      stepsEl.appendChild(wrapper);
-      currentFlowBody = wrapper.querySelector('.flow-body');
-      currentGroup = null;
-      requestAnimationFrame(() => requestAnimationFrame(() => wrapper.classList.add('visible')));
-    }
-
-    const step = SCENARIO[demoCursor];
-    const container = currentFlowBody || stepsEl;
-    appendStepToDOM(step, container);
-
-    demoCursor++;
-    stepNumEl.textContent  = demoCursor;
-    progressEl.style.width = `${(demoCursor / totalDemoSteps) * 100}%`;
-    scrollToBottom();
-
-    if (demoPlaying) {
-      const delay = step.type === 'divider' ? 800 : 1200;
-      demoTimer = setTimeout(demoShowNext, delay / demoSpeed);
-    }
-  }
-
-  function demoPlay() {
-    if (demoCursor >= totalDemoSteps) demoReset();
-    demoPlaying = true;
-    playIcon.style.display  = 'none';
-    pauseIcon.style.display = 'block';
-    demoShowNext();
-  }
-
-  function demoStop() {
-    demoPlaying = false;
-    playIcon.style.display  = 'block';
-    pauseIcon.style.display = 'none';
-    if (demoTimer) { clearTimeout(demoTimer); demoTimer = null; }
-  }
-
-  function demoReset() {
-    demoStop();
-    demoCursor = 0;
-    stepsEl.innerHTML = '';
-    resetGroupState();
-    stepNumEl.textContent  = '0';
-    progressEl.style.width = '0%';
-    showDemoWaiting();
-  }
-
-  function showDemoWaiting() {
-    const w = document.createElement('div');
-    w.className = 'waiting-state';
-    w.innerHTML = `
-      <img src="assets/gravitee-mark.svg" class="waiting-logo" alt="Gravitee" />
-      <p>Press Play to start the demo</p>
-      <small>Watch how a request flows through the AI Agent stack,<br/>
-      with Gravitee Gateway securing and observing every step.</small>`;
-    stepsEl.appendChild(w);
-  }
-
-  /* ════════════════════════════════════════════════════════════
-   * MODE SWITCHING
-   * ════════════════════════════════════════════════════════════ */
-
-  function switchMode(newMode) {
-    mode = newMode;
-
-    modeToggle.querySelectorAll('.mode-btn').forEach(b =>
-      b.classList.toggle('active', b.dataset.mode === newMode));
-
-    stepsEl.innerHTML = '';
-    resetGroupState();
-
-    if (newMode === 'live') {
-      liveControls.style.display = 'flex';
-      demoControls.style.display = 'none';
-      liveStats.style.display    = 'flex';
-      stepCounter.style.display  = 'none';
-      demoStop();
-      if (liveQueueTimer) { clearTimeout(liveQueueTimer); liveQueueTimer = null; }
-      liveQueue = [];
-      removeProgressIndicator();
-      liveCount = 0;
-      eventCountEl.textContent = '0';
-      livePulse.classList.remove('active');
-      liveLabel.textContent = 'Waiting for gateway events...';
-      liveLabel.classList.remove('has-events');
-      showLiveWaiting();
-    } else {
-      liveControls.style.display = 'none';
-      demoControls.style.display = 'flex';
-      liveStats.style.display    = 'none';
-      stepCounter.style.display  = 'block';
-      stepTotalEl.textContent    = totalDemoSteps;
-      demoReset();
-    }
-  }
-
-  /* ════════════════════════════════════════════════════════════
-   * EVENT LISTENERS
-   * ════════════════════════════════════════════════════════════ */
-
-  modeToggle.addEventListener('click', (e) => {
-    const btn = e.target.closest('[data-mode]');
-    if (btn && btn.dataset.mode !== mode) switchMode(btn.dataset.mode);
-  });
-
-  btnClear.addEventListener('click', clearLive);
-
-  btnPlay.addEventListener('click', () => {
-    if (demoPlaying) demoStop(); else {
-      const w = stepsEl.querySelector('.waiting-state');
-      if (w) w.remove();
-      demoPlay();
-    }
-  });
-
-  btnStep.addEventListener('click', () => {
-    demoStop();
-    const w = stepsEl.querySelector('.waiting-state');
-    if (w) w.remove();
-    demoShowNext();
-  });
-
-  btnReset.addEventListener('click', demoReset);
-
-  speedRange.addEventListener('input', () => {
-    demoSpeed = parseFloat(speedRange.value);
-    speedLabelEl.textContent = demoSpeed + 'x';
-    document.documentElement.style.setProperty('--speed', demoSpeed);
-  });
-
-  /* ════════════════════════════════════════════════════════════
-   * INIT
-   * ════════════════════════════════════════════════════════════ */
+  /* ── Init ───────────────────────────────────────────────── */
   connectWS();
-  switchMode('live');
+  showWaiting();
 
 })();
