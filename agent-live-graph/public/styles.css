@@ -129,6 +129,52 @@ main {
   height: calc(100vh - 54px - 48px);
 }
 
+/* ── Filter Bar ───────────────────────────────────────────── */
+.filter-bar {
+  display: flex;
+  align-items: center;
+  padding: 8px 24px;
+  background: var(--bg);
+  border-bottom: 1px solid var(--border);
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+.filter-group {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.filter-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 12px;
+  border-radius: 14px;
+  border: 1px solid var(--border-mid);
+  background: var(--bg-surface);
+  color: var(--text-3);
+  font-family: var(--sans);
+  font-size: 11px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+  white-space: nowrap;
+}
+
+.filter-pill:hover {
+  color: var(--text-2);
+  border-color: var(--border-strong);
+}
+
+.filter-pill.active {
+  background: var(--gateway);
+  border-color: var(--gateway);
+  color: #fff;
+}
+
 /* ── Lane Headers ──────────────────────────────────────────── */
 .lane-headers {
   display: grid;
@@ -587,6 +633,55 @@ main {
   text-overflow: ellipsis;
   flex: 1;
   min-width: 0;
+}
+
+.flow-timestamp {
+  font-family: var(--mono);
+  font-size: 10px;
+  font-weight: 500;
+  color: var(--text-3);
+  white-space: nowrap;
+  flex-shrink: 0;
+  letter-spacing: -0.2px;
+}
+
+.flow-stats {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-shrink: 0;
+}
+
+.flow-stat {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  font-family: var(--mono);
+  font-size: 10px;
+  font-weight: 600;
+  padding: 2px 8px;
+  border-radius: 10px;
+  white-space: nowrap;
+}
+
+.flow-stat i { font-size: 11px; }
+
+.flow-stat-mcp {
+  color: var(--mcp);
+  background: var(--mcp-bg);
+  border: 1px solid var(--mcp-border);
+}
+
+.flow-stat-llm {
+  color: var(--llm);
+  background: var(--llm-bg);
+  border: 1px solid var(--llm-border);
+}
+
+.flow-stat-tokens {
+  color: var(--agent);
+  background: var(--agent-bg);
+  border: 1px solid var(--agent-border);
 }
 
 .flow-time {

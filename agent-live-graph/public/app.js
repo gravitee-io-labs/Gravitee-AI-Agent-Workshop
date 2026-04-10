@@ -39,6 +39,7 @@
   const livePulse    = document.getElementById('livePulse');
   const liveLabel    = document.getElementById('liveLabel');
   const btnClear     = document.getElementById('btnClear');
+  const filterBar    = document.getElementById('filterBar');
   const detailModal  = document.getElementById('detailModal');
   const modalTitle   = document.getElementById('modalTitle');
   const modalBody    = document.getElementById('modalBody');
@@ -49,6 +50,68 @@
   let liveCount    = 0;
   let currentGroup    = null;   // tracks current <details> group body for arrows
   let currentFlowBody = null;   // tracks current flow wrapper body
+  let activeFilter    = 'all';  // current filter tag
+  const seenTags      = new Set(); // all tags seen so far
+
+  /* ── Tag display names ─────────────────────────────────── */
+  const TAG_LABELS = {
+    'all':            'All',
+    'complete-flow':  'Complete Flow',
+    'agent-card':     'Agent Card',
+    'tool-discovery': 'Tool Discovery',
+    'tool-call':      'Tool Call',
+    'llm-decision':   'LLM Decision',
+    'llm-response':   'LLM Response',
+    'mcp':            'MCP',
+  };
+
+  /* ── Filter logic ──────────────────────────────────────── */
+  function updateFilterBar(tags) {
+    let changed = false;
+    for (const tag of tags) {
+      if (!seenTags.has(tag)) {
+        seenTags.add(tag);
+        changed = true;
+      }
+    }
+    if (!changed) return;
+
+    const group = filterBar.querySelector('.filter-group');
+    // Rebuild pills after the icon + "All" pill
+    const existing = group.querySelectorAll('.filter-pill:not([data-tag="all"])');
+    existing.forEach(p => p.remove());
+
+    const order = ['complete-flow', 'agent-card', 'tool-discovery', 'tool-call', 'llm-decision', 'llm-response', 'mcp'];
+    for (const tag of order) {
+      if (!seenTags.has(tag)) continue;
+      const pill = document.createElement('button');
+      pill.className = 'filter-pill' + (activeFilter === tag ? ' active' : '');
+      pill.dataset.tag = tag;
+      pill.textContent = TAG_LABELS[tag] || tag;
+      group.appendChild(pill);
+    }
+  }
+
+  function applyFilter(tag) {
+    activeFilter = tag;
+    filterBar.querySelectorAll('.filter-pill').forEach(p =>
+      p.classList.toggle('active', p.dataset.tag === tag));
+
+    const wrappers = stepsEl.querySelectorAll('.flow-wrapper');
+    for (const w of wrappers) {
+      if (tag === 'all') {
+        w.style.display = '';
+      } else {
+        const wTags = (w.dataset.tags || '').split(',');
+        w.style.display = wTags.includes(tag) ? '' : 'none';
+      }
+    }
+  }
+
+  filterBar.addEventListener('click', (e) => {
+    const pill = e.target.closest('.filter-pill');
+    if (pill) applyFilter(pill.dataset.tag);
+  });
 
   /* ════════════════════════════════════════════════════════════
    * RENDERING ENGINE
@@ -425,7 +488,7 @@
   function resetGroupState() { currentGroup = null; currentFlowBody = null; }
 
   /* ── Flow-level wrapper (collapsible per request) ─────── */
-  function extractFlowSummary(steps) {
+  function extractFlowSummary(steps, msg) {
     let userText = '', totalTime = '', status = 'ok';
     const phases = [];
     for (const step of steps) {
@@ -442,7 +505,21 @@
         }
       }
     }
-    return { userText, totalTime, status, phases };
+    return {
+      userText, totalTime, status, phases,
+      timestamp: msg.timestamp || Date.now(),
+      stats:     msg.stats || {},
+      tags:      msg.tags || [],
+    };
+  }
+
+  function formatTime(ts) {
+    const d = new Date(ts);
+    const hh = String(d.getHours()).padStart(2, '0');
+    const mm = String(d.getMinutes()).padStart(2, '0');
+    const ss = String(d.getSeconds()).padStart(2, '0');
+    const ms = String(d.getMilliseconds()).padStart(3, '0');
+    return `${hh}:${mm}:${ss}.${ms}`;
   }
 
   function createFlowWrapper(summary) {
@@ -450,19 +527,39 @@
     details.className = 'flow-wrapper';
     details.open = false;
 
+    // Store tags for filtering
+    if (summary.tags && summary.tags.length) {
+      details.dataset.tags = summary.tags.join(',');
+    }
+
     const s = document.createElement('summary');
     s.className = 'flow-summary';
 
     const statusClass = `flow-status-${summary.status || 'ok'}`;
     const phasesStr = summary.phases.join(' \u00b7 ');
+    const stats = summary.stats || {};
+
+    // Build stat badges
+    let statBadges = '';
+    if (stats.mcpCalls > 0) {
+      statBadges += `<span class="flow-stat flow-stat-mcp"><i class="ph ph-plug"></i>${stats.mcpCalls} MCP</span>`;
+    }
+    if (stats.llmCalls > 0) {
+      statBadges += `<span class="flow-stat flow-stat-llm"><i class="ph ph-brain"></i>${stats.llmCalls} LLM</span>`;
+    }
+    if (stats.totalTokens > 0) {
+      statBadges += `<span class="flow-stat flow-stat-tokens"><i class="ph ph-coins"></i>${stats.totalTokens.toLocaleString()}</span>`;
+    }
 
     s.innerHTML = `
+      <span class="flow-timestamp">${formatTime(summary.timestamp)}</span>
       <svg class="flow-chevron" width="12" height="12" viewBox="0 0 10 10">
         <path d="M3 2l4 3-4 3" stroke="currentColor" stroke-width="1.5" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
       </svg>
       <span class="flow-status ${statusClass}"></span>
       <span class="flow-user-text">${escapeHtml(summary.userText || 'Request')}</span>
       ${phasesStr ? `<span class="flow-phases">${escapeHtml(phasesStr)}</span>` : ''}
+      <span class="flow-stats">${statBadges}</span>
       ${summary.totalTime ? `<span class="flow-time">${escapeHtml(summary.totalTime)}</span>` : ''}`;
 
     details.appendChild(s);
@@ -587,6 +684,11 @@
 
     if (step.type === 'flow-start') {
       const wrapper = createFlowWrapper(step.summary);
+      // Apply current filter to new wrapper
+      if (activeFilter !== 'all') {
+        const wTags = (wrapper.dataset.tags || '').split(',');
+        if (!wTags.includes(activeFilter)) wrapper.style.display = 'none';
+      }
       stepsEl.appendChild(wrapper);
       currentFlowBody = wrapper.querySelector('.flow-body');
       currentGroup = null;
@@ -626,7 +728,12 @@
     removeProgressIndicator();
 
     const steps = msg.steps || [];
-    const summary = extractFlowSummary(steps);
+    const summary = extractFlowSummary(steps, msg);
+
+    // Update filter bar with new tags
+    if (msg.tags && msg.tags.length) {
+      updateFilterBar(msg.tags);
+    }
 
     renderQueue.push({ type: 'flow-start', summary });
     renderQueue.push(...steps);
@@ -651,6 +758,12 @@
     livePulse.classList.remove('active');
     liveLabel.textContent = 'Waiting for gateway events...';
     liveLabel.classList.remove('has-events');
+    // Reset filters
+    seenTags.clear();
+    activeFilter = 'all';
+    const group = filterBar.querySelector('.filter-group');
+    group.querySelectorAll('.filter-pill:not([data-tag="all"])').forEach(p => p.remove());
+    group.querySelector('[data-tag="all"]').classList.add('active');
     showWaiting();
   }
 

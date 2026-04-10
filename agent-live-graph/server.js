@@ -130,11 +130,43 @@ const buffer = new TransactionBuffer({
 
     const ts = (outermost || innerEvents[innerEvents.length - 1] || {}).timestamp || Date.now();
 
+    /* 5. Compute flow-level stats and tags for the frontend */
+    let mcpCalls = 0, llmCalls = 0, totalTokens = 0;
+    const tags = new Set();
+
+    for (const evt of innerEvents) {
+      if (evt.protocol === 'mcp') {
+        mcpCalls++;
+        const sub = evt._classifyParams?.protocol?.subtype;
+        tags.add(sub === 'tool-list' ? 'tool-discovery' : sub === 'tool-call' ? 'tool-call' : 'mcp');
+      } else if (evt.protocol === 'llm') {
+        llmCalls++;
+        const details = evt._classifyParams?.protocol?.details || {};
+        if (details.tokens) totalTokens += details.tokens;
+        tags.add(details.hasToolCalls ? 'llm-decision' : 'llm-response');
+      } else if (evt.protocol === 'a2a') {
+        const sub = evt._classifyParams?.protocol?.subtype;
+        if (sub === 'agent-card') tags.add('agent-card');
+      }
+    }
+
+    if (outermost) {
+      tags.add('complete-flow');
+    } else if (innerEvents.length === 1) {
+      const e = innerEvents[0];
+      if (e.protocol === 'a2a') {
+        const sub = e._classifyParams?.protocol?.subtype;
+        if (sub === 'agent-card') tags.add('agent-card');
+      }
+    }
+
     ws.broadcast({
       type:      'live-steps',
       apiName:   outermost ? 'Complete Flow' : (innerEvents[0] || {}).apiName || '?',
       timestamp: ts,
       steps:     allSteps,
+      stats:     { mcpCalls, llmCalls, totalTokens },
+      tags:      [...tags],
     });
   },
   onProgress(count) {
