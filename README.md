@@ -1,5 +1,7 @@
 # Gravitee AI Agent Workshop: ACME Hotels
 
+![Gravitee AI Agent Workshop](./assets/gravitee-ai-agent-workshop.png)
+
 A hands-on workshop demonstrating how to build, secure, and govern AI agents using the **Gravitee Al Agent Management**. Through a fictional hotel booking company, ACME Hotels, you will explore the key concepts and technologies behind enterprise-grade AI agent architectures.
 
 ## Quick Start (5 Minutes)
