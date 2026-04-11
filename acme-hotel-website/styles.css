@@ -400,6 +400,7 @@ body {
     right: 2rem;
     width: 600px;
     height: 800px;
+    max-height: 95%;
     background: var(--white);
     border-radius: 16px;
     box-shadow: 0 8px 40px var(--shadow-lg);
