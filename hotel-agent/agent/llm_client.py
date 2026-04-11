@@ -59,6 +59,7 @@ class LLMClient:
         available_tools: list[dict[str, Any]],
         system_prompt: str | None = None,
         conversation_history: list[dict[str, Any]] | None = None,
+        extra_headers: dict[str, str] | None = None,
     ) -> tuple[str, list[dict[str, Any]]]:
         """Send query + tools to LLM, return (content, tool_calls)."""
         messages = []
@@ -77,6 +78,8 @@ class LLMClient:
         if available_tools:
             params["tools"] = available_tools
             params["tool_choice"] = "required"
+        if extra_headers:
+            params["extra_headers"] = extra_headers
 
         try:
             response = self.client.chat.completions.create(**params)
@@ -119,6 +122,7 @@ class LLMClient:
         tool_call: dict[str, Any],
         tool_result: Any,
         system_prompt: str | None = None,
+        extra_headers: dict[str, str] | None = None,
     ) -> str:
         """Format a tool result into a human-readable response."""
         messages = []
@@ -146,12 +150,16 @@ class LLMClient:
             },
         ])
 
+        params: dict[str, Any] = {
+            "model": self.model,
+            "messages": messages,
+            "temperature": self.temperature,
+        }
+        if extra_headers:
+            params["extra_headers"] = extra_headers
+
         try:
-            response = self.client.chat.completions.create(
-                model=self.model,
-                messages=messages,
-                temperature=self.temperature,
-            )
+            response = self.client.chat.completions.create(**params)
         except BadRequestError as e:
             logger.warning(f"Request blocked: {e}")
             body = e.body if hasattr(e, 'body') and isinstance(e.body, dict) else {}

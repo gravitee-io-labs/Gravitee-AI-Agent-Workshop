@@ -19,12 +19,16 @@ import math
 from agent.auth_service import AuthService, AuthenticationError
 from agent.logger import get_agent_logger
 
-from a2a.server.apps import A2AStarletteApplication
-from a2a.server.apps.jsonrpc.jsonrpc_app import DefaultCallContextBuilder
-from a2a.server.request_handlers.default_request_handler import DefaultRequestHandler
+from starlette.applications import Starlette
+from starlette.routing import Route
+
+from a2a.server.routes.jsonrpc_routes import create_jsonrpc_routes
+from a2a.server.routes.agent_card_routes import create_agent_card_routes
+from a2a.server.routes.common import DefaultServerCallContextBuilder
+from a2a.server.request_handlers.default_request_handler import LegacyRequestHandler
 from a2a.server.agent_execution import AgentExecutor, RequestContext
 from a2a.server.events import EventQueue
-from a2a.server.tasks import InMemoryTaskStore
+from a2a.server.tasks.inmemory_task_store import InMemoryTaskStore
 from a2a.types import AgentCard, AgentSkill, AgentCapabilities, AgentInterface, Part
 from a2a.utils import new_agent_text_message, new_agent_parts_message
 
@@ -174,17 +178,25 @@ class MCPAgent:
 
     async def process(
         self, message: str, token: str | None = None,
+        transaction_id: str | None = None,
     ) -> tuple[str, list[dict[str, Any]]]:
-        mcp_headers = {"Authorization": f"Bearer {token}"} if token else None
+        # Build gateway headers: transaction ID for correlation + auth for MCP
+        gw_headers = {}
+        if transaction_id:
+            gw_headers["X-Gravitee-Transaction-Id"] = transaction_id
+        mcp_headers = dict(gw_headers)
+        if token:
+            mcp_headers["Authorization"] = f"Bearer {token}"
 
         # Step 1 — MCP Tools Discovery
-        tools = await self.mcp.list_all_tools(extra_headers=mcp_headers)
+        tools = await self.mcp.list_all_tools(extra_headers=mcp_headers or None)
         logger.info(f"Step 1 - MCP Tools Discovery: {len(tools)} tools availables.")
-        
+
         # Step 2 — LLM decides which tool to call (no history — just current message + tools)
         try:
             content, tool_calls = await self.llm.process_query(
                 message, tools, system_prompt=SYSTEM_PROMPT,
+                extra_headers=gw_headers or None,
             )
         except LLMRateLimitError as e:
             logger.warning(f"Step 2 - Rate limited (reset={e.reset})")
@@ -204,7 +216,7 @@ class MCPAgent:
         logger.info(f"Step 3 - Tool Execution: {tool_name}({json.dumps(tool_args)[:200]})")
 
         try:
-            result, _ = await self.mcp.call_tool(tool_name, tool_args, extra_headers=mcp_headers)
+            result, _ = await self.mcp.call_tool(tool_name, tool_args, extra_headers=mcp_headers or None)
         except ToolError as e:
             logger.error(f"Step 3 - Tool Execution: {tool_name} failed ({e.status_code}): {e}")
             if e.status_code in (401, 403):
@@ -218,6 +230,7 @@ class MCPAgent:
         try:
             response = await self.llm.process_tool_result(
                 message, tc, result, system_prompt=SYSTEM_PROMPT,
+                extra_headers=gw_headers or None,
             )
             logger.info(f"Step 4 - LLM formatting: successfully formatted the tool result for user response.")
             return response, tool_messages
@@ -280,6 +293,7 @@ class HotelAgentExecutor(AgentExecutor):
             logger.info("=" * 60)
 
             authorization = self._get_authorization(context)
+            transaction_id = self._get_transaction_id(context)
             token = await self.agent.get_mcp_token(authorization)
 
             # Handle elicitation response
@@ -299,7 +313,7 @@ class HotelAgentExecutor(AgentExecutor):
             conversations.add(context_id, "user", user_text)
 
             # Race: pipeline vs elicitation request
-            tool_task = asyncio.create_task(self.agent.process(user_text, token))
+            tool_task = asyncio.create_task(self.agent.process(user_text, token, transaction_id=transaction_id))
             elicitation_wait = asyncio.create_task(elicitation_mgr.pending_queue.get())
             done, _ = await asyncio.wait({tool_task, elicitation_wait}, return_when=asyncio.FIRST_COMPLETED)
 
@@ -370,6 +384,19 @@ class HotelAgentExecutor(AgentExecutor):
         return None
 
     @staticmethod
+    def _get_transaction_id(context: RequestContext) -> str | None:
+        """Extract the Gravitee Transaction ID from the incoming request.
+
+        When provided on outgoing calls, the gateway preserves it instead of
+        generating a new one — linking all sub-calls into a single transaction.
+        """
+        if context.call_context:
+            headers = context.call_context.state.get("headers", {})
+            return (headers.get("X-Gravitee-Transaction-Id")
+                    or headers.get("x-gravitee-transaction-id"))
+        return None
+
+    @staticmethod
     def _get_elicitation_response(context: RequestContext) -> dict[str, Any] | None:
         if not context.message or not context.message.parts:
             return None
@@ -411,16 +438,27 @@ def create_agent_card() -> AgentCard:
 
 def create_app():
     agent = MCPAgent()
-    handler = DefaultRequestHandler(
+    agent_card = create_agent_card()
+    task_store = InMemoryTaskStore()
+    context_builder = DefaultServerCallContextBuilder()
+
+    handler = LegacyRequestHandler(
         agent_executor=HotelAgentExecutor(agent),
-        task_store=InMemoryTaskStore(),
+        task_store=task_store,
+        agent_card=agent_card,
     )
-    a2a_app = A2AStarletteApplication(
-        agent_card=create_agent_card(), http_handler=handler,
-        context_builder=DefaultCallContextBuilder(),
-        enable_v0_3_compat=True,
+
+    routes = (
+        create_agent_card_routes(agent_card)
+        + create_jsonrpc_routes(
+            handler,
+            rpc_url="/",
+            context_builder=context_builder,
+            enable_v0_3_compat=True,
+        )
     )
-    return a2a_app.build(), agent
+    app = Starlette(routes=routes)
+    return app, agent
 
 
 def main():
