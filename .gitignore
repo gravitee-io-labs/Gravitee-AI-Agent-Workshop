@@ -1,29 +1,30 @@
-# Byte-compiled / optimized / DLL files
-__pycache__/
+# Environment
+.env
 
-# poetry
+# OS
+.DS_Store
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+$RECYCLE.BIN/
+*.lnk
+*~
+.directory
+.Trash-*
+
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+
+# Node
+node_modules/
+
+# Lock files (regenerated per environment)
 poetry.lock
 
-# Environments
-.env
-.venv
-env/
-venv/
-ENV/
-env.bak/
-venv.bak/
-
-# VS Code
-.vscode/
-
-# macOS
-.DS_Store
-
-# Files that might appear in the root of a volume
-.DocumentRevisions-V100
-.fseventsd
-.Spotlight-V100
-.TemporaryItems
-.Trashes
-.VolumeIcon.icns
-.com.apple.timemachine.donotpresent
+# Project runtime artifacts
+apim-gateway-models/
+apim-additional-plugins/.work
