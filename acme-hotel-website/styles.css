@@ -371,7 +371,7 @@ body {
 /* Chat Widget Button */
 .chat-widget-btn {
     position: fixed;
-    bottom: calc(2rem + 50px); /* Above collapsed debug panel */
+    bottom: 2rem;
     right: 2rem;
     width: 60px;
     height: 60px;
@@ -396,7 +396,7 @@ body {
 /* Chat Window */
 .chat-window {
     position: fixed;
-    bottom: calc(2rem + 50px); /* Above collapsed debug panel */
+    bottom: 2rem;
     right: 2rem;
     width: 600px;
     height: 800px;
@@ -407,6 +407,18 @@ body {
     flex-direction: column;
     z-index: 100;
     transition: all 0.3s;
+}
+
+/* Constrain chat to available space when inspector is open */
+body.inspector-open .chat-window {
+    max-width: calc(100vw - var(--inspector-w) - 20px - 4rem);
+}
+
+body.inspector-open .chat-window.maximized {
+    width: calc(100vw - var(--inspector-w) - 20px - 4rem);
+    height: calc(100vh - 4rem);
+    bottom: 3rem;
+    right: 2rem;
 }
 
 .chat-window.maximized {
@@ -670,7 +682,7 @@ body {
     left: 0;
     width: 100%;
     height: 100%;
-    z-index: 1000;
+    z-index: 2000;
     display: flex;
     align-items: center;
     justify-content: center;
@@ -898,128 +910,287 @@ body {
     }
 }
 
-/* Debug Panel */
-.debug-panel {
+/* ── Inspector Side Panel ─────────────────────────────────── */
+:root {
+    --inspector-w: 50vw;
+}
+
+body.inspector-open {
+    padding-left: calc(var(--inspector-w) + 20px);
+    transition: padding-left 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+body.inspector-collapsed {
+    padding-left: 20px;
+    transition: padding-left 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+body:not(.inspector-open):not(.inspector-collapsed) {
+    padding-left: 0;
+    transition: padding-left 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+/* Panel container */
+.inspector-panel {
     position: fixed;
-    bottom: 0;
     left: 0;
-    right: 0;
+    top: 0;
+    bottom: 0;
+    width: var(--inspector-w);
     background: var(--white);
-    border-top: 2px solid var(--light-blue);
-    box-shadow: 0 -4px 20px var(--shadow-lg);
+    box-shadow: 4px 0 20px var(--shadow-lg);
     z-index: 1001;
-    height: 400px;
-    max-height: calc(100vh - 100px); /* Prevent overflow */
+    display: flex;
+    flex-direction: column;
     transition: transform 0.3s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
-.debug-panel.collapsed {
-    transform: translateY(calc(100% - 40px));
+.inspector-panel.collapsed {
+    transform: translateX(calc(-100% - 20px));
+    pointer-events: none;
 }
 
-.debug-panel.collapsed .debug-panel-resize-handle {
-    display: none; /* Hide resize handle when collapsed */
+/* Expand button — fixed at left edge, shown when panel is collapsed */
+.inspector-expand-btn {
+    position: fixed;
+    left: 0;
+    top: 0;
+    bottom: 0;
+    width: 20px;
+    z-index: 1002;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: #e8ecf1;
+    border: none;
+    border-right: 1px solid rgba(0,0,0,0.10);
+    color: rgba(0,0,0,0.35);
+    cursor: pointer;
+    transition: color 0.2s, background 0.2s;
 }
 
-.debug-panel.resizing {
+.inspector-expand-btn:hover {
+    color: var(--primary-blue);
+    background: #dce1e8;
+}
+
+.inspector-expand-btn i {
+    font-size: 14px;
+}
+
+.inspector-panel.resizing {
     transition: none;
 }
 
-.debug-panel-resize-handle {
-    position: absolute;
-    top: 0;
-    left: 0;
-    right: 0;
-    height: 6px;
-    cursor: ns-resize;
+body.inspector-resizing {
+    transition: none !important;
+}
+
+/* Drag overlay — covers iframes during resize to prevent them stealing mouse events */
+.inspector-drag-overlay {
+    display: none;
+    position: fixed;
+    inset: 0;
+    z-index: 9999;
+    cursor: ew-resize;
+}
+
+.inspector-drag-overlay.active {
+    display: block;
+}
+
+/* Header with tabs */
+.inspector-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    background: linear-gradient(135deg, var(--dark-navy), #0f172a);
+    padding: 0 0.5rem 0 0;
+    height: 44px;
+    flex-shrink: 0;
+}
+
+.inspector-tabs {
+    display: flex;
+    height: 100%;
+    flex: 1;
+    min-width: 0;
+}
+
+.inspector-tab {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 0 16px;
+    height: 100%;
+    border: none;
     background: transparent;
+    color: rgba(255,255,255,0.55);
+    font-family: 'Kanit', sans-serif;
+    font-size: 0.82rem;
+    font-weight: 500;
+    cursor: pointer;
+    border-bottom: 2px solid transparent;
+    transition: all 0.2s;
+    white-space: nowrap;
+}
+
+.inspector-tab:hover {
+    color: rgba(255,255,255,0.85);
+    background: rgba(255,255,255,0.05);
+}
+
+.inspector-tab.active {
+    color: #fff;
+    border-bottom-color: var(--primary-blue);
+    background: rgba(255,255,255,0.08);
+}
+
+.inspector-tab i {
+    font-size: 15px;
+    flex-shrink: 0;
+}
+
+.inspector-count {
+    font-size: 0.72rem;
+    background: rgba(255,255,255,0.15);
+    padding: 1px 7px;
+    border-radius: 10px;
+    font-weight: 400;
+    flex-shrink: 0;
+}
+
+/* Toolbar inside requests pane */
+.debug-panel-toolbar {
+    display: flex;
+    justify-content: flex-end;
+    padding: 0.5rem 0 0.25rem 0;
+}
+
+.debug-panel-clear-btn {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    padding: 4px 10px;
+    font-size: 0.78rem;
+    font-weight: 500;
+    color: #888;
+    background: transparent;
+    border: 1px solid #ddd;
+    border-radius: 5px;
+    cursor: pointer;
+    transition: all 0.15s;
+}
+
+.debug-panel-clear-btn:hover {
+    color: #c0392b;
+    border-color: #e8a9a3;
+    background: #fdf0ef;
+}
+
+/* Body area */
+.inspector-body {
+    flex: 1;
+    overflow: hidden;
+    position: relative;
+}
+
+.inspector-pane {
+    display: none;
+    position: absolute;
+    inset: 0;
+    overflow-y: auto;
+    padding: 0.75rem;
+    background: #fafafa;
+}
+
+.inspector-pane.active {
+    display: block;
+}
+
+.inspector-pane[data-panel="agent-flow"] {
+    padding: 0;
+    overflow: hidden;
+}
+
+.inspector-pane[data-panel="agent-flow"] iframe {
+    width: 100%;
+    height: 100%;
+    border: none;
+}
+
+/* Separator (right edge) — collapse button + drag handle */
+.inspector-separator {
+    position: absolute;
+    right: -20px;
+    top: 0;
+    bottom: 0;
+    width: 20px;
     z-index: 10;
     display: flex;
+    flex-direction: column;
+    align-items: center;
+    background: #e8ecf1;
+    border-left: 1px solid rgba(0,0,0,0.10);
+    border-right: 1px solid rgba(0,0,0,0.10);
+}
+
+/* Collapse / expand button at the top */
+.separator-collapse-btn {
+    width: 20px;
+    height: 36px;
+    display: flex;
     align-items: center;
     justify-content: center;
-}
-
-.debug-panel-resize-handle::before {
-    content: '';
-    width: 60px;
-    height: 4px;
-    background: rgba(37, 12, 14, 0.2);
-    border-radius: 2px;
-    transition: all 0.2s;
-}
-
-.debug-panel-resize-handle:hover::before,
-.debug-panel-resize-handle:active::before {
-    background: var(--primary-blue);
-    width: 80px;
-    height: 4px;
-}
-
-.debug-panel-header {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    padding: 0.75rem 1.5rem;
-    background: linear-gradient(135deg, var(--dark-navy), #0f172a);
-    color: var(--white);
-    cursor: pointer;
-    user-select: none;
-    position: relative;
-    height: 40px; /* Fixed height for header */
-}
-
-.debug-panel-title {
-    display: flex;
-    align-items: center;
-    gap: 0.75rem;
-    font-weight: 600;
-    font-size: 0.95rem;
-}
-
-.debug-panel-count {
-    font-size: 0.85rem;
-    opacity: 0.8;
-    font-weight: 400;
-}
-
-.debug-panel-actions {
-    display: flex;
-    gap: 0.5rem;
-}
-
-.debug-panel-btn {
-    background: rgba(255, 255, 255, 0.1);
+    background: transparent;
     border: none;
-    color: var(--white);
-    padding: 0.5rem;
-    border-radius: 6px;
+    color: rgba(0,0,0,0.4);
     cursor: pointer;
-    transition: background-color 0.2s;
-    display: flex;
-    align-items: center;
-    justify-content: center;
+    transition: color 0.2s, background 0.2s;
+    flex-shrink: 0;
+    margin-top: 4px;
 }
 
-.debug-panel-btn:hover {
-    background: rgba(255, 255, 255, 0.2);
+.separator-collapse-btn:hover {
+    color: var(--primary-blue);
+    background: rgba(0,0,0,0.06);
 }
 
-#toggleDebugBtn svg {
+.separator-collapse-btn i {
+    font-size: 14px;
     transition: transform 0.3s;
 }
 
-.debug-panel.collapsed #toggleDebugBtn svg {
-    transform: rotate(0deg);
-}
-
-.debug-panel:not(.collapsed) #toggleDebugBtn svg {
+/* When collapsed, flip the chevron */
+.inspector-panel.collapsed .separator-collapse-btn i {
     transform: rotate(180deg);
 }
 
+/* Drag handle — fills remaining space */
+.separator-drag-handle {
+    flex: 1;
+    width: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: ew-resize;
+    color: rgba(0,0,0,0.25);
+    transition: color 0.2s;
+}
+
+.separator-drag-handle:hover {
+    color: var(--primary-blue);
+}
+
+.separator-drag-handle i {
+    font-size: 18px;
+}
+
+/* Debug content (reused inside inspector pane) */
 .debug-panel-content {
-    height: calc(100% - 40px);
+    height: 100%;
     overflow-y: auto;
-    padding: 1rem;
+    padding: 0.75rem;
     background: #fafafa;
 }
 
@@ -1066,6 +1237,7 @@ body {
     display: flex;
     justify-content: space-between;
     align-items: center;
+    gap: 1rem;
     padding: 0.75rem 1rem;
     cursor: pointer;
     user-select: none;
@@ -1252,6 +1424,58 @@ body {
     border-radius: 4px;
 }
 
+/* JWT decoded claims */
+.jwt-claims-toggle {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    margin-top: 6px;
+    padding: 3px 8px;
+    font-size: 0.72rem;
+    font-weight: 600;
+    color: #d4a017;
+    background: rgba(212, 160, 23, 0.12);
+    border: 1px solid rgba(212, 160, 23, 0.25);
+    border-radius: 4px;
+    cursor: pointer;
+    transition: all 0.15s;
+    font-family: inherit;
+}
+
+.jwt-claims-toggle:hover {
+    background: rgba(212, 160, 23, 0.22);
+    border-color: rgba(212, 160, 23, 0.4);
+}
+
+.jwt-claims-toggle svg {
+    transition: transform 0.2s;
+}
+
+.jwt-claims-toggle.open svg {
+    transform: rotate(180deg);
+}
+
+.jwt-claims-block {
+    margin-top: 6px;
+    padding: 8px 10px;
+    background: #2d2a1e;
+    border: 1px solid rgba(212, 160, 23, 0.2);
+    border-radius: 5px;
+    font-size: 0.8rem;
+    line-height: 1.45;
+}
+
+.jwt-claims-block pre {
+    margin: 0;
+    white-space: pre-wrap;
+    word-wrap: break-word;
+    color: #f0d68a;
+}
+
+.jwt-claim-key { color: #d4a017; }
+.jwt-claim-str { color: #a8db8a; }
+.jwt-claim-num { color: #7cc4f0; }
+
 /* Make code blocks scrollable within columns */
 .debug-column .debug-code-block {
     max-height: 400px;
@@ -1282,22 +1506,22 @@ body {
 
     .chat-window {
         width: 100%;
-        height: calc(100% - 50px); /* Leave space for debug panel */
-        bottom: 50px; /* Above debug panel */
+        height: 100%;
+        bottom: 0;
         right: 0;
         border-radius: 0;
     }
 
     .chat-window.maximized {
         width: 100%;
-        height: calc(100% - 50px); /* Leave space for debug panel */
-        bottom: 50px; /* Above debug panel */
+        height: 100%;
+        bottom: 0;
         right: 0;
         border-radius: 0;
     }
 
     .chat-widget-btn {
-        bottom: calc(1rem + 50px); /* Above debug panel */
+        bottom: 1rem;
         right: 1rem;
     }
 
@@ -1306,6 +1530,19 @@ body {
     }
 
     .btn-with-icon span {
+        display: none;
+    }
+
+    /* Collapse inspector on mobile */
+    body.inspector-open {
+        padding-left: 0;
+    }
+
+    .inspector-panel {
+        width: 100vw !important;
+    }
+
+    .inspector-tab span {
         display: none;
     }
 }

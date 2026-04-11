@@ -10,7 +10,7 @@
     <link rel="stylesheet" href="styles.css">
     <script src="https://unpkg.com/@phosphor-icons/web@2.1.1"></script>
 </head>
-<body>
+<body class="inspector-open">
     <!-- Navigation -->
     <nav class="navbar">
         <div class="nav-container">
@@ -225,41 +225,57 @@
         </div>
     </div>
 
-    <!-- Debug Panel -->
-    <div id="debugPanel" class="debug-panel collapsed">
-        <div class="debug-panel-resize-handle" id="debugPanelResizeHandle"></div>
-        <div class="debug-panel-header">
-            <div class="debug-panel-title">
-                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
-                    <path d="M12 2L2 7l10 5 10-5-10-5z"></path>
-                    <path d="M2 17l10 5 10-5M2 12l10 5 10-5"></path>
-                </svg>
-                <span>API Request Inspector</span>
-                <span class="debug-panel-count" id="debugPanelCount">0 requests</span>
-            </div>
-            <div class="debug-panel-actions">
-                <button id="clearDebugBtn" class="debug-panel-btn" title="Clear history">
-                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                        <path d="M3 6h18M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2m3 0v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6h14z"></path>
-                    </svg>
+    <!-- Drag overlay — prevents iframes stealing mouse during resize -->
+    <div id="inspectorDragOverlay" class="inspector-drag-overlay"></div>
+
+    <!-- Expand button (visible when panel is collapsed) -->
+    <button id="inspectorExpandBtn" class="inspector-expand-btn hidden" title="Open Inspector">
+        <i class="ph ph-caret-right"></i>
+    </button>
+
+    <!-- Inspector Side Panel -->
+    <div id="inspectorPanel" class="inspector-panel">
+        <div class="inspector-header">
+            <div class="inspector-tabs">
+                <button class="inspector-tab active" data-tab="agent-flow">
+                    <span>Agent Flow</span>
                 </button>
-                <button id="toggleDebugBtn" class="debug-panel-btn" title="Toggle panel">
-                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                        <polyline points="18 15 12 9 6 15"></polyline>
-                    </svg>
+                <button class="inspector-tab" data-tab="requests">
+                    <span>API Requests</span>
+                    <span class="inspector-count" id="inspectorCount">0</span>
                 </button>
             </div>
         </div>
-        <div class="debug-panel-content">
-            <div class="debug-panel-empty" id="debugPanelEmpty">
-                <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
-                    <path d="M12 2L2 7l10 5 10-5-10-5z"></path>
-                    <path d="M2 17l10 5 10-5M2 12l10 5 10-5"></path>
-                </svg>
-                <p>No API requests yet</p>
-                <small>Send a message to see the API calls</small>
+        <div class="inspector-body">
+            <div class="inspector-pane active" data-panel="agent-flow">
+                <iframe id="agentFlowFrame" frameborder="0" allowfullscreen></iframe>
             </div>
-            <div class="debug-panel-list" id="debugPanelList"></div>
+            <div class="inspector-pane" data-panel="requests">
+                <div class="debug-panel-toolbar">
+                    <button id="clearInspectorBtn" class="debug-panel-clear-btn" title="Clear requests">
+                        <i class="ph ph-trash" style="font-size:14px"></i>
+                        <span>Clear</span>
+                    </button>
+                </div>
+                <div class="debug-panel-empty" id="debugPanelEmpty">
+                    <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                        <path d="M12 2L2 7l10 5 10-5-10-5z"></path>
+                        <path d="M2 17l10 5 10-5M2 12l10 5 10-5"></path>
+                    </svg>
+                    <p>No API requests yet</p>
+                    <small>Send a message to see the API calls</small>
+                </div>
+                <div class="debug-panel-list" id="debugPanelList"></div>
+            </div>
+        </div>
+        <!-- Separator: collapse button + drag handle -->
+        <div class="inspector-separator" id="inspectorSeparator">
+            <button id="collapseInspectorBtn" class="separator-collapse-btn" title="Collapse panel">
+                <i class="ph ph-caret-left"></i>
+            </button>
+            <div class="separator-drag-handle" id="inspectorResizeHandle" title="Drag to resize">
+                <i class="ph ph-dots-six-vertical"></i>
+            </div>
         </div>
     </div>
 

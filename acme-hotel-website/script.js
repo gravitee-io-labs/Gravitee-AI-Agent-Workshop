@@ -59,14 +59,17 @@ const elements = {
     agentDebugInfo: document.getElementById('agentDebugInfo'),
     oidcDebugInfo: document.getElementById('oidcDebugInfo'),
     
-    // Debug Panel
-    debugPanel: document.getElementById('debugPanel'),
-    toggleDebugBtn: document.getElementById('toggleDebugBtn'),
-    clearDebugBtn: document.getElementById('clearDebugBtn'),
+    // Inspector Panel
+    inspectorPanel: document.getElementById('inspectorPanel'),
+    inspectorDragOverlay: document.getElementById('inspectorDragOverlay'),
+    inspectorExpandBtn: document.getElementById('inspectorExpandBtn'),
+    collapseInspectorBtn: document.getElementById('collapseInspectorBtn'),
+    clearInspectorBtn: document.getElementById('clearInspectorBtn'),
+    inspectorResizeHandle: document.getElementById('inspectorResizeHandle'),
+    inspectorCount: document.getElementById('inspectorCount'),
+    agentFlowFrame: document.getElementById('agentFlowFrame'),
     debugPanelList: document.getElementById('debugPanelList'),
-    debugPanelEmpty: document.getElementById('debugPanelEmpty'),
-    debugPanelCount: document.getElementById('debugPanelCount'),
-    debugPanelResizeHandle: document.getElementById('debugPanelResizeHandle')
+    debugPanelEmpty: document.getElementById('debugPanelEmpty')
 };
 
 // Initialize
@@ -170,25 +173,26 @@ function initializeEventListeners() {
         }
     });
     
-    // Debug Panel
-    if (elements.toggleDebugBtn) {
-        elements.toggleDebugBtn.addEventListener('click', (e) => {
-            e.stopPropagation(); // Prevent header click
-            toggleDebugPanel();
+    // Inspector Panel
+    if (elements.collapseInspectorBtn) {
+        elements.collapseInspectorBtn.addEventListener('click', () => collapseInspector());
+    }
+    if (elements.inspectorExpandBtn) {
+        elements.inspectorExpandBtn.addEventListener('click', () => expandInspector());
+    }
+    if (elements.clearInspectorBtn) {
+        elements.clearInspectorBtn.addEventListener('click', () => clearDebugHistory());
+    }
+    if (elements.inspectorPanel) {
+        elements.inspectorPanel.querySelectorAll('.inspector-tab').forEach(tab => {
+            tab.addEventListener('click', () => switchInspectorTab(tab.dataset.tab));
         });
     }
-    if (elements.clearDebugBtn) {
-        elements.clearDebugBtn.addEventListener('click', (e) => {
-            e.stopPropagation(); // Prevent header click
-            clearDebugHistory();
-        });
+    if (elements.inspectorResizeHandle) {
+        initializeInspectorResize();
     }
-    if (elements.debugPanel) {
-        elements.debugPanel.querySelector('.debug-panel-header').addEventListener('click', toggleDebugPanel);
-    }
-    if (elements.debugPanelResizeHandle) {
-        initializeDebugPanelResize();
-    }
+    // Open inspector by default with Agent Flow tab
+    expandInspector();
     
     console.log('Event listeners setup complete');
 }
@@ -1192,9 +1196,40 @@ function generateId() {
     return `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
 }
 
-// Debug Panel Functions
-function toggleDebugPanel() {
-    elements.debugPanel.classList.toggle('collapsed');
+// Inspector Panel Functions
+let inspectorOpen = false;
+let agentFlowLoaded = false;
+
+function expandInspector() {
+    inspectorOpen = true;
+    elements.inspectorPanel.classList.remove('collapsed');
+    document.body.classList.add('inspector-open');
+    document.body.classList.remove('inspector-collapsed');
+    if (elements.inspectorExpandBtn) elements.inspectorExpandBtn.classList.add('hidden');
+    // Lazy-load Agent Flow iframe on first expand
+    if (!agentFlowLoaded && elements.agentFlowFrame) {
+        const inspectorUrl = `${location.protocol}//${location.hostname}:9002`;
+        elements.agentFlowFrame.src = inspectorUrl;
+        agentFlowLoaded = true;
+    }
+}
+
+function collapseInspector() {
+    inspectorOpen = false;
+    elements.inspectorPanel.classList.add('collapsed');
+    document.body.classList.remove('inspector-open');
+    document.body.classList.add('inspector-collapsed');
+    if (elements.inspectorExpandBtn) elements.inspectorExpandBtn.classList.remove('hidden');
+}
+
+function switchInspectorTab(tabName) {
+    if (!elements.inspectorPanel) return;
+
+    elements.inspectorPanel.querySelectorAll('.inspector-tab').forEach(t =>
+        t.classList.toggle('active', t.dataset.tab === tabName));
+
+    elements.inspectorPanel.querySelectorAll('.inspector-pane').forEach(p =>
+        p.classList.toggle('active', p.dataset.panel === tabName));
 }
 
 function clearDebugHistory() {
@@ -1202,63 +1237,55 @@ function clearDebugHistory() {
     updateDebugPanel();
 }
 
-function initializeDebugPanelResize() {
+function initializeInspectorResize() {
     let isResizing = false;
-    let startY = 0;
-    let startHeight = 0;
-    const minHeight = 100;
-    
-    const getMaxHeight = () => window.innerHeight - 100;
-    
-    elements.debugPanelResizeHandle.addEventListener('mousedown', (e) => {
-        // Don't allow resizing when panel is collapsed
-        if (elements.debugPanel.classList.contains('collapsed')) {
-            return;
-        }
-        
+    let startX = 0;
+    let startWidth = 0;
+    const minWidth = 320;
+    const maxWidth = () => window.innerWidth * 0.8;
+    const overlay = elements.inspectorDragOverlay;
+
+    elements.inspectorResizeHandle.addEventListener('mousedown', (e) => {
+        if (elements.inspectorPanel.classList.contains('collapsed')) return;
+
         isResizing = true;
-        startY = e.clientY;
-        startHeight = elements.debugPanel.offsetHeight;
-        
-        elements.debugPanel.classList.add('resizing');
-        document.body.style.cursor = 'ns-resize';
-        document.body.style.userSelect = 'none';
-        
+        startX = e.clientX;
+        startWidth = elements.inspectorPanel.offsetWidth;
+
+        elements.inspectorPanel.classList.add('resizing');
+        document.body.classList.add('inspector-resizing');
+        if (overlay) overlay.classList.add('active');
+
         e.preventDefault();
-        e.stopPropagation(); // Prevent header click
     });
-    
+
     document.addEventListener('mousemove', (e) => {
         if (!isResizing) return;
-        
-        const deltaY = startY - e.clientY;
-        let newHeight = startHeight + deltaY;
-        
-        // Constrain height dynamically
-        const maxHeight = getMaxHeight();
-        newHeight = Math.max(minHeight, Math.min(newHeight, maxHeight));
-        
-        elements.debugPanel.style.height = `${newHeight}px`;
-        
+
+        const deltaX = e.clientX - startX;
+        let newWidth = startWidth + deltaX;
+        newWidth = Math.max(minWidth, Math.min(newWidth, maxWidth()));
+
+        document.documentElement.style.setProperty('--inspector-w', `${newWidth}px`);
+
         e.preventDefault();
     });
-    
+
     document.addEventListener('mouseup', () => {
         if (isResizing) {
             isResizing = false;
-            elements.debugPanel.classList.remove('resizing');
-            document.body.style.cursor = '';
-            document.body.style.userSelect = '';
+            elements.inspectorPanel.classList.remove('resizing');
+            document.body.classList.remove('inspector-resizing');
+            if (overlay) overlay.classList.remove('active');
         }
     });
-    
-    // Handle window resize
+
     window.addEventListener('resize', () => {
-        const currentHeight = parseInt(elements.debugPanel.style.height) || elements.debugPanel.offsetHeight;
-        const maxHeight = getMaxHeight();
-        
-        if (currentHeight > maxHeight) {
-            elements.debugPanel.style.height = `${maxHeight}px`;
+        if (!inspectorOpen) return;
+        const currentWidth = elements.inspectorPanel.offsetWidth;
+        const max = maxWidth();
+        if (currentWidth > max) {
+            document.documentElement.style.setProperty('--inspector-w', `${max}px`);
         }
     });
 }
@@ -1269,16 +1296,18 @@ function addDebugRequest(requestData) {
         timestamp: new Date().toISOString(),
         ...requestData
     };
-    
+
     requestHistory.unshift(request);
-    
+
     // Keep only last 50 requests
     if (requestHistory.length > 50) {
         requestHistory = requestHistory.slice(0, 50);
     }
-    
+
+
+
     updateDebugPanel();
-    
+
     return request.id;
 }
 
@@ -1291,10 +1320,12 @@ function updateDebugRequest(id, updates) {
 }
 
 function updateDebugPanel() {
-    if (!elements.debugPanelList || !elements.debugPanelEmpty || !elements.debugPanelCount) return;
-    
+    if (!elements.debugPanelList || !elements.debugPanelEmpty) return;
+
     // Update count
-    elements.debugPanelCount.textContent = `${requestHistory.length} request${requestHistory.length !== 1 ? 's' : ''}`;
+    if (elements.inspectorCount) {
+        elements.inspectorCount.textContent = requestHistory.length;
+    }
     
     // Show/hide empty state
     if (requestHistory.length === 0) {
@@ -1375,16 +1406,55 @@ function switchDebugTab(requestId, tabName) {
     element.querySelector(`[data-tab="${tabName}"]`).classList.add('active');
 }
 
+function decodeJwt(token) {
+    try {
+        const parts = token.split('.');
+        if (parts.length !== 3) return null;
+        // base64url → base64 → decode
+        const payload = parts[1].replace(/-/g, '+').replace(/_/g, '/');
+        const json = atob(payload);
+        return JSON.parse(json);
+    } catch { return null; }
+}
+
+function formatJwtClaims(claims) {
+    const lines = JSON.stringify(claims, null, 2);
+    // Syntax-highlight keys, strings, numbers
+    const highlighted = escapeHtml(lines)
+        .replace(/"([^"]+)":/g, '<span class="jwt-claim-key">"$1"</span>:')
+        .replace(/: "([^"]*)"/g, ': <span class="jwt-claim-str">"$1"</span>')
+        .replace(/: (\d+)/g, ': <span class="jwt-claim-num">$1</span>');
+    return highlighted;
+}
+
 function formatHeaders(headers) {
     if (!headers || Object.keys(headers).length === 0) {
         return '<div class="debug-code-block"><pre>No headers</pre></div>';
     }
-    
+
+    let jwtBlock = '';
     const formatted = Object.entries(headers)
-        .map(([key, value]) => `${key}: ${value}`)
+        .map(([key, value]) => {
+            const line = `${key}: ${value}`;
+            // Detect Bearer JWT
+            if (/^authorization$/i.test(key) && /^Bearer\s+ey/i.test(value)) {
+                const token = value.replace(/^Bearer\s+/i, '');
+                const claims = decodeJwt(token);
+                if (claims) {
+                    const uid = 'jwt-' + Math.random().toString(36).slice(2, 8);
+                    jwtBlock = `
+                        <button class="jwt-claims-toggle" onclick="this.classList.toggle('open');this.nextElementSibling.style.display=this.classList.contains('open')?'block':'none'">
+                            <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="6 9 12 15 18 9"/></svg>
+                            JWT Claims
+                        </button>
+                        <div class="jwt-claims-block" style="display:none"><pre>${formatJwtClaims(claims)}</pre></div>`;
+                }
+            }
+            return escapeHtml(line);
+        })
         .join('\n');
-    
-    return `<div class="debug-code-block"><pre>${escapeHtml(formatted)}</pre></div>`;
+
+    return `<div class="debug-code-block"><pre>${formatted}</pre>${jwtBlock}</div>`;
 }
 
 function formatJson(data) {
