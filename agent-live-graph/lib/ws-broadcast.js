@@ -12,6 +12,7 @@ class WsBroadcast {
   constructor() {
     this._clients = new Set();
     this._wss = null;
+    this.onConnect = null; // optional callback(ws) for new connections
   }
 
   /**
@@ -22,6 +23,7 @@ class WsBroadcast {
     this._wss.on('connection', (ws) => {
       this._clients.add(ws);
       console.log(`[WS] Client connected (${this._clients.size} total)`);
+      if (this.onConnect) this.onConnect(ws);
       ws.on('close', () => this._clients.delete(ws));
     });
   }

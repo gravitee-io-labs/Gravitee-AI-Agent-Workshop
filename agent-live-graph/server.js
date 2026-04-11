@@ -27,6 +27,14 @@ const HTTP_PORT = parseInt(process.env.HTTP_PORT || '9002');
 const OTEL_PORT = parseInt(process.env.OTEL_PORT || '4318');
 
 /* ═══════════════════════════════════════════════════════════════
+ * Connection status tracking
+ * ═══════════════════════════════════════════════════════════════ */
+const connStatus = {
+  tcpClients: 0,       // number of active TCP reporter connections
+  otelLastTs: 0,       // timestamp of last OTel data received
+};
+
+/* ═══════════════════════════════════════════════════════════════
  * Module instances
  * ═══════════════════════════════════════════════════════════════ */
 
@@ -42,12 +50,17 @@ function classifyAtFlush(entry) {
   const { evt, protocol } = entry._classifyParams || {};
   if (!evt || !protocol) return entry.steps || [];
 
+  // Pass nested HTTP sub-events (actual backend calls) to the classifier
+  // so it can merge them into the MCP tool-call visualization.
+  evt._httpSubEvents = entry._httpSubEvents || null;
+
   // Look up OTel policies now (they should have arrived by flush time)
   const policies = otel.getPolicies(entry.traceIdHex, entry.apiId);
   return classifyEvent(evt, protocol, policies);
 }
 
 const buffer = new TransactionBuffer({
+  hasOtelData: (traceIdHex, apiId) => otel.hasPolicies(traceIdHex, apiId),
   onFlush(innerEvents, outermost) {
     const allSteps = [];
 
@@ -60,6 +73,27 @@ const buffer = new TransactionBuffer({
       void outSteps;
     }
     for (const evt of innerEvents) {
+      // Resolve OTel policies for nested HTTP sub-events (e.g. backend API calls
+      // within an MCP tool-call). Skip sub-events that share the same apiId as
+      // their parent — they're different routes in the same Gravitee API, so
+      // the OTel store returns the same policy array (avoid showing duplicates).
+      if (evt._httpSubEvents) {
+        for (const sub of evt._httpSubEvents) {
+          if (sub.apiId && sub.apiId === evt.apiId) {
+            // Same API — parent already shows these policies
+            sub._reqPolicies = [];
+            sub._resPolicies = [];
+          } else {
+            const subPolicies = otel.getPolicies(sub.traceIdHex, sub.apiId);
+            const fmt = p => ({
+              name: kebabToTitle(p.name) + (p.durationMs != null ? ` (${p.durationMs}ms)` : ''),
+              passed: p.passed,
+            });
+            sub._reqPolicies = subPolicies.filter(p => p.phase === 'request').map(fmt);
+            sub._resPolicies = subPolicies.filter(p => p.phase === 'response').map(fmt);
+          }
+        }
+      }
       evt.steps = classifyAtFlush(evt);
     }
 
@@ -68,6 +102,7 @@ const buffer = new TransactionBuffer({
     let outResPol = [];
     if (outermost) {
       const outPolicies = otel.getPolicies(outermost.traceIdHex, outermost.apiId);
+
       const fmt = p => ({
         name: kebabToTitle(p.name) + (p.durationMs != null ? ` (${p.durationMs}ms)` : ''),
         passed: p.passed,
@@ -76,34 +111,66 @@ const buffer = new TransactionBuffer({
       outResPol = outPolicies.filter(p => p.phase === 'response').map(fmt);
     }
 
-    /* 2. User → Agent arrows (only for full A2A message flows, not standalone) */
+    /* 2. Determine if the request was blocked at the gateway (error + no inner events) */
+    const blockedAtGateway = outermost
+      && outermost.status >= 400
+      && innerEvents.length === 0;
+
+    /* 3. User → Agent arrows (only for full A2A message flows, not standalone) */
     if (outermost) {
       const userText = outermost.userText || 'User request to agent';
       const rawReq   = outermost.rawRequest || null;
 
-      allSteps.push(
-        { type: 'divider', label: 'User Request' },
-        {
-          type: 'arrow', from: 'client', to: 'gateway',
-          label: `POST ${outermost.uri || '/'}`,
-          message: { lane: 'gateway', text: trunc(userText, 120), rawDetail: rawReq },
-          policies: outReqPol, plan: '',
-        },
-        {
-          type: 'arrow', from: 'gateway', to: 'agent',
-          label: 'Forwarded',
-          message: { lane: 'agent', text: 'Processing request' },
-        },
-      );
+      if (blockedAtGateway) {
+        // Request was blocked by a gateway policy — never reached the agent
+        const s   = outermost.status || 0;
+        const tot = outermost.totalMs || 0;
+        const st  = s >= 400 && s < 500 ? 'warn' : 'err';
+        const rawRes = outermost.rawResponse || null;
+        const hasBlockingPolicy = outReqPol.some(p => !p.passed);
+
+        allSteps.push(
+          { type: 'divider', label: hasBlockingPolicy ? 'Request Blocked by Policy' : `Request Rejected (${s})` },
+          {
+            type: 'arrow', from: 'client', to: 'gateway',
+            label: `POST ${outermost.uri || '/'}`,
+            message: { lane: 'gateway', text: trunc(userText, 120), rawDetail: rawReq },
+            policies: outReqPol, plan: '',
+          },
+          {
+            type: 'arrow', from: 'gateway', to: 'client',
+            label: `${s} — ${tot}ms`,
+            message: { lane: 'client', text: `Blocked — ${s}`, rawDetail: rawRes },
+            policies: outResPol,
+            badge: { type: st, text: `${tot}ms total` },
+          },
+        );
+      } else {
+        // Normal flow — request was forwarded to the agent
+        allSteps.push(
+          { type: 'divider', label: 'User Request' },
+          {
+            type: 'arrow', from: 'client', to: 'gateway',
+            label: `POST ${outermost.uri || '/'}`,
+            message: { lane: 'gateway', text: trunc(userText, 120), rawDetail: rawReq },
+            policies: outReqPol, plan: '',
+          },
+          {
+            type: 'arrow', from: 'gateway', to: 'agent',
+            label: 'Forwarded',
+            message: { lane: 'agent', text: 'Processing request' },
+          },
+        );
+      }
     }
 
-    /* 3. All intermediate events chronologically */
+    /* 4. All intermediate events chronologically */
     for (const evt of innerEvents) {
       allSteps.push(...evt.steps);
     }
 
-    /* 4. Agent → User arrows */
-    if (outermost) {
+    /* 5. Agent → User arrows (only for non-blocked flows) */
+    if (outermost && !blockedAtGateway) {
       const agentText = outermost.agentText
         || (outermost.status < 400 ? 'Agent replied' : `Error ${outermost.status}`);
       const rawRes = outermost.rawResponse || null;
@@ -130,7 +197,7 @@ const buffer = new TransactionBuffer({
 
     const ts = (outermost || innerEvents[innerEvents.length - 1] || {}).timestamp || Date.now();
 
-    /* 5. Compute flow-level stats and tags for the frontend */
+    /* 6. Compute flow-level stats and tags for the frontend */
     let mcpCalls = 0, llmCalls = 0, totalTokens = 0;
     const tags = new Set();
 
@@ -150,7 +217,9 @@ const buffer = new TransactionBuffer({
       }
     }
 
-    if (outermost) {
+    if (blockedAtGateway) {
+      tags.add('blocked');
+    } else if (outermost) {
       tags.add('complete-flow');
     } else if (innerEvents.length === 1) {
       const e = innerEvents[0];
@@ -160,9 +229,13 @@ const buffer = new TransactionBuffer({
       }
     }
 
+    const flowName = blockedAtGateway ? 'Blocked Request'
+      : outermost ? 'Complete Flow'
+      : (innerEvents[0] || {}).apiName || '?';
+
     ws.broadcast({
       type:      'live-steps',
-      apiName:   outermost ? 'Complete Flow' : (innerEvents[0] || {}).apiName || '?',
+      apiName:   flowName,
       timestamp: ts,
       steps:     allSteps,
       stats:     { mcpCalls, llmCalls, totalTokens },
@@ -189,10 +262,14 @@ function isNoise(evt) {
  * W3C format: 00-{traceId 32hex}-{spanId 16hex}-{flags 2hex}
  * ═══════════════════════════════════════════════════════════════ */
 function extractTraceId(log) {
-  // Look for traceparent in: entrypoint request → endpoint request headers
+  // Look for traceparent in all available header sources.
+  // When a policy blocks a request before forwarding, there are no endpoint
+  // request headers — but the gateway still puts traceparent in response headers.
   const sources = [
-    (log.entrypointRequest  || {}).headers,
-    (log.endpointRequest    || {}).headers,
+    (log.entrypointRequest   || {}).headers,
+    (log.endpointRequest     || {}).headers,
+    (log.entrypointResponse  || {}).headers,
+    (log.endpointResponse    || {}).headers,
   ];
   for (const headers of sources) {
     if (!headers) continue;
@@ -214,7 +291,9 @@ function extractTraceId(log) {
  * ═══════════════════════════════════════════════════════════════ */
 
 const tcpServer = net.createServer((socket) => {
-  console.log(`[TCP] Gateway reporter connected from ${socket.remoteAddress}`);
+  connStatus.tcpClients++;
+  console.log(`[TCP] Gateway reporter connected from ${socket.remoteAddress} (${connStatus.tcpClients} active)`);
+  broadcastConnStatus();
   let tcpBuffer = '';
 
   socket.on('data', (chunk) => {
@@ -229,8 +308,17 @@ const tcpServer = net.createServer((socket) => {
     }
   });
 
+  let disconnected = false;
+  function onDisconnect() {
+    if (disconnected) return;
+    disconnected = true;
+    connStatus.tcpClients = Math.max(0, connStatus.tcpClients - 1);
+    console.log(`[TCP] Gateway reporter disconnected (${connStatus.tcpClients} active)`);
+    broadcastConnStatus();
+  }
   socket.on('error', (err) => console.log(`[TCP] Error: ${err.message}`));
-  socket.on('end',   ()    => console.log('[TCP] Gateway reporter disconnected'));
+  socket.on('end', onDisconnect);
+  socket.on('close', onDisconnect);
 });
 
 function processEvent(evt) {
@@ -262,6 +350,7 @@ function processEvent(evt) {
    * Classification is deferred to FLUSH time so that OTel spans (which may arrive
    * after the TCP event) have time to be ingested and cached. */
   const traceIdHex = extractTraceId(log);
+
 
   /* ── Detect outermost request (A2A message/send, NOT standalone agent-card) ── */
   const isOutermost = protocol.protocol === 'a2a' && !protocol.standalone;
@@ -339,10 +428,34 @@ const httpServer = http.createServer((req, res) => {
 
 ws.attach(httpServer);
 
+// Send connection status to each new WS client on connect
+ws.onConnect = (client) => {
+  client.send(JSON.stringify(buildConnStatus()));
+};
+
 httpServer.listen(HTTP_PORT, '0.0.0.0', () =>
   console.log(`[HTTP] Frontend -> http://localhost:${HTTP_PORT}`));
 
 /* ═══════════════════════════════════════════════════════════════
  * OpenTelemetry receiver
  * ═══════════════════════════════════════════════════════════════ */
+otel.onData = () => {
+  connStatus.otelLastTs = Date.now();
+  broadcastConnStatus();
+};
 otel.start(OTEL_PORT);
+
+/* ═══════════════════════════════════════════════════════════════
+ * Connection status broadcasting
+ * ═══════════════════════════════════════════════════════════════ */
+function buildConnStatus() {
+  return {
+    type: 'connection-status',
+    tcp:  { connected: connStatus.tcpClients > 0, clients: connStatus.tcpClients },
+    otel: { active: connStatus.otelLastTs > 0 && (Date.now() - connStatus.otelLastTs) < 30_000 },
+  };
+}
+
+function broadcastConnStatus() {
+  ws.broadcast(buildConnStatus());
+}

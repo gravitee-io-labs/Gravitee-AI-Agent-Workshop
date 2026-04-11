@@ -90,7 +90,50 @@ header {
 
 .header-right { display: flex; align-items: center; gap: 10px; }
 
-/* ── Connection Indicator ─────────────────────────────────── */
+/* ── Connection Indicators ────────────────────────────────── */
+.conn-indicators {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.conn-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 2px 8px;
+  border-radius: 10px;
+  background: rgba(0,0,0,0.03);
+  border: 1px solid var(--border);
+}
+
+.conn-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--text-3);
+  transition: all 0.3s;
+  flex-shrink: 0;
+}
+
+.conn-badge.active .conn-dot {
+  background: var(--ok);
+  box-shadow: 0 0 5px rgba(5,150,105,0.4);
+}
+
+.conn-name {
+  font-size: 10px;
+  font-weight: 600;
+  color: var(--text-3);
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+}
+
+.conn-badge.active .conn-name {
+  color: var(--text-2);
+}
+
+/* ── WS Indicator ────────────────────────────────────────── */
 .mode-dot {
   width: 7px;
   height: 7px;
@@ -241,7 +284,6 @@ main {
   position: relative;
   z-index: 5;
   padding: 0 0 80px;
-  min-height: 100%;
   background-image:
     repeating-linear-gradient(180deg, rgba(107,114,128,0.10) 0, rgba(107,114,128,0.10) 4px, transparent 4px, transparent 12px),
     repeating-linear-gradient(180deg, rgba(124,58,237,0.13) 0, rgba(124,58,237,0.13) 4px, transparent 4px, transparent 12px),
@@ -255,13 +297,8 @@ main {
 
 /* ── Step Row ──────────────────────────────────────────────── */
 .step-row {
-  opacity: 0;
-  transform: translateY(6px);
-  transition: opacity 0.35s, transform 0.35s;
   padding: 0 8px;
 }
-
-.step-row.visible { opacity: 1; transform: translateY(0); }
 
 /* ── Arrow Zone ────────────────────────────────────────────── */
 .arrow-zone {
@@ -314,53 +351,10 @@ main {
   font-weight: 500;
   color: var(--text-2);
   pointer-events: none;
-  opacity: 0;
-  transition: opacity 0.3s 0.1s;
 }
-
-.step-row.visible .arrow-label { opacity: 1; }
 
 .step-arrow.dir-right .arrow-label { left: 8px; }
 .step-arrow.dir-left .arrow-label  { right: 8px; }
-
-/* Animated particle */
-.arrow-particle {
-  position: absolute;
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
-  top: -3px;
-  opacity: 0;
-  z-index: 9;
-}
-
-.step-row.visible .arrow-particle { opacity: 1; }
-
-.step-arrow.dir-right .arrow-particle {
-  animation: particleR 0.5s ease-in-out forwards;
-  background: var(--arrow-to);
-  box-shadow: 0 0 8px var(--arrow-to);
-}
-
-.step-arrow.dir-left .arrow-particle {
-  animation: particleL 0.5s ease-in-out forwards;
-  background: var(--arrow-to);
-  box-shadow: 0 0 8px var(--arrow-to);
-}
-
-@keyframes particleR {
-  0%   { left: 0; opacity: 0; }
-  15%  { opacity: 0.7; }
-  85%  { opacity: 0.7; }
-  100% { left: calc(100% - 8px); opacity: 0; }
-}
-
-@keyframes particleL {
-  0%   { left: calc(100% - 8px); opacity: 0; }
-  15%  { opacity: 0.7; }
-  85%  { opacity: 0.7; }
-  100% { left: 0; opacity: 0; }
-}
 
 /* ── Content Zone (5-col grid) ────────────────────────────── */
 .content-zone {
@@ -561,14 +555,6 @@ main {
 /* ── Collapsible Flow Wrapper ─────────────────────────────── */
 .flow-wrapper {
   margin: 12px 0 0;
-  opacity: 0;
-  transform: translateY(4px);
-  transition: opacity 0.3s, transform 0.3s;
-}
-
-.flow-wrapper.visible {
-  opacity: 1;
-  transform: translateY(0);
 }
 
 .flow-summary {
@@ -729,12 +715,7 @@ main {
 /* ── Section Divider ──────────────────────────────────────── */
 .step-divider {
   padding: 16px 8px 4px;
-  opacity: 0;
-  transform: translateY(4px);
-  transition: opacity 0.3s, transform 0.3s;
 }
-
-.step-divider.visible { opacity: 1; transform: translateY(0); }
 
 .divider-inner {
   display: flex;
@@ -773,11 +754,7 @@ main {
   justify-content: center;
   gap: 12px;
   padding: 32px 24px;
-  opacity: 0;
-  transition: opacity 0.3s;
 }
-
-.tx-progress.visible { opacity: 1; }
 
 .txp-spinner {
   width: 20px;
@@ -1283,16 +1260,3 @@ footer {
 .modal-body::-webkit-scrollbar-track { background: transparent; }
 .modal-body::-webkit-scrollbar-thumb { background: rgba(0,0,0,0.08); border-radius: 2px; }
 
-/* ── Flash highlight for new live events ───────────────────── */
-.step-row.flash {
-  animation: flashBg 1.2s ease-out;
-}
-
-@keyframes flashBg {
-  0%   { background: rgba(2,132,199,0.06); }
-  100% { background: transparent; }
-}
-
-.step-divider.flash {
-  animation: flashBg 1.2s ease-out;
-}

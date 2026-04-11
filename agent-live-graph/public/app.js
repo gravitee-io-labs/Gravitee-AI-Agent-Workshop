@@ -1,16 +1,14 @@
 /**
- * Gravitee AI Agent Inspector — App
+ * Gravitee AI Agent Inspector — Frontend
  *
- * Live sequence diagram for real events from the Gravitee Gateway.
- * Events arrive via WebSocket from the server (TCP reporter + OTel).
- * Protocol detection and policy details are fully automatic.
- *
- * Light theme · Click-to-popup details · Policy blocks on gateway lane
+ * Renders live sequence diagrams from gateway events received via WebSocket.
+ * Events are grouped by transactionId on the server; the frontend just
+ * renders the classified steps (dividers + arrows) inside collapsible flows.
  */
 (() => {
   'use strict';
 
-  /* ── Lane geometry ──────────────────────────────────────── */
+  /* ── Lane geometry ─────────────────────────────────────── */
   const LANES = { client: 0, agent: 1, gateway: 2, llm: 3, api: 4 };
   const centerPct = (idx) => (idx * 20) + 10;
   const LANE_COLORS = {
@@ -31,7 +29,7 @@
     try { return JSON.stringify(JSON.parse(s), null, 2); } catch { return s; }
   }
 
-  /* ── DOM refs ───────────────────────────────────────────── */
+  /* ── DOM refs ──────────────────────────────────────────── */
   const stepsEl      = document.getElementById('stepsContainer');
   const graphArea    = document.getElementById('graphArea');
   const wsIndicator  = document.getElementById('wsIndicator');
@@ -44,19 +42,21 @@
   const modalTitle   = document.getElementById('modalTitle');
   const modalBody    = document.getElementById('modalBody');
   const modalClose   = document.getElementById('modalClose');
+  const connTcp      = document.getElementById('connTcp');
+  const connOtel     = document.getElementById('connOtel');
 
-  /* ── State ──────────────────────────────────────────────── */
+  /* ── State ─────────────────────────────────────────────── */
   let ws           = null;
   let liveCount    = 0;
-  let currentGroup    = null;   // tracks current <details> group body for arrows
-  let currentFlowBody = null;   // tracks current flow wrapper body
-  let activeFilter    = 'all';  // current filter tag
-  const seenTags      = new Set(); // all tags seen so far
+  let currentGroup    = null;
+  let currentFlowBody = null;
+  let activeFilter    = 'all';
+  const seenTags      = new Set();
 
-  /* ── Tag display names ─────────────────────────────────── */
   const TAG_LABELS = {
     'all':            'All',
     'complete-flow':  'Complete Flow',
+    'blocked':        'Blocked',
     'agent-card':     'Agent Card',
     'tool-discovery': 'Tool Discovery',
     'tool-call':      'Tool Call',
@@ -69,17 +69,12 @@
   function updateFilterBar(tags) {
     let changed = false;
     for (const tag of tags) {
-      if (!seenTags.has(tag)) {
-        seenTags.add(tag);
-        changed = true;
-      }
+      if (!seenTags.has(tag)) { seenTags.add(tag); changed = true; }
     }
     if (!changed) return;
 
     const group = filterBar.querySelector('.filter-group');
-    // Rebuild pills after the icon + "All" pill
-    const existing = group.querySelectorAll('.filter-pill:not([data-tag="all"])');
-    existing.forEach(p => p.remove());
+    group.querySelectorAll('.filter-pill:not([data-tag="all"])').forEach(p => p.remove());
 
     const order = ['complete-flow', 'agent-card', 'tool-discovery', 'tool-call', 'llm-decision', 'llm-response', 'mcp'];
     for (const tag of order) {
@@ -96,15 +91,10 @@
     activeFilter = tag;
     filterBar.querySelectorAll('.filter-pill').forEach(p =>
       p.classList.toggle('active', p.dataset.tag === tag));
-
-    const wrappers = stepsEl.querySelectorAll('.flow-wrapper');
-    for (const w of wrappers) {
-      if (tag === 'all') {
-        w.style.display = '';
-      } else {
-        const wTags = (w.dataset.tags || '').split(',');
-        w.style.display = wTags.includes(tag) ? '' : 'none';
-      }
+    for (const w of stepsEl.querySelectorAll('.flow-wrapper')) {
+      if (tag === 'all') { w.style.display = ''; continue; }
+      const wTags = (w.dataset.tags || '').split(',');
+      w.style.display = wTags.includes(tag) ? '' : 'none';
     }
   }
 
@@ -113,9 +103,9 @@
     if (pill) applyFilter(pill.dataset.tag);
   });
 
-  /* ════════════════════════════════════════════════════════════
-   * RENDERING ENGINE
-   * ════════════════════════════════════════════════════════════ */
+  /* ═══════════════════════════════════════════════════════════
+   * RENDERING
+   * ═══════════════════════════════════════════════════════════ */
 
   function renderStep(step) {
     if (step.type === 'divider') return renderDivider(step);
@@ -123,7 +113,7 @@
     return document.createElement('div');
   }
 
-  /* ── Divider ────────────────────────────────────────────── */
+  /* ── Divider ───────────────────────────────────────────── */
   function renderDivider(step) {
     const el = document.createElement('div');
     el.className = 'step-divider';
@@ -141,7 +131,7 @@
     return el;
   }
 
-  /* ── Arrow (grid-based) ─────────────────────────────────── */
+  /* ── Arrow ─────────────────────────────────────────────── */
   function renderArrow(step) {
     const row = document.createElement('div');
     row.className = 'step-row';
@@ -172,10 +162,6 @@
         lbl.textContent = step.label;
         arrow.appendChild(lbl);
       }
-
-      const particle = document.createElement('div');
-      particle.className = 'arrow-particle';
-      arrow.appendChild(particle);
 
       arrowZone.appendChild(arrow);
     }
@@ -231,7 +217,7 @@
     return row;
   }
 
-  /* ── Message card ───────────────────────────────────────── */
+  /* ── Message card ──────────────────────────────────────── */
   function createCard(msg) {
     const card = document.createElement('div');
     card.className = `msg-card msg-${msg.lane}`;
@@ -275,18 +261,14 @@
       hint.className = 'msg-hint';
       hint.innerHTML = `<i class="ph ph-magnifying-glass"></i> Click for details`;
       card.appendChild(hint);
-
       card.setAttribute('data-clickable', 'true');
-      card.addEventListener('click', (e) => {
-        e.stopPropagation();
-        openModal(msg.text, msg.rawDetail);
-      });
+      card.addEventListener('click', (e) => { e.stopPropagation(); openModal(msg.text, msg.rawDetail); });
     }
 
     return card;
   }
 
-  /* ── Detail Modal (tabbed: Pretty + Raw) ─────────────────── */
+  /* ── Detail Modal (Pretty + Raw tabs) ──────────────────── */
   function openModal(title, raw) {
     modalTitle.textContent = title;
 
@@ -314,13 +296,11 @@
     detailModal.classList.add('open');
   }
 
-  function tryParseJSON(s) {
-    try { return JSON.parse(s); } catch { return null; }
-  }
+  function tryParseJSON(s) { try { return JSON.parse(s); } catch { return null; } }
 
-  /* ── Pretty view — type-aware rendering ──────────────────── */
+  /* ── Pretty view — type-aware rendering ────────────────── */
   function renderPrettyView(obj) {
-    // LLM Request: model + messages
+    // LLM Request
     if (obj.model && obj.messages) {
       const tools = obj.tools || [];
       let html = `<div class="pv-section"><span class="pv-label">Model</span><span class="pv-value">${escapeHtml(obj.model)}</span></div>`;
@@ -340,7 +320,7 @@
       return html;
     }
 
-    // LLM Response: choices array
+    // LLM Response
     if (obj.choices && Array.isArray(obj.choices)) {
       const msg = (obj.choices[0] || {}).message || {};
       const toolCalls = msg.tool_calls || [];
@@ -349,7 +329,17 @@
         html += `<div class="pv-section"><span class="pv-label">Tool calls</span><span class="pv-value">${toolCalls.length}</span></div>`;
         html += `<ul class="pv-list">${toolCalls.map(tc => {
           const fn = tc.function || {};
-          return `<li><strong>${escapeHtml(fn.name || '?')}</strong>${fn.arguments ? `<pre class="pv-inline-pre">${escapeHtml(typeof fn.arguments === 'string' ? fn.arguments : JSON.stringify(fn.arguments, null, 2))}</pre>` : ''}</li>`;
+          let argsDisplay = '';
+          if (fn.arguments) {
+            // Pretty-print JSON arguments
+            try {
+              const parsed = typeof fn.arguments === 'string' ? JSON.parse(fn.arguments) : fn.arguments;
+              argsDisplay = JSON.stringify(parsed, null, 2);
+            } catch {
+              argsDisplay = String(fn.arguments);
+            }
+          }
+          return `<li><strong>${escapeHtml(fn.name || '?')}</strong>${argsDisplay ? `<pre class="pv-inline-pre">${escapeHtml(argsDisplay)}</pre>` : ''}</li>`;
         }).join('')}</ul>`;
       } else if (msg.content) {
         html += `<div class="pv-section"><span class="pv-label">Content</span></div>`;
@@ -361,7 +351,7 @@
       return html || renderGenericView(obj);
     }
 
-    // MCP Request: method = tools/*
+    // MCP Request
     if (obj.method && typeof obj.method === 'string' && obj.method.startsWith('tools/')) {
       let html = `<div class="pv-section"><span class="pv-label">Method</span><span class="pv-value">${escapeHtml(obj.method)}</span></div>`;
       if (obj.params && obj.params.name) {
@@ -374,7 +364,7 @@
       return html;
     }
 
-    // MCP Response: result.tools or result.content
+    // MCP Response
     if (obj.result && (obj.result.tools || obj.result.content)) {
       let html = '';
       if (obj.result.tools) {
@@ -383,15 +373,14 @@
       }
       if (obj.result.content) {
         html += `<div class="pv-section"><span class="pv-label">Result content</span></div>`;
-        const texts = (obj.result.content || []).filter(c => c.type === 'text');
-        for (const t of texts) {
-          html += `<pre class="pv-pre">${escapeHtml(t.text.slice(0, 2000))}${t.text.length > 2000 ? '...' : ''}</pre>`;
+        for (const t of (obj.result.content || []).filter(c => c.type === 'text')) {
+          html += formatTextContent(t.text);
         }
       }
       return html || renderGenericView(obj);
     }
 
-    // A2A Request: params.message
+    // A2A Request
     if (obj.params && obj.params.message) {
       let html = '';
       if (obj.method) html += `<div class="pv-section"><span class="pv-label">Method</span><span class="pv-value">${escapeHtml(obj.method)}</span></div>`;
@@ -403,7 +392,7 @@
       return html || renderGenericView(obj);
     }
 
-    // A2A Response: result.parts / result.artifacts / result.status
+    // A2A Response
     if (obj.result && (obj.result.parts || obj.result.artifacts || obj.result.status)) {
       let html = '';
       if (obj.result.parts) {
@@ -435,7 +424,7 @@
     return renderGenericView(obj);
   }
 
-  /* ── Lightweight Markdown to HTML ───────────────────────── */
+  /* ── Lightweight Markdown → HTML ───────────────────────── */
   function renderMarkdown(text) {
     if (!text) return '';
     let html = escapeHtml(text);
@@ -455,6 +444,29 @@
     return '<p>' + html + '</p>';
   }
 
+  /**
+   * Format text content — auto-detect JSON and pretty-print it,
+   * otherwise render as markdown or plain pre-formatted text.
+   */
+  function formatTextContent(text) {
+    if (!text) return '';
+    const trimmed = text.trim();
+    // Try parsing as JSON
+    if ((trimmed.startsWith('{') || trimmed.startsWith('[')) && trimmed.length < 50_000) {
+      try {
+        const parsed = JSON.parse(trimmed);
+        return `<pre class="pv-pre">${escapeHtml(JSON.stringify(parsed, null, 2))}</pre>`;
+      } catch { /* not JSON, fall through */ }
+    }
+    // Looks like markdown? Render it
+    if (/[#*`\-]/.test(trimmed.slice(0, 50))) {
+      return `<div class="pv-markdown">${renderMarkdown(trimmed)}</div>`;
+    }
+    // Plain text
+    const display = trimmed.length > 2000 ? trimmed.slice(0, 2000) + '...' : trimmed;
+    return `<pre class="pv-pre">${escapeHtml(display)}</pre>`;
+  }
+
   function renderGenericView(obj) {
     let html = '';
     for (const [key, val] of Object.entries(obj)) {
@@ -470,24 +482,16 @@
   }
 
   function closeModal() { detailModal.classList.remove('open'); }
-
   modalClose.addEventListener('click', closeModal);
-  detailModal.addEventListener('click', (e) => {
-    if (e.target === detailModal) closeModal();
-  });
-  document.addEventListener('keydown', (e) => {
-    if (e.key === 'Escape') closeModal();
-  });
+  detailModal.addEventListener('click', (e) => { if (e.target === detailModal) closeModal(); });
+  document.addEventListener('keydown', (e) => { if (e.key === 'Escape') closeModal(); });
 
-  /* ── Scroll helper ──────────────────────────────────────── */
+  /* ── Scroll helper ─────────────────────────────────────── */
   function scrollToBottom() {
     graphArea.scrollTo({ top: graphArea.scrollHeight, behavior: 'smooth' });
   }
 
-  /* ── Group state ────────────────────────────────────────── */
-  function resetGroupState() { currentGroup = null; currentFlowBody = null; }
-
-  /* ── Flow-level wrapper (collapsible per request) ─────── */
+  /* ── Flow-level wrapper (collapsible per transaction) ─── */
   function extractFlowSummary(steps, msg) {
     let userText = '', totalTime = '', status = 'ok';
     const phases = [];
@@ -515,11 +519,7 @@
 
   function formatTime(ts) {
     const d = new Date(ts);
-    const hh = String(d.getHours()).padStart(2, '0');
-    const mm = String(d.getMinutes()).padStart(2, '0');
-    const ss = String(d.getSeconds()).padStart(2, '0');
-    const ms = String(d.getMilliseconds()).padStart(3, '0');
-    return `${hh}:${mm}:${ss}.${ms}`;
+    return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}:${String(d.getSeconds()).padStart(2, '0')}.${String(d.getMilliseconds()).padStart(3, '0')}`;
   }
 
   function createFlowWrapper(summary) {
@@ -527,7 +527,6 @@
     details.className = 'flow-wrapper';
     details.open = false;
 
-    // Store tags for filtering
     if (summary.tags && summary.tags.length) {
       details.dataset.tags = summary.tags.join(',');
     }
@@ -539,17 +538,10 @@
     const phasesStr = summary.phases.join(' \u00b7 ');
     const stats = summary.stats || {};
 
-    // Build stat badges
     let statBadges = '';
-    if (stats.mcpCalls > 0) {
-      statBadges += `<span class="flow-stat flow-stat-mcp"><i class="ph ph-plug"></i>${stats.mcpCalls} MCP</span>`;
-    }
-    if (stats.llmCalls > 0) {
-      statBadges += `<span class="flow-stat flow-stat-llm"><i class="ph ph-brain"></i>${stats.llmCalls} LLM</span>`;
-    }
-    if (stats.totalTokens > 0) {
-      statBadges += `<span class="flow-stat flow-stat-tokens"><i class="ph ph-coins"></i>${stats.totalTokens.toLocaleString()}</span>`;
-    }
+    if (stats.mcpCalls > 0)    statBadges += `<span class="flow-stat flow-stat-mcp"><i class="ph ph-plug"></i>${stats.mcpCalls} MCP</span>`;
+    if (stats.llmCalls > 0)    statBadges += `<span class="flow-stat flow-stat-llm"><i class="ph ph-brain"></i>${stats.llmCalls} LLM</span>`;
+    if (stats.totalTokens > 0) statBadges += `<span class="flow-stat flow-stat-tokens"><i class="ph ph-coins"></i>${stats.totalTokens.toLocaleString()}</span>`;
 
     s.innerHTML = `
       <span class="flow-timestamp">${formatTime(summary.timestamp)}</span>
@@ -571,39 +563,35 @@
     return details;
   }
 
-  function appendStepToDOM(step, container) {
+  /* ── Append a step inside the current flow/group ───────── */
+  function appendStep(step, container) {
     const el = renderStep(step);
 
     if (step.type === 'divider') {
-      const details = document.createElement('details');
-      details.className = 'step-group';
-      details.open = false;
+      const group = document.createElement('details');
+      group.className = 'step-group';
+      group.open = false;
 
       const summary = document.createElement('summary');
       summary.className = 'step-group-summary';
       summary.appendChild(el);
-      details.appendChild(summary);
+      group.appendChild(summary);
 
       const body = document.createElement('div');
       body.className = 'step-group-body';
-      details.appendChild(body);
+      group.appendChild(body);
 
-      container.appendChild(details);
+      container.appendChild(group);
       currentGroup = body;
-
-      requestAnimationFrame(() => requestAnimationFrame(() => el.classList.add('visible')));
-      return el;
+      return;
     }
 
-    const target = currentGroup || container;
-    target.appendChild(el);
-    requestAnimationFrame(() => requestAnimationFrame(() => el.classList.add('visible')));
-    return el;
+    (currentGroup || container).appendChild(el);
   }
 
-  /* ════════════════════════════════════════════════════════════
-   * WEBSOCKET — Live event consumer
-   * ════════════════════════════════════════════════════════════ */
+  /* ═══════════════════════════════════════════════════════════
+   * WEBSOCKET
+   * ═══════════════════════════════════════════════════════════ */
 
   function connectWS() {
     const proto = location.protocol === 'https:' ? 'wss' : 'ws';
@@ -617,8 +605,9 @@
     ws.onmessage = (e) => {
       try {
         const msg = JSON.parse(e.data);
-        if (msg.type === 'live-steps')  onLiveSteps(msg);
-        if (msg.type === 'tx-progress') onTxProgress(msg);
+        if (msg.type === 'live-steps')        onLiveSteps(msg);
+        if (msg.type === 'tx-progress')       onTxProgress(msg);
+        if (msg.type === 'connection-status') onConnStatus(msg);
       } catch (_) { /* ignore */ }
     };
 
@@ -628,6 +617,12 @@
     };
 
     ws.onerror = () => ws.close();
+  }
+
+  /* ── Connection status indicators ─────────────────────── */
+  function onConnStatus(msg) {
+    if (connTcp) connTcp.classList.toggle('active', msg.tcp?.connected);
+    if (connOtel) connOtel.classList.toggle('active', msg.otel?.active);
   }
 
   /* ── Transaction progress indicator ────────────────────── */
@@ -652,8 +647,6 @@
           <span class="txp-count">${msg.buffered}</span>
         </div>`;
       stepsEl.appendChild(progressIndicator);
-      requestAnimationFrame(() =>
-        requestAnimationFrame(() => progressIndicator && progressIndicator.classList.add('visible')));
     } else {
       progressIndicator.querySelector('.txp-count').textContent = msg.buffered;
     }
@@ -665,100 +658,55 @@
   }
 
   function removeProgressIndicator() {
-    if (progressIndicator) {
-      progressIndicator.remove();
-      progressIndicator = null;
-    }
+    if (progressIndicator) { progressIndicator.remove(); progressIndicator = null; }
   }
 
-  /* ── Staggered rendering queue ──────────────────────────── */
-  let renderQueue = [];
-  let renderTimer = null;
-  const DELAY_DIVIDER = 200;
-  const DELAY_ARROW   = 350;
-
-  function drainQueue() {
-    if (!renderQueue.length) { renderTimer = null; return; }
-
-    const step = renderQueue.shift();
-
-    if (step.type === 'flow-start') {
-      const wrapper = createFlowWrapper(step.summary);
-      // Apply current filter to new wrapper
-      if (activeFilter !== 'all') {
-        const wTags = (wrapper.dataset.tags || '').split(',');
-        if (!wTags.includes(activeFilter)) wrapper.style.display = 'none';
-      }
-      stepsEl.appendChild(wrapper);
-      currentFlowBody = wrapper.querySelector('.flow-body');
-      currentGroup = null;
-      requestAnimationFrame(() => requestAnimationFrame(() => wrapper.classList.add('visible')));
-      drainQueue();
-      return;
-    }
-    if (step.type === 'flow-end') {
-      currentFlowBody = null;
-      currentGroup = null;
-      drainQueue();
-      return;
-    }
-
-    const container = currentFlowBody || stepsEl;
-    const el = appendStepToDOM(step, container);
-    el.classList.add('flash');
-
-    liveCount++;
-    eventCountEl.textContent = liveCount;
-    scrollToBottom();
-
-    if (renderQueue.length) {
-      const next  = renderQueue[0];
-      const delay = (next.type === 'flow-start' || next.type === 'flow-end') ? 0
-                  : next.type === 'divider' ? DELAY_DIVIDER : DELAY_ARROW;
-      renderTimer = setTimeout(drainQueue, delay);
-    } else {
-      renderTimer = null;
-    }
-  }
-
+  /* ── Render a complete flow immediately ────────────────── */
   function onLiveSteps(msg) {
     const w = stepsEl.querySelector('.waiting-state');
     if (w) w.remove();
-
     removeProgressIndicator();
 
     const steps = msg.steps || [];
     const summary = extractFlowSummary(steps, msg);
 
-    // Update filter bar with new tags
-    if (msg.tags && msg.tags.length) {
-      updateFilterBar(msg.tags);
+    if (msg.tags && msg.tags.length) updateFilterBar(msg.tags);
+
+    // Build the flow wrapper
+    const wrapper = createFlowWrapper(summary);
+    if (activeFilter !== 'all') {
+      const wTags = (wrapper.dataset.tags || '').split(',');
+      if (!wTags.includes(activeFilter)) wrapper.style.display = 'none';
     }
+    stepsEl.appendChild(wrapper);
 
-    renderQueue.push({ type: 'flow-start', summary });
-    renderQueue.push(...steps);
-    renderQueue.push({ type: 'flow-end' });
+    // Render all steps inside the flow body
+    const flowBody = wrapper.querySelector('.flow-body');
+    currentGroup = null;
+    for (const step of steps) {
+      appendStep(step, flowBody);
+      liveCount++;
+    }
+    currentGroup = null;
 
+    eventCountEl.textContent = liveCount;
     livePulse.classList.add('active');
     liveLabel.textContent = `${msg.apiName || 'Event'} — ${new Date(msg.timestamp).toLocaleTimeString()}`;
     liveLabel.classList.add('has-events');
-
-    if (!renderTimer) drainQueue();
+    scrollToBottom();
   }
 
-  /* ── Clear ──────────────────────────────────────────────── */
+  /* ── Clear ─────────────────────────────────────────────── */
   function clearAll() {
-    if (renderTimer) { clearTimeout(renderTimer); renderTimer = null; }
-    renderQueue = [];
     removeProgressIndicator();
     stepsEl.innerHTML = '';
-    resetGroupState();
+    currentGroup = null;
+    currentFlowBody = null;
     liveCount = 0;
     eventCountEl.textContent = '0';
     livePulse.classList.remove('active');
     liveLabel.textContent = 'Waiting for gateway events...';
     liveLabel.classList.remove('has-events');
-    // Reset filters
     seenTags.clear();
     activeFilter = 'all';
     const group = filterBar.querySelector('.filter-group');
@@ -783,7 +731,7 @@
           </div>
           <div class="wc-body">
             <span class="wc-title">Chat on the ACME Hotels demo site</span>
-            <span class="wc-desc">Open the workshop website and use the AI chatbot. Try simple queries, ask for private data, or trigger guardrails and rate limits.</span>
+            <span class="wc-desc">Open the workshop website and use the AI chatbot.</span>
           </div>
         </div>
         <div class="waiting-card wc-curl">
@@ -795,17 +743,15 @@
           </div>
           <div class="wc-body">
             <span class="wc-title">Send a request via your agent client</span>
-            <span class="wc-desc">Call the agent through the Gravitee Gateway using any A2A-compatible client. The inspector will automatically detect the protocol and display the full flow.</span>
+            <span class="wc-desc">Call the agent through the Gravitee Gateway using any A2A-compatible client.</span>
           </div>
         </div>
       </div>`;
     stepsEl.appendChild(w);
   }
 
-  /* ── Event listeners ────────────────────────────────────── */
+  /* ── Init ──────────────────────────────────────────────── */
   btnClear.addEventListener('click', clearAll);
-
-  /* ── Init ───────────────────────────────────────────────── */
   connectWS();
   showWaiting();
 

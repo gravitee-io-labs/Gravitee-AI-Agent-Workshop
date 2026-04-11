@@ -156,6 +156,7 @@ class OtelReceiver {
     this._store  = new Map();
     this._server = null;
     this._cleanupTimer = null;
+    this.onData  = null; // optional callback when trace data is received
   }
 
   /**
@@ -197,16 +198,60 @@ class OtelReceiver {
 
   /**
    * Get policies for a given traceId + apiId combination.
+   * Falls back to apiId-only matching when traceIdHex is empty (e.g. when
+   * a policy blocks a request before the gateway generates a traceparent).
    *
-   * @param {string} traceIdHex — 32-char hex traceId from traceparent header
+   * @param {string} traceIdHex — 32-char hex traceId from traceparent header (may be empty)
    * @param {string} apiId      — Gravitee API ID from TCP event
    * @returns {Array<{ name, phase, durationMs, passed, errorMsg }>}
    */
   getPolicies(traceIdHex, apiId) {
-    if (!traceIdHex || !apiId) return [];
-    const key = `${traceIdHex}:${apiId}`;
-    const entry = this._store.get(key);
-    return entry ? entry.policies : [];
+    if (!apiId) return [];
+
+    // Primary lookup: exact traceId + apiId
+    if (traceIdHex) {
+      const key = `${traceIdHex}:${apiId}`;
+      const entry = this._store.get(key);
+      return entry ? entry.policies : [];
+    }
+
+    // Fallback: traceId is empty — find the most recent entry for this apiId
+    return this._getPoliciesByApiId(apiId);
+  }
+
+  /**
+   * Check if any policies exist for a given traceId + apiId.
+   * Falls back to apiId-only matching when traceIdHex is empty.
+   */
+  hasPolicies(traceIdHex, apiId) {
+    if (!apiId) return false;
+    if (traceIdHex) return this._store.has(`${traceIdHex}:${apiId}`);
+    // Fallback: check if ANY entry exists for this apiId
+    return this._hasEntriesForApiId(apiId);
+  }
+
+  /**
+   * Fallback: find the most recent policies for a given apiId (ignoring traceId).
+   * Used when traceparent is absent (e.g. blocked requests).
+   */
+  _getPoliciesByApiId(apiId) {
+    let best = null;
+    for (const [key, entry] of this._store) {
+      if (key.endsWith(`:${apiId}`)) {
+        if (!best || entry.ts > best.ts) best = entry;
+      }
+    }
+    if (best) {
+      console.log(`[OTEL] Fallback apiId match for ${apiId}: ${best.policies.length} policies`);
+    }
+    return best ? best.policies : [];
+  }
+
+  _hasEntriesForApiId(apiId) {
+    for (const key of this._store.keys()) {
+      if (key.endsWith(`:${apiId}`)) return true;
+    }
+    return false;
   }
 
   /**
@@ -304,6 +349,7 @@ class OtelReceiver {
     }
     if (policyCount > 0) {
       console.log(`[OTEL] Stored ${policyCount} policy spans (${this._store.size} entries in cache)`);
+      if (this.onData) this.onData();
     }
   }
 
@@ -322,9 +368,11 @@ class OtelReceiver {
     if (policyName) {
       const phase     = attrs['gravitee.execution.phase'] || '';
       const durationMs = this._spanDurationMs(span);
-      const statusCode = span.status?.code ?? 0;
-      const passed     = statusCode !== 2;
-      const errorMsg   = (statusCode === 2 && span.status?.message) ? span.status.message : null;
+      const statusCode = Number(span.status?.code ?? 0);
+      const failureKey = attrs['gravitee.execution-failure.key'] || '';
+      // Policy failed if span status is ERROR (2) OR execution-failure attributes present
+      const passed     = statusCode !== 2 && !failureKey;
+      const errorMsg   = span.status?.message || failureKey || null;
 
       const key = `${traceHex}:${apiId}`;
       const entry = this._store.get(key) || { policies: [], ts: Date.now() };
@@ -345,8 +393,9 @@ class OtelReceiver {
     if (securityType) {
       const phase     = attrs['gravitee.execution.phase'] || '';
       const durationMs = this._spanDurationMs(span);
-      const statusCode = span.status?.code ?? 0;
-      const passed     = statusCode !== 2;
+      const statusCode = Number(span.status?.code ?? 0);
+      const failureKey = attrs['gravitee.execution-failure.key'] || '';
+      const passed     = statusCode !== 2 && !failureKey;
 
       const key = `${traceHex}:${apiId}`;
       const entry = this._store.get(key) || { policies: [], ts: Date.now() };

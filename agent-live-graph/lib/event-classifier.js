@@ -5,6 +5,11 @@
  * produces an array of steps (dividers + arrows) for the frontend.
  *
  * No hardcoded URIs or policy names.
+ *
+ * Whether the gateway forwarded to a backend is determined solely by the
+ * presence of `endpointRequest.uri` in the TCP reporter event data —
+ * if it exists, the endpoint was reached; if not, the gateway handled
+ * the request entirely (blocked, served from cache, etc.).
  */
 
 'use strict';
@@ -39,27 +44,53 @@ function st(status) {
 }
 
 /**
- * Extract bodies from a gateway event's log object.
+ * Compute a clean metadata summary for a response body.
+ * Returns e.g. "JSON · 1.2 KB" or "Text · 340 bytes".
  */
-function extractBodies(evt) {
-  const log = evt.log || {};
+function bodyMeta(body) {
+  if (!body) return '';
+  const len = body.length;
+  const size = len >= 1024 ? `${(len / 1024).toFixed(1)} KB` : `${len} B`;
+  const t = body.trim();
+  if (t.startsWith('{') || t.startsWith('[')) return `JSON · ${size}`;
+  if (t.startsWith('<'))                      return `XML · ${size}`;
+  return `Text · ${size}`;
+}
+
+/**
+ * Extract bodies and endpoint metadata from a gateway event's log object.
+ *
+ * `endpointReached` is the single source of truth for whether the gateway
+ * actually forwarded the request to a backend. Derived from the presence
+ * of `endpointRequest.uri` in the TCP reporter event.
+ */
+function extractLogData(evt) {
+  const log   = evt.log || {};
+  const epReq = log.endpointRequest  || {};
+  const epRes = log.endpointResponse || {};
+
   return {
     reqB:  (log.entrypointRequest  || {}).body || '',
-    edReq: (log.endpointRequest    || {}).body || '',
-    resB:  (log.endpointResponse   || {}).body || '',
+    edReq: epReq.body || '',
+    resB:  epRes.body || '',
     eRes:  (log.entrypointResponse || {}).body || '',
+
+    // Did the gateway forward to a backend?
+    endpointReached: !!epReq.uri,
+    endpointUri:     epReq.uri || '',
+    endpointStatus:  epRes.status || null,
   };
 }
 
 /* ── A2A classification ──────────────────────────────────── */
 
-function classifyA2A(evt, bodies, protocol, reqPolicies, resPolicies) {
+function classifyA2A(evt, logData, protocol, reqPolicies, resPolicies) {
   // Agent Card — standalone discovery request
   if (protocol.subtype === 'agent-card') {
-    return classifyAgentCard(evt, bodies, protocol, reqPolicies, resPolicies);
+    return classifyAgentCard(evt, logData, protocol, reqPolicies, resPolicies);
   }
 
-  const { reqB, edReq, eRes, resB } = bodies;
+  const { reqB, edReq, eRes, resB } = logData;
   const s   = evt.status || 0;
   const tot = evt.gatewayResponseTimeMs || 0;
   const gw  = evt.gatewayLatencyMs || 0;
@@ -100,8 +131,8 @@ function classifyA2A(evt, bodies, protocol, reqPolicies, resPolicies) {
 
 /* ── Agent Card — standalone A2A discovery ────────────────── */
 
-function classifyAgentCard(evt, bodies, protocol, reqPolicies, resPolicies) {
-  const { eRes, resB } = bodies;
+function classifyAgentCard(evt, logData, protocol, reqPolicies, resPolicies) {
+  const { eRes, resB } = logData;
   const s   = evt.status || 0;
   const tot = evt.gatewayResponseTimeMs || 0;
   const gw  = evt.gatewayLatencyMs || 0;
@@ -135,10 +166,14 @@ function classifyAgentCard(evt, bodies, protocol, reqPolicies, resPolicies) {
   ];
 }
 
-/* ── MCP classification ──────────────────────────────────── */
+/* ── MCP classification ──────────────────────────────────── *
+ * MCP events represent the agent↔gateway interaction.         *
+ * When a nested HTTP sub-event exists (the actual backend     *
+ * API call), it is merged into the visualization using real   *
+ * endpoint data from that sub-event's TCP reporter event.     */
 
-function classifyMCP(evt, bodies, protocol, reqPolicies, resPolicies) {
-  const { reqB, edReq, eRes, resB } = bodies;
+function classifyMCP(evt, logData, protocol, reqPolicies, resPolicies) {
+  const { reqB, edReq, eRes, resB } = logData;
   const s   = evt.status || 0;
   const tot = evt.gatewayResponseTimeMs || 0;
   const gw  = evt.gatewayLatencyMs || 0;
@@ -147,14 +182,14 @@ function classifyMCP(evt, bodies, protocol, reqPolicies, resPolicies) {
   const { method, toolName, tools, count, text } = protocol.details;
   const isList = protocol.subtype === 'tool-list';
   const isCall = protocol.subtype === 'tool-call';
-  const isStandalone = protocol.subtype === 'initialize' || protocol.subtype === 'ping';
 
-  // Build response text
+  // Build response text — clean metadata only, no raw content
+  const resRawBody = eRes || resB || '';
   let resText;
   if (s >= 400)                resText = `Error ${s}`;
   else if (tools)              resText = `${tools.length} tools discovered`;
   else if (count != null)      resText = `${count} results`;
-  else if (text)               resText = text;
+  else if (resRawBody)         resText = `${s} · ${bodyMeta(resRawBody)}`;
   else                         resText = s < 400 ? 'OK' : `${s}`;
 
   const dividerLabel = isList ? 'Tool Discovery'
@@ -163,96 +198,103 @@ function classifyMCP(evt, bodies, protocol, reqPolicies, resPolicies) {
 
   const reqRaw = reqB || edReq || null;
   const resRaw = eRes || resB || null;
-
   const badgeText = `${tot}ms${gw ? ' / ' + gw + 'ms gw' : ''}`;
-
-  // initialize / ping — standalone handshake, simple 2-arrow flow
-  if (isStandalone) {
-    return [
-      { type: 'divider', label: dividerLabel },
-      {
-        type: 'arrow', from: 'agent', to: 'gateway',
-        label: `${m} ${evt.uri}`,
-        message: { lane: 'gateway', text: `MCP ${method}`, rawDetail: reqRaw },
-        policies: reqPolicies,
-      },
-      {
-        type: 'arrow', from: 'gateway', to: 'agent',
-        label: `${s} — ${tot}ms`,
-        message: { lane: 'agent', text: resText, rawDetail: resRaw },
-        policies: resPolicies,
-        badge: { type: st(s), text: badgeText },
-      },
-    ];
-  }
-
-  // tools/list — gateway answers directly (no backend call)
-  if (isList) {
-    return [
-      { type: 'divider', label: dividerLabel },
-      {
-        type: 'arrow', from: 'agent', to: 'gateway',
-        label: `${m} ${evt.uri}`,
-        message: { lane: 'gateway', text: `MCP ${method || 'tools/list'}`, rawDetail: reqRaw },
-        policies: reqPolicies,
-        plan: evt.planName || '',
-      },
-      {
-        type: 'arrow', from: 'gateway', to: 'agent',
-        label: `${s} — ${tot}ms`,
-        message: {
-          lane: 'agent',
-          text: resText,
-          toolList: tools || null,
-          rawDetail: resRaw,
-        },
-        policies: resPolicies,
-        badge: { type: st(s), text: badgeText },
-      },
-    ];
-  }
-
-  // tools/call — gateway proxies to backend API
   const toolCall = isCall ? { name: toolName, args: protocol.details.toolArgs } : null;
 
-  return [
+  const steps = [
     { type: 'divider', label: dividerLabel },
     {
       type: 'arrow', from: 'agent', to: 'gateway',
       label: `${m} ${evt.uri}`,
       message: {
         lane: 'gateway',
-        text: `MCP ${method || 'request'} — ${toolName || '?'}`,
+        text: `MCP ${method || 'request'}${toolName ? ' — ' + toolName : ''}`,
         toolCall,
         rawDetail: reqRaw,
       },
       policies: reqPolicies,
       plan: evt.planName || '',
     },
-    {
-      type: 'arrow', from: 'gateway', to: 'api',
-      label: toolName || 'Backend call',
-      message: { lane: 'api', text: toolName || 'Backend call' },
-    },
-    {
-      type: 'arrow', from: 'api', to: 'gateway',
-      label: `${s}`,
-      message: { lane: 'gateway', text: resText },
-    },
-    {
-      type: 'arrow', from: 'gateway', to: 'agent',
-      label: `${s} — ${tot}ms`,
-      message: { lane: 'agent', text: resText, rawDetail: resRaw },
-      policies: resPolicies,
-      badge: { type: st(s), text: badgeText },
-    },
   ];
+
+  // If there are nested HTTP sub-events (actual backend API calls),
+  // show them as gateway↔api arrows using real data from those TCP events.
+  const subEvents = evt._httpSubEvents || [];
+  for (const sub of subEvents) {
+    const subLog  = extractLogData(sub._classifyParams?.evt || {});
+    const subM    = (sub._classifyParams?.evt || {}).httpMethod || '';
+    const subUri  = sub.uri || '';
+    const subS    = (sub._classifyParams?.evt || {}).status || 0;
+    const subTot  = sub.responseTimeMs || 0;
+
+    // Sub-event policies (from OTel, attached at flush via classifyAtFlush)
+    const subPolicies = sub.steps || [];
+
+    // Use the sub-event's real endpoint data for the API lane arrows
+    let apiLabel;
+    if (subLog.endpointReached) {
+      try {
+        const u = new URL(subLog.endpointUri);
+        apiLabel = `${subM} ${u.pathname}${u.search || ''}`;
+      } catch {
+        apiLabel = `${subM} ${subLog.endpointUri}`;
+      }
+    } else {
+      apiLabel = `${subM} ${subUri}`;
+    }
+
+    const subStatus = subLog.endpointReached ? (subLog.endpointStatus || subS) : subS;
+
+    if (subLog.endpointReached) {
+      const subResBody = subLog.resB || subLog.eRes || '';
+      const subResMeta = bodyMeta(subResBody);
+      steps.push(
+        {
+          type: 'arrow', from: 'gateway', to: 'api',
+          label: apiLabel,
+          message: { lane: 'api', text: apiLabel },
+          policies: sub._reqPolicies || [],
+        },
+        {
+          type: 'arrow', from: 'api', to: 'gateway',
+          label: `${subStatus}`,
+          message: { lane: 'gateway', text: subResMeta ? `${subStatus} · ${subResMeta}` : `${subStatus}`, rawDetail: subResBody || null },
+          policies: sub._resPolicies || [],
+        },
+      );
+    } else {
+      // Backend not reached — gateway blocked this sub-call
+      steps.push(
+        {
+          type: 'arrow', from: 'gateway', to: 'gateway',
+          label: `${apiLabel} → ${subS}`,
+          message: { lane: 'gateway', text: `Blocked — ${subS}`, rawDetail: subLog.eRes || null },
+          policies: sub._reqPolicies || [],
+        },
+      );
+    }
+  }
+
+  steps.push({
+    type: 'arrow', from: 'gateway', to: 'agent',
+    label: `${s} — ${tot}ms`,
+    message: {
+      lane: 'agent',
+      text: resText,
+      toolList: (isList && tools) ? tools : undefined,
+      rawDetail: resRaw,
+    },
+    policies: resPolicies,
+    badge: { type: st(s), text: badgeText },
+  });
+
+  return steps;
 }
 
 /* ── LLM classification ──────────────────────────────────── */
 
-function classifyLLM(evt, bodies, protocol, reqPolicies, resPolicies) {
-  const { reqB, edReq, eRes, resB } = bodies;
+function classifyLLM(evt, logData, protocol, reqPolicies, resPolicies) {
+  const { reqB, edReq, eRes, resB, endpointReached, endpointStatus } = logData;
   const s   = evt.status || 0;
   const tot = evt.gatewayResponseTimeMs || 0;
   const gw  = evt.gatewayLatencyMs || 0;
@@ -261,34 +303,38 @@ function classifyLLM(evt, bodies, protocol, reqPolicies, resPolicies) {
   const { model, hasTools, nTools, nMsgs, hasToolCalls, toolCalls, content, tokens } = protocol.details;
   const mdl = model || 'LLM';
 
-  // Blocked at gateway? (error status + no backend response)
-  const blockedAtGateway = s >= 400 && !resB;
-
   const reqText = hasTools
     ? `${nMsgs || '?'} messages + ${nTools} tool definitions`
     : `${nMsgs || '?'} messages`;
 
-  if (blockedAtGateway) {
+  // Common first arrow: agent → gateway
+  const inboundArrow = {
+    type: 'arrow', from: 'agent', to: 'gateway',
+    label: `${m} ${evt.uri}`,
+    message: { lane: 'gateway', text: 'Forwarding to LLM', rawDetail: reqB || null },
+    policies: reqPolicies,
+    plan: evt.planName || '',
+  };
+
+  // Endpoint not reached — gateway handled entirely (blocked, cached, rate-limited, etc.)
+  if (!endpointReached) {
+    const isCacheHit = s >= 200 && s < 300;
+    const resLabel = isCacheHit ? 'Served from cache' : `Error ${s}`;
+    const divLabel = isCacheHit ? 'LLM — Cached' : `LLM — ${s}`;
     return [
-      { type: 'divider', label: 'LLM — Blocked by Policy' },
-      {
-        type: 'arrow', from: 'agent', to: 'gateway',
-        label: `${m} ${evt.uri}`,
-        message: { lane: 'gateway', text: 'Forwarding to LLM', rawDetail: reqB || null },
-        policies: reqPolicies,
-        plan: evt.planName || '',
-      },
+      { type: 'divider', label: divLabel },
+      inboundArrow,
       {
         type: 'arrow', from: 'gateway', to: 'agent',
         label: `${s} — ${tot}ms`,
-        message: { lane: 'agent', text: `Error ${s}`, rawDetail: eRes || null },
+        message: { lane: 'agent', text: resLabel, rawDetail: eRes || null },
         policies: resPolicies,
-        badge: { type: st(s), text: `${tot}ms / ${gw}ms gw` },
+        badge: { type: st(s), text: `${tot}ms${gw ? ' / ' + gw + 'ms gw' : ''}` },
       },
     ];
   }
 
-  // Normal flow
+  // Endpoint reached — show backend round-trip
   const tc = hasToolCalls;
   let resText;
   if (s >= 400)        resText = `Error ${s}`;
@@ -296,15 +342,11 @@ function classifyLLM(evt, bodies, protocol, reqPolicies, resPolicies) {
   else if (content)    resText = `Text response${tokens ? ' — ' + tokens + ' tokens' : ''}`;
   else                 resText = 'Response received';
 
+  const epStatus = endpointStatus || s;
+
   return [
     { type: 'divider', label: tc ? 'LLM — Tool Call Decision' : 'LLM — Response' },
-    {
-      type: 'arrow', from: 'agent', to: 'gateway',
-      label: `${m} ${evt.uri}`,
-      message: { lane: 'gateway', text: 'Forwarding to LLM', rawDetail: reqB || null },
-      policies: reqPolicies,
-      plan: evt.planName || '',
-    },
+    inboundArrow,
     {
       type: 'arrow', from: 'gateway', to: 'llm',
       label: mdl,
@@ -312,7 +354,7 @@ function classifyLLM(evt, bodies, protocol, reqPolicies, resPolicies) {
     },
     {
       type: 'arrow', from: 'llm', to: 'gateway',
-      label: `${s}`,
+      label: `${epStatus}`,
       message: { lane: 'gateway', text: resText },
     },
     {
@@ -332,22 +374,69 @@ function classifyLLM(evt, bodies, protocol, reqPolicies, resPolicies) {
   ];
 }
 
-/* ── HTTP fallback ───────────────────────────────────────── */
+/* ── HTTP fallback ───────────────────────────────────────── *
+ * These events represent actual gateway API transactions.     *
+ * When endpointReached, shows the real backend round-trip     *
+ * with actual endpoint URI and response status.               */
 
-function classifyHTTP(evt, bodies, protocol, reqPolicies, resPolicies) {
-  const { eRes } = bodies;
+function classifyHTTP(evt, logData, protocol, reqPolicies, resPolicies) {
+  const { reqB, eRes, resB, endpointReached, endpointUri, endpointStatus } = logData;
   const s   = evt.status || 0;
   const tot = evt.gatewayResponseTimeMs || 0;
+  const gw  = evt.gatewayLatencyMs || 0;
   const m   = evt.httpMethod || '';
 
+  const dividerLabel = `${m} ${evt.uri}`;
+  const badgeText = `${tot}ms${gw ? ' / ' + gw + 'ms gw' : ''}`;
+
+  if (!endpointReached) {
+    // Gateway handled entirely — no backend call was made
+    const gwResMeta = bodyMeta(eRes);
+    return [
+      { type: 'divider', label: dividerLabel },
+      {
+        type: 'arrow', from: 'gateway', to: 'gateway',
+        label: `${m} ${evt.uri}`,
+        message: { lane: 'gateway', text: `${m} ${evt.uri}`, rawDetail: reqB || null },
+        policies: reqPolicies,
+      },
+      {
+        type: 'arrow', from: 'gateway', to: 'gateway',
+        label: `${s} — ${tot}ms`,
+        message: { lane: 'gateway', text: gwResMeta ? `${s} · ${gwResMeta}` : `${s}`, rawDetail: eRes || null },
+        policies: resPolicies,
+        badge: { type: st(s), text: badgeText },
+      },
+    ];
+  }
+
+  // Endpoint was reached — show the actual backend round-trip
+  const epStatus = endpointStatus || s;
+  let epLabel;
+  try {
+    const u = new URL(endpointUri);
+    epLabel = `${m} ${u.pathname}${u.search || ''}`;
+  } catch {
+    epLabel = `${m} ${endpointUri}`;
+  }
+
+  const epResBody = resB || eRes || '';
+  const epResMeta = bodyMeta(epResBody);
+
   return [
-    { type: 'divider', label: `${evt.apiName || '?'} — ${m} ${evt.uri}` },
+    { type: 'divider', label: dividerLabel },
     {
-      type: 'arrow', from: 'agent', to: 'gateway',
-      label: `${m} ${evt.uri}`,
-      message: { lane: 'gateway', text: `${s}`, rawDetail: eRes || null },
+      type: 'arrow', from: 'gateway', to: 'api',
+      label: epLabel,
+      message: { lane: 'api', text: epLabel, rawDetail: reqB || null },
       policies: reqPolicies,
-      badge: { type: st(s), text: `${tot}ms` },
+    },
+    {
+      type: 'arrow', from: 'api', to: 'gateway',
+      label: `${epStatus} — ${tot}ms`,
+      message: { lane: 'gateway', text: epResMeta ? `${epStatus} · ${epResMeta}` : `${epStatus}`, rawDetail: epResBody || null },
+      policies: resPolicies,
+      badge: { type: st(s), text: badgeText },
     },
   ];
 }
@@ -371,14 +460,14 @@ function classifyEvent(evt, protocol, otelPolicies) {
   const requestPolicies  = (otelPolicies || []).filter(p => p.phase === 'request').map(fmt);
   const responsePolicies = (otelPolicies || []).filter(p => p.phase === 'response').map(fmt);
 
-  const bodies = extractBodies(evt);
+  const logData = extractLogData(evt);
 
   switch (protocol.protocol) {
-    case 'a2a': return classifyA2A(evt, bodies, protocol, requestPolicies, responsePolicies);
-    case 'mcp': return classifyMCP(evt, bodies, protocol, requestPolicies, responsePolicies);
-    case 'llm': return classifyLLM(evt, bodies, protocol, requestPolicies, responsePolicies);
-    default:    return classifyHTTP(evt, bodies, protocol, requestPolicies, responsePolicies);
+    case 'a2a': return classifyA2A(evt, logData, protocol, requestPolicies, responsePolicies);
+    case 'mcp': return classifyMCP(evt, logData, protocol, requestPolicies, responsePolicies);
+    case 'llm': return classifyLLM(evt, logData, protocol, requestPolicies, responsePolicies);
+    default:    return classifyHTTP(evt, logData, protocol, requestPolicies, responsePolicies);
   }
 }
 
-module.exports = { classifyEvent, extractBodies, kebabToTitle };
+module.exports = { classifyEvent, extractLogData, kebabToTitle };
