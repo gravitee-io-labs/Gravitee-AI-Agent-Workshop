@@ -4,6 +4,7 @@
 cat > /usr/share/nginx/html/config.js <<EOF
 // Configuration generated from environment variables
 window.APP_CONFIG = {
+    version: '${APP_VERSION:-2.0.0}',
     agentCardUrl: '${AGENT_CARD_URL}',
     oidcUrl: '${OIDC_URL}',
     clientId: '${CLIENT_ID}',

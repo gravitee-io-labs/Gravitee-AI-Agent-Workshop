@@ -1182,6 +1182,22 @@ function saveConfigToStorage() {
 }
 
 function loadConfigFromStorage() {
+    const appVersion = window.APP_CONFIG?.version || '0';
+    const storedVersion = localStorage.getItem('app_version');
+
+    // Clear stale config when app version changes
+    if (storedVersion !== appVersion) {
+        localStorage.removeItem('agent_card_url');
+        localStorage.removeItem('oidc_url');
+        localStorage.removeItem('client_id');
+        localStorage.removeItem('access_token');
+        localStorage.removeItem('id_token');
+        localStorage.removeItem('user_info');
+        localStorage.setItem('app_version', appVersion);
+        console.log(`App updated to ${appVersion}, cleared stale config`);
+        return;
+    }
+
     const savedAgentCardUrl = localStorage.getItem('agent_card_url');
     const savedOidcUrl = localStorage.getItem('oidc_url');
     const savedClientId = localStorage.getItem('client_id');
