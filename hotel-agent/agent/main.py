@@ -30,7 +30,7 @@ from a2a.server.agent_execution import AgentExecutor, RequestContext
 from a2a.server.events import EventQueue
 from a2a.server.tasks.inmemory_task_store import InMemoryTaskStore
 from a2a.types import AgentCard, AgentSkill, AgentCapabilities, AgentInterface, Part
-from a2a.utils import new_agent_text_message, new_agent_parts_message
+from a2a.helpers.proto_helpers import new_text_message, new_message
 
 load_dotenv()
 
@@ -323,7 +323,7 @@ class HotelAgentExecutor(AgentExecutor):
                 _pending_tasks[eid] = tool_task
                 msg = elicitation_data.get("message", "Please provide the requested information.")
                 conversations.add(context_id, "assistant", f"[Elicitation] {msg}")
-                await event_queue.enqueue_event(new_agent_parts_message(
+                await event_queue.enqueue_event(new_message(
                     parts=[
                         Part(data=_to_value(elicitation_data), metadata=_to_struct({"type": "elicitation"})),
                         Part(text=msg),
@@ -350,7 +350,7 @@ class HotelAgentExecutor(AgentExecutor):
 
     @staticmethod
     async def _reply(eq: EventQueue, text: str, context_id: str | None, task_id: str | None):
-        await eq.enqueue_event(new_agent_text_message(text, context_id=context_id, task_id=task_id))
+        await eq.enqueue_event(new_text_message(text, context_id=context_id, task_id=task_id))
 
     @staticmethod
     async def _handle_elicitation(context_id: str, resp: dict[str, Any]) -> str:
