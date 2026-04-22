@@ -4,7 +4,7 @@ services:
 
   ### MongoDB
   mongodb:
-    image: mongo:${MONGODB_VERSION:-8.0.18} # https://hub.docker.com/_/mongo/tags?name=8.0
+    image: mongo:${MONGODB_VERSION:-8.0.20} # https://hub.docker.com/_/mongo/tags?name=8.0
     container_name: gio-apim-mongodb
     restart: always
     volumes:
@@ -47,7 +47,7 @@ services:
 
   ### Elasticsearch
   elasticsearch:
-    image: docker.elastic.co/elasticsearch/elasticsearch:${ELASTIC_VERSION:-9.2.5} # https://www.docker.elastic.co/r/elasticsearch/elasticsearch
+    image: docker.elastic.co/elasticsearch/elasticsearch:${ELASTIC_VERSION:-9.3.3} # https://www.docker.elastic.co/r/elasticsearch/elasticsearch
     container_name: gio-apim-elasticsearch
     restart: always
     ports:
@@ -309,7 +309,7 @@ services:
   # --- OpenFGA Components ---
   ### OpenFGA Postgres
   openfga-postgres:
-    image: postgres:17
+    image: postgres:${POSTGRES_VERSION:-17.9}
     container_name: openfga-postgres
     restart: unless-stopped
     environment:
@@ -328,7 +328,7 @@ services:
 
   ### OpenFGA Tables Creation
   openfga-migrate:
-    image: openfga/openfga:latest
+    image: openfga/openfga:${OPENFGA_VERSION:-v1.14.1}
     container_name: openfga-migrate
     command: migrate
     environment:
@@ -342,7 +342,7 @@ services:
 
   ### OpenFGA server
   openfga:
-    image: openfga/openfga:latest
+    image: openfga/openfga:${OPENFGA_VERSION:-v1.14.1}
     container_name: openfga
     command: run
     environment:
