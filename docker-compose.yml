@@ -80,23 +80,6 @@ services:
     networks:
       - southbound
 
-  ### Kibana (Elasticsearch UI, to explore in depth the data stored in Elasticsearch, useful for token consumption analytics, not yet visible in the APIM UI (planned 4.11))
-  # kibana:
-  #   image: docker.elastic.co/kibana/kibana:${ELASTIC_VERSION:-9.2.5} # https://www.docker.elastic.co/r/kibana/kibana
-  #   container_name: gio-apim-kibana
-  #   restart: always
-  #   ports:
-  #     - "5601:5601"
-  #   depends_on:
-  #     elasticsearch:
-  #       condition: service_healthy
-  #   volumes:
-  #     - data-kibana:/usr/share/kibana/data
-  #   environment:
-  #     ELASTICSEARCH_HOSTS: '["http://elasticsearch:9200"]'
-  #   networks:
-  #     - southbound
-
   ### Gravitee API Management Gateway
   apim-gateway:
     image: ${APIM_REGISTRY:-graviteeio}/apim-gateway:${APIM_VERSION_GATEWAY:-latest} # https://hub.docker.com/r/graviteeio/apim-gateway/tags?name=4.10
