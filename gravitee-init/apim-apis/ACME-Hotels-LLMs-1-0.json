@@ -184,7 +184,8 @@
                 "FINANCIAL_ACCOUNT"
               ],
               "skipResponsePayloadFiltering": true
-            }
+            },
+            "condition": "{#jsonPath(#request.content, '$.messages[?(@.role==\"tool\")]').size() == 0}"
           },
           {
             "name": "AI Semantic Caching",
