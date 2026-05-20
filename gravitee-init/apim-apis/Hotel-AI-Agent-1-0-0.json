@@ -61,6 +61,19 @@
             "services": {},
             "secondary": false,
             "tenants": []
+          },
+          {
+            "name": "Hotel Agent Proxy 2",
+            "type": "a2a-proxy",
+            "weight": 1,
+            "inheritConfiguration": true,
+            "configuration": {
+              "target": "http://hotel-agent-2:8001"
+            },
+            "sharedConfigurationOverride": "{}",
+            "services": {},
+            "secondary": false,
+            "tenants": []
           }
         ],
         "services": {}

@@ -17,6 +17,8 @@ from typing import Optional, Dict, Any, List
 import requests
 import yaml
 
+from agent_keys import ensure_agent_keypair
+
 # ---------------------------------------------------------------------------
 # Configuration
 # ---------------------------------------------------------------------------
@@ -307,22 +309,40 @@ class GraviteeInitializer:
             for c in claims
         ] if claims else []
 
+        # Blueprint Agent JWKS — for HOSTED_DELEGATED / AUTONOMOUS jwt-bearer auth.
+        # `agentKeys` generates an EC keypair on the shared volume and publishes
+        # the public JWK Set on settings.oauth.jwks.
+        agent_keys_cfg = app_config.get("agentKeys")
+        if agent_keys_cfg:
+            jwks = ensure_agent_keypair(
+                private_pem_path=agent_keys_cfg["privateKeyPath"],
+                kid=agent_keys_cfg.get("kid", "agent-key-prod"),
+            )
+            settings["jwks"] = jwks
+
         return {"settings": {"oauth": settings}}
 
     def create_application(self, app_config: Dict[str, Any]) -> Optional[str]:
         app_name = app_config["name"]
         client_id = app_config["clientId"]
         app_type = app_config.get("type", "BROWSER")
+        kind = app_config.get("kind")
 
-        self.log(f"Creating application '{app_name}' (type: {app_type})...")
+        self.log(f"Creating application '{app_name}' (type: {app_type}{', kind: ' + kind if kind else ''})...")
 
         payload: Dict[str, Any] = {
             "name": app_name,
             "type": app_type,
             "clientId": client_id,
-            "clientSecret": app_config.get("clientSecret"),
             "redirectUris": app_config.get("redirectUris", []),
         }
+        # AGENT applications: persona lives on top-level `kind`; AM derives the
+        # underlying client defaults from it. No clientSecret for HOSTED_DELEGATED
+        # when authenticating via jwt-bearer assertions.
+        if kind:
+            payload["kind"] = kind
+        if app_type != "AGENT" and app_config.get("clientSecret"):
+            payload["clientSecret"] = app_config["clientSecret"]
         if app_config.get("description"):
             payload["description"] = app_config["description"]
         if app_config.get("agentCardUrl"):
@@ -388,8 +408,31 @@ class GraviteeInitializer:
         try:
             r = self.session.patch(self._app_url(app_id), json=payload, timeout=10)
             r.raise_for_status()
-            grants = r.json().get("settings", {}).get("oauth", {}).get("grantTypes", [])
+            saved = r.json().get("settings", {}).get("oauth", {})
+            grants = saved.get("grantTypes", [])
             self.log(f"  ✓ OAuth settings configured — grantTypes: {grants}")
+
+            # Verify private_key_jwt + JWKS landed (AM has been known to silently
+            # drop these when set in the same PATCH as other fields).
+            want_auth = payload["settings"]["oauth"].get("tokenEndpointAuthMethod")
+            want_jwks = payload["settings"]["oauth"].get("jwks")
+            needs_fix = {}
+            if want_auth and saved.get("tokenEndpointAuthMethod") != want_auth:
+                needs_fix["tokenEndpointAuthMethod"] = want_auth
+            if want_jwks and not saved.get("jwks", {}).get("keys"):
+                needs_fix["jwks"] = want_jwks
+            if needs_fix:
+                self.log(f"  ! Re-applying dropped fields: {list(needs_fix.keys())}")
+                r2 = self.session.patch(self._app_url(app_id), json={"settings": {"oauth": needs_fix}}, timeout=10)
+                r2.raise_for_status()
+                saved2 = r2.json().get("settings", {}).get("oauth", {})
+                if want_auth and saved2.get("tokenEndpointAuthMethod") != want_auth:
+                    self.log(f"  ERROR: tokenEndpointAuthMethod still not persisted (got {saved2.get('tokenEndpointAuthMethod')!r})")
+                    return False
+                if want_jwks and not saved2.get("jwks", {}).get("keys"):
+                    self.log("  ERROR: jwks still not persisted")
+                    return False
+                self.log("  ✓ Re-PATCH applied successfully")
             return True
         except requests.exceptions.RequestException as exc:
             self._log_response_error("Failed to configure settings", exc)

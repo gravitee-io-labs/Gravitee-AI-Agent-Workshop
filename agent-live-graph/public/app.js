@@ -486,6 +486,18 @@
   detailModal.addEventListener('click', (e) => { if (e.target === detailModal) closeModal(); });
   document.addEventListener('keydown', (e) => { if (e.key === 'Escape') closeModal(); });
 
+  // Identity-token buttons open the token on jwt.io in a new tab. Delegated
+  // here so the handler covers dynamically rendered identity headers.
+  document.addEventListener('click', (e) => {
+    const btn = e.target.closest('.id-token-btn');
+    if (!btn) return;
+    e.preventDefault();
+    e.stopPropagation();
+    const token = btn.dataset.token;
+    if (!token) return;
+    window.open(`https://jwt.io/#token=${encodeURIComponent(token)}`, '_blank', 'noopener');
+  });
+
   /* ── Scroll helper ─────────────────────────────────────── */
   function scrollToBottom() {
     graphArea.scrollTo({ top: graphArea.scrollHeight, behavior: 'smooth' });
@@ -514,7 +526,78 @@
       timestamp: msg.timestamp || Date.now(),
       stats:     msg.stats || {},
       tags:      msg.tags || [],
+      identity:  msg.identity || null,
     };
+  }
+
+  /* Deterministic colour from a string — used to colour the instance pill
+   * so multiple agent instances pop visually side by side. */
+  function hashColour(str) {
+    let h = 0;
+    for (let i = 0; i < str.length; i++) h = (h * 31 + str.charCodeAt(i)) >>> 0;
+    // 137 is coprime with 360 and large enough that one-char differences in
+    // the input still produce widely separated hues.
+    return `hsl(${(h * 137) % 360}, 70%, 55%)`;
+  }
+
+  function shortInstance(id) {
+    if (!id) return '';
+    const m = id.match(/[0-9a-f]{8}/i);
+    return m ? id.slice(0, id.indexOf(m[0]) + 8) : (id.length > 20 ? id.slice(0, 20) + '…' : id);
+  }
+
+  function renderIdentityHeader(identity) {
+    if (!identity) return '';
+    const isDelegated = identity.profile && identity.profile.includes('hosted_delegated');
+    const cards = [];
+    if (identity.user) {
+      cards.push(`
+        <div class="id-card" title="End user">
+          <div class="id-card-label"><i class="ph ph-user"></i> User</div>
+          <div class="id-card-value">${escapeHtml(identity.user)}</div>
+        </div>`);
+    }
+    if (identity.blueprint) {
+      cards.push(`
+        <div class="id-card" title="Blueprint application in AM">
+          <div class="id-card-label"><i class="ph ph-blueprint"></i> Blueprint</div>
+          <div class="id-card-value">${escapeHtml(identity.blueprint)}</div>
+        </div>`);
+    }
+    if (identity.instance) {
+      const c = hashColour(identity.instance);
+      cards.push(`
+        <div class="id-card id-card-instance" title="Agent instance: ${escapeHtml(identity.instance)}" style="border-left:3px solid ${c}">
+          <div class="id-card-label"><i class="ph ph-circuitry"></i> Agent instance</div>
+          <div class="id-card-value" style="color:${c}">${escapeHtml(identity.instance)}</div>
+        </div>`);
+    }
+    if (!cards.length) return '';
+    const tag = isDelegated
+      ? '<span class="id-tag" title="RFC 8693 delegated token — agent acting on behalf of user">DELEGATED</span>'
+      : '<span class="id-tag id-tag-plain" title="Plain user OIDC token (no delegation)">USER TOKEN</span>';
+    const tokenButtons = [];
+    if (identity.rawUser) {
+      tokenButtons.push(`<button class="id-token-btn" data-token="${escapeHtml(identity.rawUser)}" title="Open user OIDC token in jwt.io"><i class="ph ph-user"></i> View user token</button>`);
+    }
+    if (identity.rawDelegated) {
+      tokenButtons.push(`<button class="id-token-btn id-token-btn-delegated" data-token="${escapeHtml(identity.rawDelegated)}" title="Open delegated token in jwt.io"><i class="ph ph-shield-check"></i> View delegated token</button>`);
+    }
+    const tokens = tokenButtons.length
+      ? `<div class="id-header-tokens">${tokenButtons.join('')}</div>`
+      : '';
+    return `
+      <div class="id-header">
+        <div class="id-header-row">
+          <div class="id-header-title">
+            <i class="ph ph-shield-check"></i>
+            <span>Identity chain</span>
+            ${tag}
+          </div>
+          ${tokens}
+        </div>
+        <div class="id-header-cards">${cards.join('<div class="id-card-arrow">›</div>')}</div>
+      </div>`;
   }
 
   function formatTime(ts) {
@@ -682,6 +765,8 @@
 
     // Render all steps inside the flow body
     const flowBody = wrapper.querySelector('.flow-body');
+    const idHeader = renderIdentityHeader(summary.identity);
+    if (idHeader) flowBody.insertAdjacentHTML('afterbegin', idHeader);
     currentGroup = null;
     for (const step of steps) {
       appendStep(step, flowBody);

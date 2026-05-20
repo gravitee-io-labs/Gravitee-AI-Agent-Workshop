@@ -1425,6 +1425,50 @@ body.inspector-resizing {
     border-radius: 4px;
 }
 
+/* RFC 8693 actor chain — subject → actor → blueprint, decoded from JWT */
+.actor-chain {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 6px;
+    margin-top: 8px;
+    padding: 8px 10px;
+    background: rgba(99, 102, 241, 0.08);
+    border: 1px solid rgba(99, 102, 241, 0.25);
+    border-radius: 5px;
+}
+
+.actor-pill {
+    display: inline-flex;
+    flex-direction: column;
+    gap: 1px;
+    padding: 4px 8px;
+    background: rgba(99, 102, 241, 0.15);
+    border: 1px solid rgba(99, 102, 241, 0.3);
+    border-radius: 4px;
+    font-size: 0.7rem;
+    line-height: 1.2;
+}
+
+.actor-pill-label {
+    color: #a5b4fc;
+    font-weight: 600;
+    font-size: 0.62rem;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+}
+
+.actor-pill-sub {
+    color: #e0e7ff;
+    font-family: 'SFMono-Regular', Consolas, monospace;
+    word-break: break-all;
+}
+
+.actor-arrow {
+    color: #818cf8;
+    font-weight: 700;
+}
+
 /* JWT decoded claims */
 .jwt-claims-toggle {
     display: inline-flex;

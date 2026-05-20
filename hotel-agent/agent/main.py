@@ -46,7 +46,10 @@ AGENT_DESCRIPTION = os.getenv(
 MCP_HTTP_URLS = os.getenv("MCP_HTTP_URLS", os.getenv("MCP_HTTP_URL", ""))
 AM_TOKEN_URL = os.getenv("AM_TOKEN_URL", "")
 AM_CLIENT_ID = os.getenv("AM_CLIENT_ID", "")
-AM_CLIENT_SECRET = os.getenv("AM_CLIENT_SECRET", "")
+# Blueprint Agent — per-instance jwt-bearer assertion auth (RFC 7523)
+AGENT_PRIVATE_KEY_PATH = os.getenv("AGENT_PRIVATE_KEY_PATH", "/agent-keys/agent-private.pem")
+AGENT_KID = os.getenv("AGENT_KID", "agent-key-prod")
+AGENT_INSTANCE_ID = os.getenv("AGENT_INSTANCE_ID")  # default uuid generated in AuthService
 SYSTEM_PROMPT = os.getenv(
     "SYSTEM_PROMPT",
     "You are a Hotel booking assistant. "
@@ -148,7 +151,13 @@ class MCPAgent:
     def __init__(self):
         self.mcp = MCPMultiClient(mcp_urls=MCP_HTTP_URLS, elicitation_callback=elicitation_mgr.request)
         self.llm = LLMClient()
-        self.auth = AuthService(am_token_url=AM_TOKEN_URL, am_client_id=AM_CLIENT_ID, am_client_secret=AM_CLIENT_SECRET)
+        self.auth = AuthService(
+            am_token_url=AM_TOKEN_URL,
+            am_client_id=AM_CLIENT_ID,
+            private_key_path=AGENT_PRIVATE_KEY_PATH,
+            kid=AGENT_KID,
+            instance_id=AGENT_INSTANCE_ID,
+        )
         self._ready = False
 
     async def initialize(self):

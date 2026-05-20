@@ -1,16 +1,31 @@
-# Hotels AI Agent — Token Exchange (RFC 8693)
+# Hotels AI Agent — Blueprint Agent (HOSTED_DELEGATED)
+#
+# Registered as a real AGENT application. Each running hotel-agent instance
+# proves itself at the token endpoint with a signed jwt-bearer assertion
+# (RFC 7523) instead of sharing a static client_secret. The matching public
+# JWK is written into settings.oauth.jwks by gravitee-init at startup.
 name: "Hotels AI Agent"
 description: "Hotels AI Agent App"
-type: "SERVICE"
+type: "AGENT"
+kind: "HOSTED_DELEGATED"
 
 clientId: "hotel-ai-agent"
-clientSecret: "hotel-ai-agent"
+
+redirectUris:
+  - "http://localhost:8001/callback"
+
+# Generates an EC P-256 keypair on the shared agent-keys volume, then publishes
+# the public half on settings.oauth.jwks during the standard application PATCH.
+agentKeys:
+  privateKeyPath: "/agent-keys/agent-private.pem"
+  kid: "agent-key-prod"
 
 oauth:
   grantTypes:
-    - "urn:ietf:params:oauth:grant-type:token-exchange"
+    - "authorization_code"
     - "client_credentials"
-  tokenEndpointAuthMethod: "client_secret_basic"
+    - "urn:ietf:params:oauth:grant-type:token-exchange"
+  tokenEndpointAuthMethod: "private_key_jwt"
   pkce: false
   tokenExchange:
     inherited: true

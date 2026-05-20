@@ -1443,12 +1443,36 @@ function formatJwtClaims(claims) {
     return highlighted;
 }
 
+// Walks `sub` + nested `act.sub` claims (RFC 8693) into an ordered chain.
+// Returns e.g. ['john.doe@…', '<instance-uuid>', 'hotel-ai-agent'] or null.
+function extractActorChain(claims) {
+    if (!claims || !claims.sub || !claims.act) return null;
+    const chain = [claims.sub];
+    let current = claims.act;
+    while (current && current.sub) {
+        chain.push(current.sub);
+        current = current.act;
+    }
+    return chain.length > 1 ? chain : null;
+}
+
+function renderActorChainBadge(chain) {
+    // Subject first, then each actor up the delegation chain.
+    const labels = ['subject', 'actor', 'on behalf of'];
+    const pills = chain.map((sub, i) => {
+        const label = labels[Math.min(i, labels.length - 1)];
+        return `<span class="actor-pill"><span class="actor-pill-label">${escapeHtml(label)}</span><span class="actor-pill-sub">${escapeHtml(sub)}</span></span>`;
+    }).join('<span class="actor-arrow">→</span>');
+    return `<div class="actor-chain" title="RFC 8693 actor chain — read left to right as subject → actor → blueprint">${pills}</div>`;
+}
+
 function formatHeaders(headers) {
     if (!headers || Object.keys(headers).length === 0) {
         return '<div class="debug-code-block"><pre>No headers</pre></div>';
     }
 
     let jwtBlock = '';
+    let actorChainBlock = '';
     const formatted = Object.entries(headers)
         .map(([key, value]) => {
             const line = `${key}: ${value}`;
@@ -1457,7 +1481,10 @@ function formatHeaders(headers) {
                 const token = value.replace(/^Bearer\s+/i, '');
                 const claims = decodeJwt(token);
                 if (claims) {
-                    const uid = 'jwt-' + Math.random().toString(36).slice(2, 8);
+                    const chain = extractActorChain(claims);
+                    if (chain) {
+                        actorChainBlock = renderActorChainBadge(chain);
+                    }
                     jwtBlock = `
                         <button class="jwt-claims-toggle" onclick="this.classList.toggle('open');this.nextElementSibling.style.display=this.classList.contains('open')?'block':'none'">
                             <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="6 9 12 15 18 9"/></svg>
@@ -1470,17 +1497,27 @@ function formatHeaders(headers) {
         })
         .join('\n');
 
-    return `<div class="debug-code-block"><pre>${formatted}</pre>${jwtBlock}</div>`;
+    return `<div class="debug-code-block"><pre>${formatted}</pre>${actorChainBlock}${jwtBlock}</div>`;
 }
 
 function formatJson(data) {
     if (!data) {
         return '<div class="debug-code-block"><pre>No data</pre></div>';
     }
-    
+
     try {
         const formatted = typeof data === 'string' ? data : JSON.stringify(data, null, 2);
-        return `<div class="debug-code-block"><pre>${escapeHtml(formatted)}</pre></div>`;
+        // If this looks like an OAuth token response, surface the actor chain
+        // from the access_token (RFC 8693 user → instance → blueprint).
+        let actorChainBlock = '';
+        if (data && typeof data === 'object' && typeof data.access_token === 'string') {
+            const claims = decodeJwt(data.access_token);
+            const chain = claims && extractActorChain(claims);
+            if (chain) {
+                actorChainBlock = renderActorChainBadge(chain);
+            }
+        }
+        return `<div class="debug-code-block"><pre>${escapeHtml(formatted)}</pre>${actorChainBlock}</div>`;
     } catch (e) {
         return `<div class="debug-code-block"><pre>Error formatting data: ${escapeHtml(String(data))}</pre></div>`;
     }

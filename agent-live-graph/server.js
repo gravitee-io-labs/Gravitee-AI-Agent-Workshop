@@ -233,6 +233,25 @@ const buffer = new TransactionBuffer({
       : outermost ? 'Complete Flow'
       : (innerEvents[0] || {}).apiName || '?';
 
+    // Identity for the flow: prefer the richest delegated chain we see across
+    // all events in the transaction (agent → MCP carries `act.sub`); fall back
+    // to the outermost (user OIDC token only). Keep both raw tokens so the UI
+    // can offer "View on jwt.io" for each.
+    const candidates = [outermost, ...innerEvents]
+      .map(e => e?.identity)
+      .filter(Boolean);
+    const delegated = candidates.find(i => i.instance);
+    const plainUser = candidates.find(i => !i.instance && i.user);
+    const flowIdentity = delegated
+      ? { ...delegated,
+          user: delegated.user || plainUser?.user || null,
+          rawDelegated: delegated.raw,
+          rawUser:      plainUser?.raw || null }
+      : (plainUser
+          ? { ...plainUser, rawUser: plainUser.raw, rawDelegated: null }
+          : null);
+    if (flowIdentity) delete flowIdentity.raw;
+
     ws.broadcast({
       type:      'live-steps',
       apiName:   flowName,
@@ -240,6 +259,7 @@ const buffer = new TransactionBuffer({
       steps:     allSteps,
       stats:     { mcpCalls, llmCalls, totalTokens },
       tags:      [...tags],
+      identity:  flowIdentity,
     });
   },
   onProgress(count) {
@@ -255,6 +275,42 @@ function isNoise(evt) {
   if (method === 'OPTIONS' || method === 'HEAD' || method === 'CONNECT') return true;
   if (evt.status === 499) return true;
   return false;
+}
+
+/* ═══════════════════════════════════════════════════════════════
+ * Identity extraction (display only — no signature verification)
+ *
+ * Pulls the Bearer JWT from the entrypoint request headers, decodes
+ * the claims, and shapes them into a user → instance → blueprint
+ * chain matching the RFC 8693 actor structure AM emits.
+ * ═══════════════════════════════════════════════════════════════ */
+function extractIdentity(log) {
+  const headers = (log.entrypointRequest || {}).headers
+               || (log.endpointRequest   || {}).headers;
+  if (!headers) return null;
+  const raw = headers['authorization'] || headers['Authorization'];
+  const val = Array.isArray(raw) ? raw[0] : raw;
+  if (!val || !val.startsWith('Bearer ')) return null;
+  const token = val.slice(7).trim();
+  const parts = token.split('.');
+  if (parts.length !== 3) return null;
+  let claims;
+  try {
+    const b64 = parts[1].replace(/-/g, '+').replace(/_/g, '/');
+    const pad = '='.repeat((4 - (b64.length % 4)) % 4);
+    claims = JSON.parse(Buffer.from(b64 + pad, 'base64').toString('utf8'));
+  } catch (_) { return null; }
+  const instance  = claims.act?.sub || null;
+  const blueprint = claims.act?.actor_act?.sub || claims.client_id || null;
+  // Skip non-delegated tokens — they have no useful chain to render.
+  if (!instance && !blueprint) return null;
+  return {
+    user:      claims.email || claims.sub || null,
+    instance,
+    blueprint,
+    profile:   claims.client_profile || null,
+    raw:       token,
+  };
 }
 
 /* ═══════════════════════════════════════════════════════════════
@@ -389,6 +445,11 @@ function processEvent(evt) {
     // Raw params for deferred classification at flush time
     _classifyParams: { evt, protocol },
   };
+
+  // Identity is extracted from every event — inner hops carry the delegated
+  // token (agent → MCP), outermost carries only the user's OIDC token. We
+  // pick the richest chain at flush time.
+  entry.identity = extractIdentity(log);
 
   if (isOutermost) {
     entry.userText    = protocol.details.userText || null;

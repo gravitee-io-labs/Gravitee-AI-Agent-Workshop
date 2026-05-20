@@ -392,6 +392,9 @@ services:
       # Common configuration
       - ORGANIZATION=DEFAULT
       - ENVIRONMENT=DEFAULT
+    volumes:
+      # Shared with hotel-agent: blueprint agent private signing key.
+      - agent-keys:/agent-keys
     networks:
       - southbound
 
@@ -477,11 +480,6 @@ services:
       context: .
       dockerfile: ./hotel-agent/Dockerfile
     container_name: hotel-agent
-    depends_on:
-      acme-hotel-api:
-        condition: service_healthy
-      apim-gateway:
-        condition: service_healthy
     environment:
       - LLM_BASE_URL=http://gio-apim-gateway:8082/llm-proxy
       - LLM_MODEL=ollama:qwen3:0.6b
@@ -490,9 +488,60 @@ services:
       - AGENT_SERVER_PORT=8001
       - AM_TOKEN_URL=http://gio-am-gateway:8092/gravitee/oauth/token
       - AM_CLIENT_ID=hotel-ai-agent
-      - AM_CLIENT_SECRET=hotel-ai-agent
+      # Blueprint Agent (HOSTED_DELEGATED) — instances authenticate with a
+      # jwt-bearer assertion signed by the key written by gravitee-init.
+      - AGENT_PRIVATE_KEY_PATH=/agent-keys/agent-private.pem
+      - AGENT_KID=agent-key-prod
+      - AGENT_INSTANCE_ID=hotel-agent-instance-a
+      # Demo switch: set to "false" to omit actor_token from the RFC 8693
+      # exchange — AM then treats the request as impersonation and rejects it.
+      - INCLUDE_ACTOR_TOKEN=${INCLUDE_ACTOR_TOKEN:-true}
+    depends_on:
+      acme-hotel-api:
+        condition: service_healthy
+      apim-gateway:
+        condition: service_healthy
+      gravitee-init:
+        condition: service_completed_successfully
+    volumes:
+      - agent-keys:/agent-keys:ro
     ports:
       - "8001:8001"
+    restart: unless-stopped
+    networks:
+      - southbound
+
+  # Second instance of the same Blueprint Agent. Same image, same blueprint
+  # client_id and signing key — distinct AGENT_INSTANCE_ID so its delegated
+  # tokens carry a different `act.sub`. APIM round-robins between the two
+  # instances so the inspector visibly alternates which agent handled each
+  # request.
+  hotel-agent-2:
+    build:
+      context: .
+      dockerfile: ./hotel-agent/Dockerfile
+    container_name: hotel-agent-2
+    environment:
+      - LLM_BASE_URL=http://gio-apim-gateway:8082/llm-proxy
+      - LLM_MODEL=ollama:qwen3:0.6b
+      - LLM_TEMPERATURE=0.3
+      - MCP_HTTP_URLS=http://gio-apim-gateway:8082/hotels/mcp
+      - AGENT_SERVER_PORT=8001
+      - AM_TOKEN_URL=http://gio-am-gateway:8092/gravitee/oauth/token
+      - AM_CLIENT_ID=hotel-ai-agent
+      - AGENT_PRIVATE_KEY_PATH=/agent-keys/agent-private.pem
+      - AGENT_KID=agent-key-prod
+      - AGENT_INSTANCE_ID=hotel-agent-instance-b
+      - INCLUDE_ACTOR_TOKEN=${INCLUDE_ACTOR_TOKEN:-true}
+    depends_on:
+      acme-hotel-api:
+        condition: service_healthy
+      apim-gateway:
+        condition: service_healthy
+      gravitee-init:
+        condition: service_completed_successfully
+    volumes:
+      - agent-keys:/agent-keys:ro
     restart: unless-stopped
     networks:
       - southbound
@@ -574,6 +623,8 @@ volumes:
   ollama_data:
     driver: local
   openfga_postgres_data:
+    driver: local
+  agent-keys:
     driver: local
 
 networks:

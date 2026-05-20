@@ -274,7 +274,7 @@
                 "message": "Access denied: this endpoint requires a delegated access token issued to the AI Agent on behalf of an authenticated user.",
                 "statusCode": 403
               },
-              "condition": "{#context.attributes['jwt.claims']['act']?.['sub'] != 'hotel-ai-agent' || #context.attributes['jwt.claims']['email'] == null}"
+              "condition": "{#context.attributes['jwt.claims']['client_profile'] == null || !#context.attributes['jwt.claims']['client_profile'].contains('ai_agent') || #context.attributes['jwt.claims']['email'] == null}"
             },
             {
               "name": "Transform Headers",
