@@ -42,10 +42,23 @@ class AuthService:
     def _is_agent_token_expired(self) -> bool:
         return time.time() >= (self._agent_token_expires_at - TOKEN_EXPIRY_MARGIN_SECS)
 
-    async def initialize(self):
+    async def initialize(self, max_retries: int = 10, retry_interval: float = 5.0):
         logger.info(f"AuthService initializing (endpoint: {self.am_token_url})")
-        await self._refresh_agent_token()
-        logger.info("AuthService ready — agent token acquired")
+        import asyncio
+        last_error: Optional[Exception] = None
+        for attempt in range(1, max_retries + 1):
+            try:
+                await self._refresh_agent_token()
+                logger.info("AuthService ready — agent token acquired")
+                return
+            except AuthenticationError as e:
+                last_error = e
+                logger.warning(
+                    f"Agent token attempt {attempt}/{max_retries} failed: {e}. "
+                    f"Retrying in {retry_interval}s (AM gateway may still be syncing domain)..."
+                )
+                await asyncio.sleep(retry_interval)
+        raise AuthenticationError(f"Failed to obtain agent token after {max_retries} attempts: {last_error}")
 
     async def ensure_agent_token(self) -> str:
         """Return a valid agent token, refreshing if expired."""

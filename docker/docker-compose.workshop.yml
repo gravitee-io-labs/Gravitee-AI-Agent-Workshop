@@ -1,0 +1,204 @@
+# docker/docker-compose.workshop.yml — Workshop-specific services for the Gravitee AI Agent Workshop.
+# Included by docker-compose.yml alongside docker-compose.apim.yml.
+# All services share the same compose project network as the APIM and AM services.
+#
+# Services:
+#   redis             — in-memory cache (semantic caching for the APIM gateway)
+#   openfga-*         — fine-grained authorization store (hotel booking entitlements)
+#   acme-hotel-api    — backend REST API (hotel search, bookings)
+#   acme-hotel-website — frontend SPA (OIDC login + A2A agent chat)
+#   hotel-agent       — A2A AI agent (LLM + MCP tools via APIM gateway)
+#   agent-live-graph  — real-time flow visualizer (TCP events + OTel spans)
+#   mcp-inspector     — MCP protocol inspector (dev tool)
+#   gravitee-init     — one-shot bootstrap: loads APIs into APIM, apps into AM, and the FGA store
+
+services:
+
+  # ── Redis — in-memory cache ──────────────────────────────────────────────────
+  # Used by APIM gateway policies (e.g. semantic-cache) that write/read from Redis.
+  redis:
+    image: redis:8.6.2-alpine3.23   # https://hub.docker.com/_/redis/tags?name=8.6
+    container_name: gio-workshop-redis
+    restart: always
+    ports:
+      - '6379:6379'
+    healthcheck:
+      test: ['CMD', 'redis-cli', 'ping']
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
+  # ── OpenFGA — fine-grained authorization ────────────────────────────────────
+  openfga-postgres:
+    image: postgres:17.9   # https://hub.docker.com/_/postgres/tags?name=17.9
+    container_name: openfga-postgres
+    restart: unless-stopped
+    environment:
+      - POSTGRES_DB=openfga
+      - POSTGRES_USER=openfga
+      - POSTGRES_PASSWORD=openfga
+    volumes:
+      - openfga_postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U openfga -d openfga']
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  openfga-migrate:
+    image: openfga/openfga:v1.14.1   # https://hub.docker.com/r/openfga/openfga/tags?name=v1.14
+    container_name: openfga-migrate
+    command: migrate
+    environment:
+      - OPENFGA_DATASTORE_ENGINE=postgres
+      - OPENFGA_DATASTORE_URI=postgres://openfga:openfga@openfga-postgres:5432/openfga?sslmode=disable
+    depends_on:
+      openfga-postgres:
+        condition: service_healthy
+
+  openfga:
+    image: openfga/openfga:v1.14.1
+    container_name: openfga
+    command: run
+    environment:
+      - OPENFGA_DATASTORE_ENGINE=postgres
+      - OPENFGA_DATASTORE_URI=postgres://openfga:openfga@openfga-postgres:5432/openfga?sslmode=disable
+      - OPENFGA_LOG_FORMAT=json
+      - OPENFGA_AUTHN_METHOD=none
+    depends_on:
+      openfga-migrate:
+        condition: service_completed_successfully
+    ports:
+      - '8087:8081'   # OpenFGA gRPC API
+      - '3000:3000'   # OpenFGA Playground
+
+  # ── Agent Live Graph — real-time flow visualizer ─────────────────────────────
+  # Receives TCP reporter events (port 9001) and OTel spans (port 4318) from the
+  # APIM gateway (configured in docker-compose.apim.yml), then streams them to the
+  # browser via WebSocket on port 9002.
+  agent-live-graph:
+    build:
+      context: ../agent-live-graph
+      dockerfile: Dockerfile
+    container_name: agent-live-graph
+    restart: unless-stopped
+    ports:
+      - '9002:9002'   # Web UI + WebSocket
+    environment:
+      - HTTP_PORT=9002   # Web UI port
+      - TCP_PORT=9001    # Gravitee TCP reporter input
+      - OTEL_PORT=4318   # OTLP/HTTP input (forwarded by otel-collector)
+
+  # ── ACME Hotel API — backend ─────────────────────────────────────────────────
+  acme-hotel-api:
+    build:
+      context: ../acme-hotel-api
+      dockerfile: Dockerfile
+    container_name: acme-hotel-api
+    restart: unless-stopped
+    ports:
+      - '8000:8000'
+    healthcheck:
+      test: ['CMD', 'curl', '-f', 'http://localhost:8000/health']
+      interval: 5s
+      timeout: 5s
+      retries: 3
+      start_period: 3s
+
+  # ── ACME Hotel Website — frontend SPA ────────────────────────────────────────
+  # OIDC URLs use localhost because they are embedded in the page and resolved by
+  # the end-user's browser, not from within the Docker network.
+  acme-hotel-website:
+    build:
+      context: ../acme-hotel-website
+      dockerfile: Dockerfile
+    container_name: acme-hotel-website
+    restart: unless-stopped
+    ports:
+      - '8002:80'
+    environment:
+      - AGENT_CARD_URL=http://localhost:8082/hotel-agent/.well-known/agent-card.json
+      - OIDC_URL=http://localhost:8092/gravitee/oidc/.well-known/openid-configuration
+      - CLIENT_ID=acme-hotels
+      - REDIRECT_URI=http://localhost:8002/
+
+  # ── Hotel Agent — A2A AI agent ───────────────────────────────────────────────
+  # Calls the LLM via the APIM gateway (llm-proxy API) and MCP tools via the APIM
+  # gateway (hotels-mcp API). Authenticates against AM using client_credentials /
+  # token-exchange (hotel-ai-agent app created by gravitee-init).
+  hotel-agent:
+    build:
+      context: ..
+      dockerfile: ./hotel-agent/Dockerfile
+    container_name: hotel-agent
+    restart: unless-stopped
+    depends_on:
+      acme-hotel-api:
+        condition: service_healthy
+    environment:
+    # LLM configuration (accessed via APIM gateway)
+      - LLM_BASE_URL=http://apim-gateway:8082/llm-proxy
+      - LLM_MODEL=ollama:qwen3:0.6b
+      - LLM_TEMPERATURE=0.3
+    # MCP configuration (accessed via APIM gateway)
+      - MCP_HTTP_URLS=http://apim-gateway:8082/mcp-proxy
+      - MCP_API_KEY=880b5899-726a-4c3f-8b58-99726a7c3f84
+    # Agent server configuration
+      - AGENT_SERVER_PORT=8001
+      - AGENT_PUBLIC_URL=http://localhost:8082/hotel-agent
+    # AM token endpoint (in-network name; the "gravitee" domain is created by gravitee-init)
+      - AM_TOKEN_URL=http://gateway:8092/gravitee/oauth/token
+      - AM_CLIENT_ID=hotel-ai-agent
+      - AM_CLIENT_SECRET=hotel-ai-agent
+    ports:
+      - '8001:8001'
+
+  # ── MCP Inspector — protocol inspector ──────────────────────────────────────
+  mcp-inspector:
+    image: ghcr.io/modelcontextprotocol/inspector:latest   # https://github.com/modelcontextprotocol/inspector
+    container_name: mcp-inspector
+    restart: unless-stopped
+    ports:
+      - '6274:6274'
+      - '6277:6277'
+    environment:
+      - DANGEROUSLY_OMIT_AUTH=true
+      - HOST=0.0.0.0
+
+  # ── Gravitee Init — one-shot workshop bootstrap ──────────────────────────────
+  # Runs once after AM and APIM management APIs are healthy + OpenFGA is started.
+  # Creates: AM security domain + apps + MCP servers, APIM APIs + apps + subscriptions,
+  # OpenFGA authorization store.
+  # Re-run safe: all operations are idempotent (look up by name first).
+  gravitee-init:
+    build:
+      context: ../gravitee-init
+      dockerfile: Dockerfile
+    container_name: gio-gravitee-init
+    restart: 'no'
+    depends_on:
+      management:
+        condition: service_healthy
+      apim-rest-api:
+        condition: service_healthy
+      openfga:
+        condition: service_started
+    environment:
+      # Access Management (AM) — in-network service name
+      - AM_BASE_URL=http://management:8093
+      - AM_USERNAME=admin
+      - AM_PASSWORD=adminadmin
+      # API Management (APIM) — in-network service name
+      - APIM_BASE_URL=http://apim-rest-api:8083
+      - APIM_USERNAME=admin
+      - APIM_PASSWORD=admin
+      - API_DEFINITIONS_DIR=/app/apim-apis
+      # OpenFGA
+      - FGA_BASE_URL=http://openfga:8080
+      - FGA_CONFIG_FILE=/app/openfga/openfgastore.yaml
+      # Common
+      - ORGANIZATION=DEFAULT
+      - ENVIRONMENT=DEFAULT
+
+volumes:
+  openfga_postgres_data:

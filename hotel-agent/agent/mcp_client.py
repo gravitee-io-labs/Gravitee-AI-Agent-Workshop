@@ -55,13 +55,15 @@ class MCPClient:
     """Single MCP server connection with elicitation support and auto-reconnect."""
 
     def __init__(self, mcp_url: str, retry_interval: int = MCP_RETRY_INTERVAL,
-                 elicitation_callback: Optional[ElicitationCallbackT] = None):
+                 elicitation_callback: Optional[ElicitationCallbackT] = None,
+                 static_headers: Optional[Dict[str, str]] = None):
         self.session: Optional[ClientSession] = None
         self.exit_stack = AsyncExitStack()
         self.mcp_http_url = mcp_url
         self.retry_interval = retry_interval
         self.is_connected = False
         self._elicitation_callback = elicitation_callback
+        self.static_headers: Dict[str, str] = static_headers or {}
 
     def _create_sdk_elicitation_callback(self):
         outer_callback = self._elicitation_callback
@@ -94,7 +96,7 @@ class MCPClient:
         while True:
             try:
                 http_transport = await self.exit_stack.enter_async_context(
-                    mcp_http_client(self.mcp_http_url)
+                    mcp_http_client(self.mcp_http_url, headers=self.static_headers or None)
                 )
                 try:
                     read_stream, write_stream, _ = http_transport
@@ -293,7 +295,9 @@ class MCPMultiClient:
 
     def __init__(self, mcp_urls: Optional[List[str] | str] = None,
                  retry_interval: int = MCP_RETRY_INTERVAL,
-                 elicitation_callback: Optional[ElicitationCallbackT] = None):
+                 elicitation_callback: Optional[ElicitationCallbackT] = None,
+                 static_headers: Optional[Dict[str, str]] = None):
+        self._static_headers: Dict[str, str] = static_headers or {}
         if mcp_urls is None or mcp_urls == "":
             urls_str = MCP_HTTP_URLS_DEFAULT
         elif isinstance(mcp_urls, str):
@@ -309,7 +313,7 @@ class MCPMultiClient:
 
     async def connect_all(self, max_retries: Optional[int] = None, connection_timeout: int = 30):
         for url in self.mcp_urls:
-            client = MCPClient(url, self.retry_interval, self._elicitation_callback)
+            client = MCPClient(url, self.retry_interval, self._elicitation_callback, self._static_headers or None)
             try:
                 await asyncio.wait_for(client.connect(max_retries=max_retries), timeout=connection_timeout)
                 self.clients[url] = client

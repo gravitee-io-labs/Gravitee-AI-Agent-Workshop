@@ -112,7 +112,8 @@ class LLMClient:
                 })
             logger.info(f"Tool calls: {[tc['function']['name'] for tc in tool_calls]}")
         else:
-            logger.info("No tool calls from LLM")
+            finish_reason = response.choices[0].finish_reason if response.choices else "unknown"
+            logger.info(f"No tool calls from LLM (finish_reason={finish_reason}, content={repr(content[:300]) if content else 'empty'})")
 
         return content, tool_calls
 

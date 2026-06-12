@@ -31,10 +31,10 @@
         "loadBalancer": {
           "type": "ROUND_ROBIN"
         },
-        "sharedConfiguration": "{\"proxy\":{\"useSystemProxy\":false,\"enabled\":false},\"http\":{\"keepAliveTimeout\":30000,\"keepAlive\":true,\"propagateClientHost\":false,\"followRedirects\":false,\"readTimeout\":30000,\"idleTimeout\":0,\"connectTimeout\":3000,\"useCompression\":true,\"maxConcurrentConnections\":20,\"version\":\"HTTP_1_1\",\"pipelining\":false},\"ssl\":{\"keyStore\":{\"type\":\"\"},\"hostnameVerifier\":true,\"trustStore\":{\"type\":\"\"},\"trustAll\":false}}",
+        "sharedConfiguration": "{\"proxy\":{\"useSystemProxy\":false,\"enabled\":false},\"http\":{\"keepAliveTimeout\":30000,\"keepAlive\":true,\"propagateClientHost\":false,\"followRedirects\":false,\"readTimeout\":30000,\"idleTimeout\":0,\"connectTimeout\":3000,\"useCompression\":true,\"maxConcurrentConnections\":20,\"version\":\"HTTP_1_1\",\"pipelining\":false},\"ssl\":{\"keyStore\":{\"type\":\"NONE\"},\"hostnameVerifier\":true,\"trustStore\":{\"type\":\"NONE\"},\"trustAll\":false}}",
         "endpoints": [
           {
-            "name": "ollama default endpoint",
+            "name": "llm-ollama",
             "type": "llm-proxy",
             "weight": 1,
             "inheritConfiguration": true,
@@ -46,7 +46,14 @@
                   "inputPrice": 0.1
                 }
               ],
-              "provider": "OPEN_AI_COMPATIBLE",
+              "provider": "OPEN_AI",
+              "modelGovernance": {
+                "prefixPolicy": {
+                  "policy": "PREFIXED_BOTH"
+                },
+                "aliasOnly": false,
+                "modelPattern": ""
+              },
               "target": "http://host.docker.internal:11434/v1",
               "authentication": {
                 "type": "NONE"
@@ -61,35 +68,40 @@
         "services": {}
       },
       {
-        "name": "gemini",
+        "name": "openai",
         "type": "llm-proxy",
         "loadBalancer": {
           "type": "ROUND_ROBIN"
         },
-        "sharedConfiguration": "{\"proxy\":{\"useSystemProxy\":false,\"enabled\":false},\"http\":{\"keepAliveTimeout\":30000,\"keepAlive\":true,\"propagateClientHost\":false,\"followRedirects\":false,\"readTimeout\":30000,\"idleTimeout\":0,\"connectTimeout\":3000,\"useCompression\":true,\"maxConcurrentConnections\":20,\"version\":\"HTTP_1_1\",\"pipelining\":false},\"ssl\":{\"keyStore\":{\"type\":\"\"},\"hostnameVerifier\":true,\"trustStore\":{\"type\":\"\"},\"trustAll\":false}}",
+        "sharedConfiguration": "{}",
         "endpoints": [
           {
-            "name": "gemini default endpoint",
+            "name": "llm-openai",
             "type": "llm-proxy",
             "weight": 1,
             "inheritConfiguration": true,
             "configuration": {
               "models": [
                 {
-                  "outputPrice": 3,
-                  "name": "gemini-3-flash-preview",
-                  "inputPrice": 0.5
+                  "outputPrice": 1.25,
+                  "name": "gpt-5.4-nano",
+                  "inputPrice": 0.2
                 }
               ],
-              "provider": "GEMINI",
-              "target": "https://generativelanguage.googleapis.com/v1beta",
+              "provider": "OPEN_AI",
+              "modelGovernance": {
+                "prefixPolicy": {
+                  "policy": "PREFIXED_BOTH"
+                },
+                "aliasOnly": false,
+                "modelPattern": ""
+              },
+              "target": "https://api.openai.com/v1",
               "authentication": {
-                "headerName": "X-goog-api-key",
-                "apiKey": "your-personal-api-key-here",
-                "type": "API_KEY"
+                "bearer": "YOUR_BEARER",
+                "type": "BEARER"
               }
             },
-            "sharedConfigurationOverride": "{\"http\":{\"version\":\"HTTP_1_1\",\"keepAlive\":true,\"keepAliveTimeout\":30000,\"connectTimeout\":3000,\"pipelining\":false,\"readTimeout\":10000,\"useCompression\":true,\"propagateClientHost\":false,\"idleTimeout\":0,\"followRedirects\":false,\"maxConcurrentConnections\":20},\"proxy\":{\"enabled\":false,\"useSystemProxy\":false},\"ssl\":{\"hostnameVerifier\":true,\"trustAll\":false,\"trustStore\":{\"type\":\"\"},\"keyStore\":{\"type\":\"\"}}}",
             "services": {},
             "secondary": false,
             "tenants": []
@@ -129,6 +141,7 @@
     "flows": [
       {
         "enabled": true,
+        "name": "Completions",
         "selectors": [
           {
             "type": "HTTP",
@@ -217,6 +230,7 @@
       },
       {
         "enabled": true,
+        "name": "Models",
         "selectors": [
           {
             "type": "HTTP",
@@ -237,6 +251,7 @@
       },
       {
         "enabled": true,
+        "name": "Embeddings",
         "selectors": [
           {
             "type": "HTTP",

@@ -1,7 +1,7 @@
 {
   "api": {
     "definitionVersion": "V4",
-    "type": "A2A_PROXY",
+    "type": "PROXY",
     "listeners": [
       {
         "type": "HTTP",
@@ -32,8 +32,8 @@
         },
         "entrypoints": [
           {
-            "type": "a2a-proxy",
-            "qos": "NONE",
+            "type": "http-proxy",
+            "qos": "AUTO",
             "configuration": {}
           }
         ],
@@ -42,16 +42,16 @@
     ],
     "endpointGroups": [
       {
-        "name": "Hotel Agent Proxy group",
-        "type": "a2a-proxy",
+        "name": "Default HTTP proxy group",
+        "type": "http-proxy",
         "loadBalancer": {
           "type": "ROUND_ROBIN"
         },
-        "sharedConfiguration": "{\"proxy\":{\"useSystemProxy\":false,\"enabled\":false},\"http\":{\"keepAliveTimeout\":30000,\"keepAlive\":true,\"propagateClientHost\":false,\"followRedirects\":false,\"readTimeout\":30000,\"idleTimeout\":0,\"connectTimeout\":3000,\"useCompression\":true,\"maxConcurrentConnections\":20,\"version\":\"HTTP_1_1\",\"pipelining\":false},\"ssl\":{\"keyStore\":{\"type\":\"\"},\"hostnameVerifier\":true,\"trustStore\":{\"type\":\"\"},\"trustAll\":false}}",
+        "sharedConfiguration": "{\"proxy\":{\"useSystemProxy\":false,\"enabled\":false},\"http\":{\"keepAliveTimeout\":30000,\"keepAlive\":true,\"propagateClientHost\":false,\"followRedirects\":false,\"readTimeout\":10000,\"idleTimeout\":0,\"connectTimeout\":3000,\"useCompression\":true,\"maxConcurrentConnections\":20,\"version\":\"HTTP_1_1\",\"pipelining\":false},\"ssl\":{\"keyStore\":{\"type\":\"NONE\"},\"hostnameVerifier\":true,\"trustStore\":{\"type\":\"NONE\"},\"trustAll\":false}}",
         "endpoints": [
           {
-            "name": "Hotel Agent Proxy",
-            "type": "a2a-proxy",
+            "name": "Default HTTP proxy",
+            "type": "http-proxy",
             "weight": 1,
             "inheritConfiguration": true,
             "configuration": {

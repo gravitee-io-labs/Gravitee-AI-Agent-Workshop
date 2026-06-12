@@ -1,0 +1,222 @@
+services:
+  # mongo:4.4 has no native arm64 build (SIGTRAPs under emulation on Apple
+  # Silicon) — use a modern arm64-native release. Healthcheck uses mongosh since
+  # the legacy `mongo` shell was dropped in 6+.
+  apim-mongo:
+    image: mongo:8.0
+    ports:
+      - '27017:27017'
+    volumes:
+      - apim-mongo-data:/data/db
+    healthcheck:
+      test: ['CMD', 'mongosh', '--quiet', '--eval', "db.adminCommand('ping')"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  apim-es:
+    image: docker.elastic.co/elasticsearch/elasticsearch:8.17.2
+    environment:
+      - discovery.type=single-node
+      - xpack.security.enabled=false
+      - ES_JAVA_OPTS=-Xms512m -Xmx512m
+    ports:
+      - '9200:9200'
+    healthcheck:
+      test: ['CMD-SHELL', 'curl -sf http://localhost:9200 >/dev/null']
+      interval: 5s
+      timeout: 3s
+      retries: 30
+
+  # OTel collector — receives OTLP from apim-gateway (spans + payload-log records) and writes to
+  # apim-es with mapping.mode: otel. The contrib distribution is required for the elasticsearch
+  # exporter (core doesn't bundle it). Relies on the pinned ES 8.17.2 image shipping x-pack's OTel
+  # index templates by default — if you bump ES below 8.13, the writer will land docs in a stream
+  # with text-mapped trace_id and the trace explorer's terms aggs will 500.
+  otel-collector:
+    image: otel/opentelemetry-collector-contrib:0.111.0
+    command: ['--config=/etc/otelcol-contrib/config.yaml']
+    depends_on:
+      apim-es:
+        condition: service_healthy
+    volumes:
+      - ./otel/otel-collector-config.yaml:/etc/otelcol-contrib/config.yaml:ro
+    # No host ports: gateway reaches the collector in-network via otel-collector:4317 (gRPC, traces)
+    # and otel-collector:4318/v1/logs (HTTP, logs).
+
+  apim-rest-api:
+    image: graviteeio/apim-management-api:4.12.0-milestone.2-debian
+    extra_hosts:
+      - 'host.docker.internal:host-gateway'
+    depends_on:
+      apim-mongo:
+        condition: service_healthy
+      apim-es:
+        condition: service_healthy
+    environment:
+      # gamma management API
+      - gravitee_gamma_enabled=true
+      # stock gravitee.yml references ${ds.*} — point them at the compose service names
+      - gravitee_ds_mongodb_host=apim-mongo
+      - gravitee_ds_elastic_host=apim-es
+      # UIs reach the rest-api same-origin via the nginx proxy (gamma.localhost,
+      # apim.localhost), so no CORS config is needed here.
+      # installation URLs: tell the rest-api how to build redirects to the console/portal
+      - gravitee_installation_api_url=http://apim.localhost/management
+      - gravitee_installation_api_portal_url=http://portal.localhost
+      - gravitee_installation_standalone_portal_url=http://portal.localhost
+      - gravitee_installation_standalone_console_url=http://apim.localhost
+      # extra plugin path so the (optional) MCP entrypoint zip in ./plugins is picked up
+      - gravitee_plugins_path_0=/opt/graviteeio-management-api/plugins
+      - gravitee_plugins_path_1=/opt/graviteeio-management-api/plugins-ext
+      # license: the mounted file is primary; LICENSE_KEY is an inline fallback
+      - 'license.key=${LICENSE_KEY:-}'
+      # ── OTel traces + logs repositories (back the gamma trace explorer) ─────
+      # Fixed index names — the collector hardcodes them too. No {orgId}/{envId} substitution since
+      # the demo is single-tenant. See ./otel/otel-collector-config.yaml for the matching writer side.
+      - gravitee_repositories_otel_traces_type=elasticsearch
+      - gravitee_repositories_otel_traces_elasticsearch_endpoints_0=http://apim-es:9200
+      - gravitee_repositories_otel_traces_elasticsearch_index=traces-gamma.otel-local
+      - gravitee_repositories_otel_logs_type=elasticsearch
+      - gravitee_repositories_otel_logs_elasticsearch_endpoints_0=http://apim-es:9200
+      - gravitee_repositories_otel_logs_elasticsearch_index=logs-gamma.otel-local
+    volumes:
+      # not :ro — the plugin registry unpacks zips into a .work dir inside this path
+      - ./plugins:/opt/graviteeio-management-api/plugins-ext
+      - ./license/license.key:/opt/graviteeio-management-api/license/license.key:ro
+      - ./gravitee-management.yml:/opt/graviteeio-management-api/config/gravitee.yml:ro
+    ports:
+      - '8083:8083'
+    healthcheck:
+      test: ['CMD-SHELL', 'curl -sf http://localhost:8083/management/v2/ui/bootstrap >/dev/null']
+      interval: 5s
+      timeout: 3s
+      retries: 40
+
+  apim-gateway:
+    image: graviteeio/apim-gateway:4.12.0-milestone.2-debian
+    depends_on:
+      apim-mongo:
+        condition: service_healthy
+      apim-es:
+        condition: service_healthy
+      otel-collector:
+        condition: service_started
+    healthcheck:
+      # Internal technical API (port 18082) — used by workshop services to wait for gateway readiness.
+      test: ['CMD-SHELL', 'curl -sf http://localhost:18082/_node/health >/dev/null']
+      interval: 5s
+      timeout: 3s
+      retries: 30
+      start_period: 10s
+    environment:
+      - gravitee_ds_mongodb_host=apim-mongo
+      - gravitee_ds_elastic_host=apim-es
+      - gravitee_plugins_path_0=/opt/graviteeio-gateway/plugins
+      - gravitee_plugins_path_1=/opt/graviteeio-gateway/plugins-ext
+      - 'license.key=${LICENSE_KEY:-}'
+      # ── Gamma authz sync ─────────────────────────────────────────────────────
+      - gravitee_gamma_enabled=true
+      # ── Internal technical API ────────────────────────────────────────────────
+      - gravitee_services_core_http_host=0.0.0.0
+      # ── OTel SDK init (shared by runtime span emission + reporter-otel payload logs) ─
+      - gravitee_services_opentelemetry_enabled=true
+      # Traces — gRPC native; no path suffix (gRPC service binding handles it).
+      - gravitee_services_opentelemetry_exporter_endpoint=http://otel-collector:4317
+      - gravitee_services_opentelemetry_exporter_protocol=grpc
+      # Logs — OTLP HTTP only, full path REQUIRED. The shipped default targets Loki
+      # (:3100/otlp/v1/logs); point it at the collector's HTTP port with the standards-compliant
+      # /v1/logs suffix instead.
+      - gravitee_services_opentelemetry_exporter_logsEndpoint=http://otel-collector:4318/v1/logs
+      # Reporter-otel: orgId stamped onto payload-log records emitted by the gateway.
+      - gravitee_reporters_otel_org=DEFAULT
+      # ── TCP Reporter → agent-live-graph (real-time flow visualization) ────────
+      # agent-live-graph is defined in docker-compose.workshop.yml and listens on port 9001.
+      # The gateway handles connection failures gracefully — no crash if it's not running.
+      - gravitee_reporters_tcp_enabled=true
+      - gravitee_reporters_tcp_host=agent-live-graph
+      - gravitee_reporters_tcp_port=9001
+      - gravitee_reporters_tcp_output=json
+      # ── Groovy policy whitelist (required by workshop API policies) ───────────
+      - gravitee_groovy_whitelist_mode=append
+      - gravitee_groovy_whitelist_list_0=class java.net.URL
+      - gravitee_groovy_whitelist_list_1=class java.net.URLConnection
+      - gravitee_groovy_whitelist_list_2=class java.net.HttpURLConnection
+      - gravitee_groovy_whitelist_list_3=class sun.net.www.protocol.http.HttpURLConnection
+      - gravitee_groovy_whitelist_list_4=class java.io.OutputStream
+      - gravitee_groovy_whitelist_list_5=class java.io.OutputStreamWriter
+      - gravitee_groovy_whitelist_list_6=class java.io.BufferedWriter
+      - gravitee_groovy_whitelist_list_7=class java.io.InputStream
+      - gravitee_groovy_whitelist_list_8=class java.io.InputStreamReader
+      - gravitee_groovy_whitelist_list_9=class java.io.BufferedReader
+      - gravitee_groovy_whitelist_list_10=class sun.net.www.http.PosterOutputStream
+      - gravitee_groovy_whitelist_list_11=class java.lang.StringBuilder
+    volumes:
+      # not :ro — the plugin registry unpacks zips into a .work dir inside this path
+      - ./plugins:/opt/graviteeio-gateway/plugins-ext
+      - ./license/license.key:/opt/graviteeio-gateway/license/license.key:ro
+      # AI/ML models for gateway policies (PII detection, toxicity classifier, embeddings)
+      - ../apim-gateway-models:/opt/graviteeio-gateway/models
+    ports:
+      - '8082:8082'
+
+  # Reached only via nginx at http://gamma.localhost (no host port).
+  gamma-console:
+    image: graviteeio/gamma-ui:4.12.0-milestone.2
+    depends_on:
+      apim-rest-api:
+        condition: service_healthy
+    environment:
+      # same-origin: nginx serves the SPA at gamma.localhost/ and proxies /gamma -> rest-api
+      - GAMMA_API_URL=http://gamma.localhost/gamma
+      - GAMMA_CONSOLE_BASE_HREF=/
+      - HTTP_PORT=8080
+      - HTTPS_PORT=8443
+      - SERVER_NAME=gamma.localhost
+
+  # APIM management console. Reached only via nginx at http://apim.localhost.
+  apim-console:
+    image: graviteeio/apim-management-ui:4.12.0-milestone.2
+    depends_on:
+      apim-rest-api:
+        condition: service_healthy
+    environment:
+      # same-origin: nginx serves the console at apim.localhost/ and proxies /management -> rest-api
+      - MGMT_API_URL=http://apim.localhost/management
+      - CONSOLE_BASE_HREF=/
+      # Portal Next as default: console "Open Website" links redirect to /next
+      - DEFAULT_PORTAL=next
+
+  # APIM developer portal (Portal Next by default). Reached only via nginx at
+  # http://portal.localhost. DEFAULT_PORTAL=next swaps the internal nginx config
+  # so Portal Next is served at / and the classic portal at /classic/.
+  # We mount a patched default-next.conf that fixes the try_files fallback for
+  # /classic/ (upstream bug: falls through to / serving Portal Next instead).
+  apim-portal:
+    image: graviteeio/apim-portal-ui:4.12.0-milestone.2
+    depends_on:
+      apim-rest-api:
+        condition: service_healthy
+    volumes:
+      - ./nginx/portal-next.conf.template:/etc/nginx/conf.d/default-next.conf:ro
+    environment:
+      # same-origin: nginx serves the portal at portal.localhost/ and proxies /portal -> rest-api
+      - PORTAL_API_URL=http://portal.localhost/portal
+      - DEFAULT_PORTAL=next
+
+  # Reverse proxy — the only service publishing a host port. Routes the four
+  # UI subdomains and proxies each one's API same-origin. See nginx/default.conf.
+  nginx:
+    image: nginx:1.27-alpine
+    depends_on:
+      - gamma-console
+      - apim-console
+      - apim-portal
+    volumes:
+      - ./nginx/default.conf:/etc/nginx/conf.d/default.conf:ro
+    ports:
+      - '80:80'
+
+# Named volumes persist across `docker compose down` (wiped only by `down -v`).
+volumes:
+  apim-mongo-data:
