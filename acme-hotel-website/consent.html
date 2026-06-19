@@ -1,0 +1,89 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>ACME Hotels — Confirm &amp; Pay</title>
+    <link rel="stylesheet" href="styles.css" />
+    <style>
+        body { background: #eef3fb; font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; margin: 0; }
+        .consent-wrap { max-width: 460px; margin: 40px auto; padding: 0 16px; }
+        .consent-card { background: #fff; border-radius: 16px; box-shadow: 0 8px 30px rgba(30,60,120,.12); overflow: hidden; }
+        .consent-head { background: linear-gradient(135deg, #2563eb, #1e40af); color: #fff; padding: 20px 24px; }
+        .consent-head h1 { margin: 0; font-size: 1.15rem; }
+        .consent-head p { margin: 4px 0 0; opacity: .85; font-size: .82rem; }
+        .consent-body { padding: 22px 24px; }
+        .summary { border: 1px solid #e4ebf6; border-radius: 12px; padding: 16px; margin-bottom: 18px; }
+        .summary h2 { margin: 0 0 10px; font-size: 1rem; color: #1e3a8a; }
+        .row { display: flex; justify-content: space-between; font-size: .88rem; margin: 6px 0; color: #334155; }
+        .row .k { color: #64748b; }
+        .total { border-top: 1px dashed #cbd5e1; margin-top: 10px; padding-top: 10px; font-weight: 700; font-size: 1.05rem; color: #0f172a; }
+        .step { margin-top: 6px; }
+        .muted { color: #64748b; font-size: .82rem; }
+        .pill { display: inline-block; background: #eff6ff; color: #1d4ed8; border-radius: 999px; padding: 2px 10px; font-size: .72rem; font-weight: 600; margin-bottom: 10px; }
+        .btn { width: 100%; border: none; border-radius: 10px; padding: 12px; font-size: .95rem; font-weight: 700; cursor: pointer; margin-top: 12px; }
+        .btn-primary { background: #2563eb; color: #fff; }
+        .btn-primary:disabled { opacity: .5; cursor: default; }
+        .profile { display: flex; align-items: center; gap: 10px; background: #f0f7ff; border-radius: 10px; padding: 10px 12px; margin: 8px 0; }
+        .profile .av { width: 34px; height: 34px; border-radius: 50%; background: #2563eb; color: #fff; display: flex; align-items: center; justify-content: center; font-weight: 700; }
+        .consent-check { display: flex; gap: 8px; align-items: flex-start; margin: 14px 0; font-size: .85rem; color: #334155; }
+        .ok { text-align: center; padding: 10px; }
+        .ok .big { font-size: 2.4rem; }
+        .hidden { display: none; }
+    </style>
+</head>
+<body>
+    <div class="consent-wrap">
+        <div class="consent-card">
+            <div class="consent-head">
+                <h1>Confirm &amp; Pay</h1>
+                <p>Secure booking via ACME Hotels</p>
+            </div>
+            <div class="consent-body">
+                <div class="summary">
+                    <h2 id="sumHotel">Hotel</h2>
+                    <div class="row"><span class="k">Room</span><span id="sumRoom">—</span></div>
+                    <div class="row"><span class="k">Check-in</span><span id="sumIn">—</span></div>
+                    <div class="row"><span class="k">Check-out</span><span id="sumOut">—</span></div>
+                    <div class="row"><span class="k">Guests</span><span id="sumGuests">—</span></div>
+                    <div class="row"><span class="k" id="sumNightsK">Nights</span><span id="sumNights">—</span></div>
+                    <div class="row total"><span>Total</span><span id="sumTotal">—</span></div>
+                </div>
+
+                <!-- Step A: sign in -->
+                <div id="stepSignin" class="step">
+                    <span class="pill">Step 1 of 2 · Authentication</span>
+                    <p class="muted">Booking and payment require you to sign in and approve sharing your profile, as mandated by MCP security guidelines.</p>
+                    <button id="signinBtn" class="btn btn-primary">Sign in to continue</button>
+                </div>
+
+                <!-- Step B: consent -->
+                <div id="stepConsent" class="step hidden">
+                    <span class="pill">Step 2 of 2 · Consent</span>
+                    <div class="profile">
+                        <div class="av" id="pavatar">U</div>
+                        <div>
+                            <div id="pname" style="font-weight:600;">User</div>
+                            <div class="muted" id="pemail">—</div>
+                        </div>
+                    </div>
+                    <label class="consent-check">
+                        <input type="checkbox" id="consentChk" />
+                        <span>I consent to share my name and email with ACME Hotels to complete this booking and payment.</span>
+                    </label>
+                    <button id="confirmBtn" class="btn btn-primary" disabled>Confirm &amp; Pay</button>
+                </div>
+
+                <!-- Step C: done -->
+                <div id="stepDone" class="step hidden ok">
+                    <div class="big">✅</div>
+                    <h2>Payment authorized</h2>
+                    <p class="muted">Returning you to your booking…</p>
+                </div>
+            </div>
+        </div>
+    </div>
+    <script src="config.js"></script>
+    <script src="consent.js"></script>
+</body>
+</html>

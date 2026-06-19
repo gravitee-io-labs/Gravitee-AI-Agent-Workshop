@@ -552,17 +552,183 @@ async function sendMessage() {
         // Remove typing indicator
         hideTypingIndicator();
         
-        // Add agent response
+        // Add agent response — handle MCP elicitations before plain text.
         if (response && response.parts) {
-            const textPart = response.parts.find(p => p.text);
-            if (textPart) {
-                addMessage('agent', textPart.text);
+            const elicitation = response.parts.find(
+                p => (p.metadata && p.metadata.type === 'elicitation') ||
+                     (p.data && (p.data.requestedSchema || p.data.mode))
+            );
+            if (elicitation) {
+                renderElicitation(elicitation.data || {});
+            } else {
+                const textPart = response.parts.find(p => p.text);
+                if (textPart) {
+                    addMessage('agent', textPart.text);
+                }
             }
         }
     } catch (error) {
         hideTypingIndicator();
         console.error('Error sending message:', error);
         addMessage('agent', 'Sorry, I encountered an error. Please try again.');
+    }
+}
+
+// --- MCP elicitation handling ---------------------------------------------
+
+// Render an elicitation from the agent: Form mode (collect structured input)
+// or URL mode (out-of-band login/consent), per the MCP spec.
+function renderElicitation(data) {
+    const mode = data.mode || (data.url ? 'url' : 'form');
+    if (mode === 'url') {
+        renderConsentPrompt(data);
+    } else {
+        renderElicitationForm(data);
+    }
+}
+
+function renderConsentPrompt(data) {
+    const eid = data.elicitationId;
+    const wrap = elicitationContainer(data.message || 'Authentication required to continue.');
+    const btn = document.createElement('button');
+    btn.className = 'elicitation-submit';
+    btn.textContent = 'Sign in & consent';
+    btn.onclick = () => {
+        if (!data.url) return;
+        // IMPORTANT: no 'noopener' — the consent page needs window.opener to post
+        // the authenticated identity back here.
+        const popup = window.open(data.url, 'acme-consent', 'width=520,height=720');
+
+        // Resolve the elicitation when the consent page reports back.
+        const onMsg = (event) => {
+            if (event.origin !== window.location.origin) return;
+            const m = event.data || {};
+            if (m.type !== 'elicitation-consent' || m.eid !== eid) return;
+            window.removeEventListener('message', onMsg);
+            wrap.querySelectorAll('button').forEach(b => b.disabled = true);
+            if (m.action === 'accept') {
+                const who = (m.content && m.content.guest_name) ? ` as ${m.content.guest_name}` : '';
+                addMessage('user', `[Authenticated & consented${who}]`);
+                sendElicitationResponse(eid, 'accept', m.content || {});
+            } else {
+                addMessage('user', '[Consent cancelled]');
+                sendElicitationResponse(eid, 'cancel', null);
+            }
+        };
+        window.addEventListener('message', onMsg);
+    };
+    const cancel = cancelButton(eid, wrap);
+    wrap.appendChild(btn);
+    wrap.appendChild(cancel);
+}
+
+function renderElicitationForm(data) {
+    const eid = data.elicitationId;
+    const schema = data.requestedSchema || { properties: {} };
+    const props = schema.properties || {};
+    const wrap = elicitationContainer(data.message || 'Please provide the requested details.');
+
+    const inputs = {};
+    Object.entries(props).forEach(([key, spec]) => {
+        const field = document.createElement('div');
+        field.className = 'elicitation-field';
+        const label = document.createElement('label');
+        label.textContent = spec.title || key;
+        const input = document.createElement('input');
+        const t = (spec.type || 'string');
+        input.type = t === 'integer' || t === 'number' ? 'number'
+                   : /date/i.test(key) ? 'date' : 'text';
+        if (spec.description) input.placeholder = spec.description;
+        if (spec.default !== undefined) input.value = spec.default;
+        inputs[key] = { el: input, type: t };
+        field.appendChild(label);
+        field.appendChild(input);
+        wrap.appendChild(field);
+    });
+
+    const submit = document.createElement('button');
+    submit.className = 'elicitation-submit';
+    submit.textContent = 'Submit';
+    submit.onclick = () => {
+        const content = {};
+        for (const [key, { el, type }] of Object.entries(inputs)) {
+            let v = el.value;
+            if (type === 'integer') v = parseInt(v || '0', 10);
+            else if (type === 'number') v = parseFloat(v || '0');
+            content[key] = v;
+        }
+        wrap.querySelectorAll('input,button').forEach(e => e.disabled = true);
+        const summary = Object.entries(content).map(([k, v]) => `${k}: ${v}`).join(', ');
+        addMessage('user', summary);
+        sendElicitationResponse(eid, 'accept', content);
+    };
+    wrap.appendChild(submit);
+    wrap.appendChild(cancelButton(eid, wrap));
+}
+
+function elicitationContainer(message) {
+    const messageDiv = document.createElement('div');
+    messageDiv.className = 'message agent-message';
+    const avatarDiv = document.createElement('div');
+    avatarDiv.className = 'message-avatar';
+    avatarDiv.innerHTML = '<i class="ph ph-clipboard-text" style="font-size: 1.2rem; color: var(--primary-blue);"></i>';
+    avatarDiv.style.background = 'var(--light-blue)';
+    const contentDiv = document.createElement('div');
+    contentDiv.className = 'message-content elicitation-card';
+    const p = document.createElement('p');
+    p.textContent = message;
+    contentDiv.appendChild(p);
+    messageDiv.appendChild(avatarDiv);
+    messageDiv.appendChild(contentDiv);
+    elements.chatMessages.appendChild(messageDiv);
+    elements.chatMessages.scrollTop = elements.chatMessages.scrollHeight;
+    return contentDiv;
+}
+
+function cancelButton(eid, wrap) {
+    const cancel = document.createElement('button');
+    cancel.className = 'elicitation-cancel';
+    cancel.textContent = 'Cancel';
+    cancel.onclick = () => {
+        wrap.querySelectorAll('input,button').forEach(e => e.disabled = true);
+        sendElicitationResponse(eid, 'cancel', null);
+    };
+    return cancel;
+}
+
+async function sendElicitationResponse(elicitationId, action, content) {
+    showTypingIndicator();
+    try {
+        const headers = { 'Content-Type': 'application/json' };
+        if (config.accessToken) headers['Authorization'] = `Bearer ${config.accessToken}`;
+        const messageObj = {
+            role: 'user',
+            messageId: generateId(),
+            parts: [{
+                kind: 'data',
+                data: { elicitationId, action, content: content || {} },
+                metadata: { type: 'elicitation_response' }
+            }]
+        };
+        if (contextId) messageObj.contextId = contextId;
+        const payload = { method: 'message/send', jsonrpc: '2.0', id: generateId(), params: { message: messageObj } };
+        const response = await fetch(config.agentUrl, { method: 'POST', headers, body: JSON.stringify(payload) });
+        const data = await response.json();
+        hideTypingIndicator();
+        if (data.result && data.result.contextId) contextId = data.result.contextId;
+        const parts = (data.result && data.result.parts) || [];
+        // The resumed tool may itself trigger another elicitation (e.g. URL consent).
+        const next = parts.find(p => (p.metadata && p.metadata.type === 'elicitation') || (p.data && (p.data.requestedSchema || p.data.mode)));
+        if (next) {
+            renderElicitation(next.data || {});
+        } else {
+            const textPart = parts.find(p => p.text);
+            if (textPart) addMessage('agent', textPart.text);
+        }
+    } catch (error) {
+        hideTypingIndicator();
+        console.error('Elicitation response error:', error);
+        addMessage('agent', 'Sorry, something went wrong submitting your details.');
     }
 }
 

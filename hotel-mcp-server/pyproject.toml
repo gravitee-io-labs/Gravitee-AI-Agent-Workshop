@@ -1,0 +1,20 @@
+[project]
+name = "hotel-mcp-server"
+version = "1.0.0"
+description = "ACME Hotel MCP server with Form + URL elicitation (demo flow from MCP Dev Summit thread)"
+requires-python = ">=3.14"
+dependencies = [
+    "mcp==1.27.0",
+    "httpx==0.28.1",
+    "uvicorn==0.45.0",
+]
+
+[project.scripts]
+hotel-mcp-server = "hotel_mcp_server.server:main"
+
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools]
+packages = ["hotel_mcp_server"]

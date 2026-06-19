@@ -1565,3 +1565,57 @@ body.inspector-resizing {
 .chat-messages::-webkit-scrollbar-thumb:hover {
     background: var(--secondary-blue);
 }
+
+/* --- MCP elicitation cards (Form + URL mode) --- */
+.elicitation-card {
+    border: 1px solid var(--light-blue, #cfe0ff);
+    border-radius: 10px;
+    padding: 12px 14px;
+    background: #f7faff;
+}
+.elicitation-field {
+    display: flex;
+    flex-direction: column;
+    margin: 8px 0;
+}
+.elicitation-field label {
+    font-size: 0.78rem;
+    font-weight: 600;
+    color: var(--secondary-blue, #2a4d8f);
+    margin-bottom: 3px;
+}
+.elicitation-field input {
+    padding: 7px 9px;
+    border: 1px solid #c9d4e8;
+    border-radius: 7px;
+    font-size: 0.9rem;
+}
+.elicitation-field input:focus {
+    outline: none;
+    border-color: var(--primary-blue, #2563eb);
+}
+.elicitation-submit,
+.elicitation-cancel {
+    margin: 8px 6px 2px 0;
+    padding: 7px 16px;
+    border: none;
+    border-radius: 7px;
+    font-size: 0.85rem;
+    font-weight: 600;
+    cursor: pointer;
+}
+.elicitation-submit {
+    background: var(--primary-blue, #2563eb);
+    color: #fff;
+}
+.elicitation-cancel {
+    background: transparent;
+    color: var(--secondary-blue, #2a4d8f);
+    border: 1px solid #c9d4e8;
+}
+.elicitation-submit:disabled,
+.elicitation-cancel:disabled,
+.elicitation-field input:disabled {
+    opacity: 0.55;
+    cursor: default;
+}

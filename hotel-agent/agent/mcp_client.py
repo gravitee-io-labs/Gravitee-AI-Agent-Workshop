@@ -194,7 +194,11 @@ class MCPClient:
             try:
                 if not self.session or not self.is_connected:
                     raise RuntimeError("Not connected")
-                tools_response = await self.session.list_tools()
+                # A stale streamable-http session (expired through the gateway)
+                # makes list_tools hang forever; bound it so the hang becomes an
+                # exception that triggers reconnect below.
+                async with asyncio.timeout(20):
+                    tools_response = await self.session.list_tools()
                 return [{
                     "type": "function",
                     "function": {
@@ -264,6 +268,9 @@ class MCPClient:
             try:
                 if not self.session or not self.is_connected:
                     raise RuntimeError("Not connected")
+                # No timeout here: a tool call may legitimately block for a long
+                # time while an elicitation waits on human input (filling the
+                # form / completing out-of-band consent).
                 result = await self.session.call_tool(tool_name, arguments)
                 result_dict = {
                     "content": [
@@ -315,7 +322,14 @@ class MCPMultiClient:
         for url in self.mcp_urls:
             client = MCPClient(url, self.retry_interval, self._elicitation_callback, self._static_headers or None)
             try:
-                await asyncio.wait_for(client.connect(max_retries=max_retries), timeout=connection_timeout)
+                # NB: do NOT wrap connect() in asyncio.wait_for or any cancel scope.
+                # connect() enters the streamable-http/ClientSession anyio task groups
+                # into self.exit_stack and leaves them open past this call; wrapping it
+                # in a timeout scope (wait_for child task, or anyio.move_on_after) that
+                # closes first violates anyio's cancel-scope stack on Python 3.14
+                # ("Cancelled via cancel scope" / "exit a cancel scope that isn't the
+                # current task's"). connect() already bounds itself via max_retries.
+                await client.connect(max_retries=max_retries)
                 self.clients[url] = client
             except (asyncio.TimeoutError, asyncio.CancelledError, Exception) as e:
                 logger.error(f"Failed to connect to {url}: {e}")

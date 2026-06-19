@@ -115,6 +115,9 @@ services:
       - gravitee_plugins_path_0=/opt/graviteeio-gateway/plugins
       - gravitee_plugins_path_1=/opt/graviteeio-gateway/plugins-ext
       - 'license.key=${LICENSE_KEY:-}'
+      # Raise the gateway-wide request timeout (default 30s) — agent turns (MCP
+      # connect + LLM generation on a small local model) can exceed 30s, esp. cold.
+      - gravitee_http_requestTimeout=120000
       # ── Gamma authz sync ─────────────────────────────────────────────────────
       - gravitee_gamma_enabled=true
       # ── Internal technical API ────────────────────────────────────────────────

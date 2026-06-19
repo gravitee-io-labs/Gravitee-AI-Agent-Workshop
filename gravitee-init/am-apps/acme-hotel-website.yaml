@@ -8,6 +8,7 @@ clientSecret: "acme-hotels"
 
 redirectUris:
   - "http://localhost:8002/"
+  - "http://localhost:8002/consent.html"
   - "https://oauth.pstmn.io/v1/callback"
 
 scopes:

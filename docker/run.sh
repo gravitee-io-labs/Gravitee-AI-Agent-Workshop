@@ -89,8 +89,11 @@ if [ "$DO_PULL" = 1 ]; then
   echo "── docker compose pull ──"
   docker compose pull
 fi
-echo "── docker compose up -d ──"
-docker compose up -d
+echo "── docker compose up -d --build ──"
+# --build so locally-built services (gravitee-init, hotel-agent, hotel-mcp-server,
+# acme-hotel-website, etc.) pick up source/API-def edits on a clean start;
+# without it `up` reuses stale images and changes silently don't apply.
+docker compose up -d --build
 
 # ── Health poll ─────────────────────────────────────────────────────────────
 # poll <name> <url> [host-header].  Backends are checked on their own ports;

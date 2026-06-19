@@ -5,8 +5,10 @@ COPY nginx.conf /etc/nginx/conf.d/default.conf
 
 # Copy website files to nginx html directory
 COPY index.html /usr/share/nginx/html/
+COPY consent.html /usr/share/nginx/html/
 COPY styles.css /usr/share/nginx/html/
 COPY script.js /usr/share/nginx/html/
+COPY consent.js /usr/share/nginx/html/
 COPY assets /usr/share/nginx/html/assets
 
 # Copy entrypoint script

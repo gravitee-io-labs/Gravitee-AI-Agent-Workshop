@@ -1,11 +1,13 @@
 """ACME Hotel Agent — A2A 1.0 + MCP + RFC 8693 Token Exchange."""
 
 import os
+import re
 import uuid
 import asyncio
 import json
 import logging
 import time
+import unicodedata
 from typing import Any
 from contextlib import asynccontextmanager
 from collections import OrderedDict
@@ -54,6 +56,12 @@ SYSTEM_PROMPT = os.getenv(
     "You are a Hotel booking assistant. "
     "Help guests search for hotels, check availability, make reservations, and manage their bookings. "
     "Always use the available tools to retrieve data, never invent or fabricate information. "
+    "To search for hotels or check availability, call searchHotels immediately — even if the user has "
+    "not given a city or dates. Never ask the user for the city or dates yourself; searchHotels collects "
+    "any missing details directly from the user. "
+    "When the user chooses a specific hotel to book, call createBooking — use that hotel's id from the "
+    "earlier search results and reuse the same city, dates and guest count already provided earlier in "
+    "this conversation. Do NOT call searchHotels again once the user has picked a hotel. "
     "When asked for information beyond hotel bookings (local attractions, restaurants, things to do, current events, etc.), "
     "use the web search tool if available to answer the question. "
     "Be friendly, concise, and whenever possible, personalize your responses using the guest's first name.",
@@ -129,6 +137,21 @@ class ElicitationManager:
         if future and not future.done():
             future.set_result(response)
 
+    def reset(self):
+        """Abandon any in-flight/queued elicitation. Needed because a single MCP
+        session can't run two tool calls at once: if a paused elicitation's tool
+        call is left running, a new request's tool call deadlocks behind it. The
+        orphaned form is recovered in _handle_elicitation (re-runs the search)."""
+        while not self.pending_queue.empty():
+            try:
+                self.pending_queue.get_nowait()
+            except asyncio.QueueEmpty:
+                break
+        for fut in self._futures.values():
+            if not fut.done():
+                fut.cancel()
+        self._futures.clear()
+
 
 elicitation_mgr = ElicitationManager()
 
@@ -145,6 +168,101 @@ def _rate_limit_message(e: LLMRateLimitError) -> str:
         except (ValueError, TypeError):
             pass
     return "You're sending too many requests and have been rate limited. Please try again in a few seconds."
+
+
+def _norm(s: str) -> str:
+    """Lowercase + strip accents for tolerant hotel-name matching."""
+    s = unicodedata.normalize("NFKD", s or "")
+    s = "".join(c for c in s if not unicodedata.combining(c))
+    return s.lower()
+
+
+_BOOKING_INTENT = re.compile(
+    r"\b(book|reserve|reservation|let'?s go|i'?ll take|i will take|go (for|with|ahead)|"
+    r"choose|select|pick|confirm)\b",
+    re.IGNORECASE,
+)
+
+
+def _extract_search_payload(content: str) -> dict[str, Any] | None:
+    """Pull the {hotels, check_in, ...} payload out of a stored tool result,
+    handling both the flat dict and the nested MCP result wrapper
+    ({"content":[{"text": "<json>"}], "structuredContent": {...}})."""
+    try:
+        data = json.loads(content)
+    except (ValueError, TypeError):
+        return None
+    if not isinstance(data, dict):
+        return None
+    if isinstance(data.get("hotels"), list):
+        return data
+    sc = data.get("structuredContent")
+    if isinstance(sc, dict) and isinstance(sc.get("hotels"), list):
+        return sc
+    for c in (data.get("content") or []):
+        text = c.get("text") if isinstance(c, dict) else None
+        if text and "hotels" in text:
+            try:
+                inner = json.loads(text)
+            except (ValueError, TypeError):
+                continue
+            if isinstance(inner, dict) and isinstance(inner.get("hotels"), list):
+                return inner
+    return None
+
+
+def _last_search_context(history: list[dict[str, Any]] | None) -> dict[str, Any] | None:
+    """Find the most recent searchHotels result in the conversation history and
+    return its hotels list plus the dates/guests that were used."""
+    if not history:
+        return None
+    for msg in reversed(history):
+        content = msg.get("content")
+        if not content or not isinstance(content, str) or "hotels" not in content:
+            continue
+        payload = _extract_search_payload(content)
+        if payload:
+            return payload
+    return None
+
+
+def _maybe_booking_shortcut(
+    message: str,
+    history: list[dict[str, Any]] | None,
+    tools: list[dict[str, Any]],
+) -> dict[str, Any] | None:
+    """Small models can't reliably switch from searching to booking. When the
+    user expresses a booking intent AND names a hotel from the previous search
+    results, force a createBooking call reusing the remembered dates/guests."""
+    if not any(t["function"]["name"] == "createBooking" for t in tools):
+        return None
+    if not _BOOKING_INTENT.search(message or ""):
+        return None
+    ctx = _last_search_context(history)
+    if not ctx:
+        return None
+
+    msg_norm = _norm(message)
+    chosen = None
+    for hotel in ctx["hotels"]:
+        name = hotel.get("name", "")
+        hid = hotel.get("id", "")
+        if name and _norm(name) in msg_norm:
+            chosen = hotel
+            break
+        if hid and _norm(hid.replace("-", " ")) in msg_norm:
+            chosen = hotel
+            break
+    if not chosen:
+        return None
+
+    args = {
+        "hotel_id": chosen.get("id"),
+        "check_in": ctx.get("check_in"),
+        "check_out": ctx.get("check_out"),
+        "guests": ctx.get("guests", 2),
+    }
+    return {"id": "forced_booking", "function": {"name": "createBooking", "arguments": args}}
 
 
 class MCPAgent:
@@ -184,6 +302,7 @@ class MCPAgent:
     async def process(
         self, message: str, token: str | None = None,
         transaction_id: str | None = None,
+        conversation_history: list[dict[str, Any]] | None = None,
     ) -> tuple[str, list[dict[str, Any]]]:
         # Build gateway headers: transaction ID for correlation + auth for MCP
         gw_headers = {}
@@ -209,16 +328,23 @@ class MCPAgent:
                 "Never answer from your own knowledge or say you cannot help — always use a tool."
             )
 
-        # Step 2 — LLM decides which tool to call (no history — just current message + tools)
+        # Step 2 — LLM decides which tool to call. Pass prior turns so it can reuse
+        # details already gathered (city/dates) and book the chosen hotel instead
+        # of re-searching.
         # Shortcut: if the message contains "web", force tavily_search if available
         web_tool = next((t for t in tools if t["function"]["name"] == "tavily_search"), None)
-        if web_tool and "web" in message.lower():
+        booking_call = _maybe_booking_shortcut(message, conversation_history, tools)
+        if booking_call:
+            logger.info(f"Step 2 - Shortcut: booking intent detected, forcing createBooking({json.dumps(booking_call['function']['arguments'])[:120]})")
+            tool_calls = [booking_call]
+        elif web_tool and "web" in message.lower():
             logger.info("Step 2 - Shortcut: 'web' keyword detected, forcing tavily_search")
             tool_calls = [{"id": "forced_web_search", "function": {"name": "tavily_search", "arguments": {"query": message}}}]
         else:
             try:
                 content, tool_calls = await self.llm.process_query(
                     message, tools, system_prompt=effective_system_prompt,
+                    conversation_history=conversation_history,
                     extra_headers=gw_headers or None,
                 )
             except LLMRateLimitError as e:
@@ -332,11 +458,23 @@ class HotelAgentExecutor(AgentExecutor):
                 await self._reply(event_queue, "No message content provided.", context_id, context.task_id)
                 return
 
+            # A fresh typed message abandons any prior elicitation. Cancel its
+            # tool task — a single MCP session can't run two tool calls at once,
+            # so leaving a paused one alive deadlocks this turn. An answer to the
+            # abandoned form is still recovered in _handle_elicitation.
+            elicitation_mgr.reset()
+            for stale in _pending_tasks.values():
+                stale.cancel()
+            _pending_tasks.clear()
+
             logger.info(f"User prompt: {user_text[:150]}")
             conversations.add(context_id, "user", user_text)
 
-            # Race: pipeline vs elicitation request
-            tool_task = asyncio.create_task(self.agent.process(user_text, token, transaction_id=transaction_id))
+            # Race: pipeline vs elicitation request. Pass conversation history (which
+            # already includes this turn) so the model can reuse earlier details.
+            history = conversations.get(context_id)
+            tool_task = asyncio.create_task(self.agent.process(
+                user_text, token, transaction_id=transaction_id, conversation_history=history))
             elicitation_wait = asyncio.create_task(elicitation_mgr.pending_queue.get())
             done, _ = await asyncio.wait({tool_task, elicitation_wait}, return_when=asyncio.FIRST_COMPLETED)
 

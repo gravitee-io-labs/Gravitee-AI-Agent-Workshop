@@ -105,6 +105,25 @@ services:
       retries: 3
       start_period: 3s
 
+  # ── Hotel MCP Server — elicitation-capable MCP over the ACME REST API ─────────
+  # Issues Form-mode (search details) and URL-mode (auth/consent) elicitations.
+  # Sits behind APIM at /hotels-mcp; the hotel-agent connects via /hotels/mcp.
+  hotel-mcp-server:
+    build:
+      context: ../hotel-mcp-server
+      dockerfile: Dockerfile
+    container_name: hotel-mcp-server
+    restart: unless-stopped
+    depends_on:
+      acme-hotel-api:
+        condition: service_healthy
+    environment:
+      - HOTEL_API_BASE=http://acme-hotel-api:8000
+      - CONSENT_URL_BASE=http://localhost:8002/consent.html
+      - MCP_PORT=9100
+    ports:
+      - '9100:9100'
+
   # ── ACME Hotel Website — frontend SPA ────────────────────────────────────────
   # OIDC URLs use localhost because they are embedded in the page and resolved by
   # the end-user's browser, not from within the Docker network.
@@ -141,8 +160,11 @@ services:
       - LLM_MODEL=ollama:qwen3:0.6b
       - LLM_TEMPERATURE=0.3
     # MCP configuration (accessed via APIM gateway)
-      - MCP_HTTP_URLS=http://apim-gateway:8082/mcp-proxy
-      - MCP_API_KEY=880b5899-726a-4c3f-8b58-99726a7c3f84
+      - MCP_HTTP_URLS=http://apim-gateway:8082/hotels-mcp/mcp
+      # MCP server (ACME-Hotels-API-MCP-Server) is published KEY_LESS. The gamma
+      # `mcp` entrypoint validates an Authorization bearer when one is present, so
+      # sending this api-key value as a bearer yields 401. Leave empty -> anonymous.
+      - MCP_API_KEY=
     # Agent server configuration
       - AGENT_SERVER_PORT=8001
       - AGENT_PUBLIC_URL=http://localhost:8082/hotel-agent
