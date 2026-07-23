@@ -3,7 +3,7 @@ services:
   # Silicon) — use a modern arm64-native release. Healthcheck uses mongosh since
   # the legacy `mongo` shell was dropped in 6+.
   apim-mongo:
-    image: mongo:8.0
+    image: mongo:${MONGODB_VERSION:-8.0}
     ports:
       - '27017:27017'
     volumes:
@@ -15,7 +15,7 @@ services:
       retries: 20
 
   apim-es:
-    image: docker.elastic.co/elasticsearch/elasticsearch:8.17.2
+    image: docker.elastic.co/elasticsearch/elasticsearch:${ELASTIC_VERSION:-8.17.2}
     environment:
       - discovery.type=single-node
       - xpack.security.enabled=false
@@ -45,7 +45,7 @@ services:
     # and otel-collector:4318/v1/logs (HTTP, logs).
 
   apim-rest-api:
-    image: graviteeio/apim-management-api:4.12.0-milestone.2-debian
+    image: ${APIM_REGISTRY:-graviteeio}/apim-management-api:${APIM_VERSION_GATEWAY:-4.12.11-debian}
     extra_hosts:
       - 'host.docker.internal:host-gateway'
     depends_on:
@@ -94,7 +94,7 @@ services:
       retries: 40
 
   apim-gateway:
-    image: graviteeio/apim-gateway:4.12.0-milestone.2-debian
+    image: ${APIM_REGISTRY:-graviteeio}/apim-gateway:${APIM_VERSION_GATEWAY:-4.12.11-debian}
     depends_on:
       apim-mongo:
         condition: service_healthy
@@ -162,7 +162,7 @@ services:
 
   # Reached only via nginx at http://gamma.localhost (no host port).
   gamma-console:
-    image: graviteeio/gamma-ui:4.12.0-milestone.2
+    image: ${APIM_REGISTRY:-graviteeio}/gamma-ui:${APIM_VERSION:-4.12.11}
     depends_on:
       apim-rest-api:
         condition: service_healthy
@@ -176,7 +176,7 @@ services:
 
   # APIM management console. Reached only via nginx at http://apim.localhost.
   apim-console:
-    image: graviteeio/apim-management-ui:4.12.0-milestone.2
+    image: ${APIM_REGISTRY:-graviteeio}/apim-management-ui:${APIM_VERSION:-4.12.11}
     depends_on:
       apim-rest-api:
         condition: service_healthy
@@ -193,7 +193,7 @@ services:
   # We mount a patched default-next.conf that fixes the try_files fallback for
   # /classic/ (upstream bug: falls through to / serving Portal Next instead).
   apim-portal:
-    image: graviteeio/apim-portal-ui:4.12.0-milestone.2
+    image: ${APIM_REGISTRY:-graviteeio}/apim-portal-ui:${APIM_VERSION:-4.12.11}
     depends_on:
       apim-rest-api:
         condition: service_healthy

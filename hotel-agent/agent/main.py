@@ -150,16 +150,18 @@ def _rate_limit_message(e: LLMRateLimitError) -> str:
 class MCPAgent:
 
     def __init__(self):
-        static_headers = {"Authorization": f"Bearer {MCP_API_KEY}"} if MCP_API_KEY else None
-        self.mcp = MCPMultiClient(mcp_urls=MCP_HTTP_URLS, elicitation_callback=elicitation_mgr.request, static_headers=static_headers)
+        self.mcp: MCPMultiClient | None = None
         self.llm = LLMClient()
         self.auth = AuthService(am_token_url=AM_TOKEN_URL, am_client_id=AM_CLIENT_ID, am_client_secret=AM_CLIENT_SECRET)
         self._ready = False
 
     async def initialize(self):
-        await self.mcp.connect_all(max_retries=3, connection_timeout=15)
         if AM_TOKEN_URL:
             await self.auth.initialize()
+        token = await self.auth.ensure_agent_token() if AM_TOKEN_URL else None
+        static_headers = {"Authorization": f"Bearer {token}"} if token else None
+        self.mcp = MCPMultiClient(mcp_urls=MCP_HTTP_URLS, elicitation_callback=elicitation_mgr.request, static_headers=static_headers)
+        await self.mcp.connect_all(max_retries=3, connection_timeout=15)
         self._ready = True
         logger.info("Agent initialized")
 
@@ -190,9 +192,7 @@ class MCPAgent:
         if transaction_id:
             gw_headers["X-Gravitee-Transaction-Id"] = transaction_id
         mcp_headers = dict(gw_headers)
-        if MCP_API_KEY:
-            mcp_headers["Authorization"] = f"Bearer {MCP_API_KEY}"
-        elif token:
+        if token:
             mcp_headers["Authorization"] = f"Bearer {token}"
 
         # Step 1 — MCP Tools Discovery
@@ -268,7 +268,8 @@ class MCPAgent:
             return json.dumps(result) if isinstance(result, (dict, list)) else str(result), tool_messages
 
     async def cleanup(self):
-        await self.mcp.cleanup()
+        if self.mcp:
+            await self.mcp.cleanup()
         await self.auth.cleanup()
 
     @staticmethod

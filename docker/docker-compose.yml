@@ -14,7 +14,7 @@ include:
 # this one (AM, :27018) and apim-mongo (:27017) from docker-compose.apim.yml.
 services:
   mongodb:
-    image: mongo:8.0
+    image: mongo:${MONGODB_VERSION:-8.0}
     restart: always
     ports:
       - '27018:27017'
@@ -22,7 +22,7 @@ services:
       - am-mongo-data:/data/db
 
   management:
-    image: graviteeio/am-management-api:4.12.0-alpha.6
+    image: ${AM_REGISTRY:-graviteeio}/am-management-api:${AM_VERSION:-4.12.0}
     extra_hosts:
       - 'host.docker.internal:host-gateway'
     depends_on:
@@ -55,7 +55,7 @@ services:
       - GRAVITEE_DATAPLANES_0_MONGODB_URI=mongodb://mongodb:27017/graviteeam?serverSelectionTimeoutMS=5000&connectTimeoutMS=5000&socketTimeoutMS=5000
 
   gateway:
-    image: graviteeio/am-gateway:4.12.0-alpha.6
+    image: ${AM_REGISTRY:-graviteeio}/am-gateway:${AM_VERSION:-4.12.0}
     extra_hosts:
       - 'host.docker.internal:host-gateway'
     depends_on:
@@ -94,7 +94,7 @@ services:
   # Reached only via nginx at http://am.localhost (no host port).
   # same-origin: nginx serves the UI at am.localhost/ and proxies /management -> AM mgmt.
   webui:
-    image: graviteeio/am-management-ui:4.12.0-alpha.6
+    image: ${AM_REGISTRY:-graviteeio}/am-management-ui:${AM_VERSION:-4.12.0}
     depends_on:
       management:
         condition: service_healthy
