@@ -1,8 +1,7 @@
 #!/usr/bin/env python3
 """
 Gravitee Access Management (AM) Initialization Script.
-Configures a security domain, applications (from YAML), users, MCP servers,
-Token Exchange (RFC 8693), and OpenFGA authorization.
+Configures a security domain, applications (from YAML), users, and MCP servers.
 """
 
 import json
@@ -12,6 +11,7 @@ import sys
 import time
 import traceback
 from glob import glob
+from pathlib import Path
 from typing import Optional, Dict, Any, List
 
 import requests
@@ -31,21 +31,21 @@ DOMAIN_NAME = "gravitee"
 APPS_CONFIG_DIR = os.getenv("APPS_CONFIG_DIR", "/app/am-apps")
 MCP_SERVERS_CONFIG_DIR = os.getenv("MCP_SERVERS_CONFIG_DIR", "/app/am-mcp-servers")
 
+# Gamma <-> AM linking configuration
+GAMMA_SERVICE_ACCOUNT_USERNAME = os.getenv("GAMMA_SERVICE_ACCOUNT_USERNAME", "Gamma")
+GAMMA_SERVICE_ACCOUNT_TOKEN_NAME = os.getenv("GAMMA_SERVICE_ACCOUNT_TOKEN_NAME", "Gamma")
+GAMMA_AM_BASE_URL = os.getenv("GAMMA_AM_BASE_URL", "http://host.docker.internal:8093")
+GAMMA_AM_CONFIG_FILE = os.getenv("GAMMA_AM_CONFIG_FILE", "/tmp/gamma-am-config.json")
+
 # User configuration
-USER_FIRST_NAME = "John"
-USER_LAST_NAME = "Doe"
-USER_EMAIL = "john.doe@gravitee.io"
-USER_USERNAME = "john.doe@gravitee.io"
 USER_PASSWORD = "HelloWorld@123"
+USERS = [
+    {"firstName": "Customer", "lastName": "Demo",  "email": "customer.demo@gravitee.io",  "username": "customer.demo@gravitee.io"},
+    {"firstName": "Hotel",    "lastName": "Admin", "email": "hotel.admin@gravitee.io",    "username": "hotel.admin@gravitee.io"},
+]
 
 MAX_RETRIES = 30
 RETRY_DELAY = 5
-
-# OpenFGA
-FGA_BASE_URL = os.getenv("FGA_BASE_URL", "http://openfga:8080")
-FGA_STORE_NAME = "Hotel Booking Authorization"
-FGA_CONFIG_FILE = os.getenv("FGA_CONFIG_FILE", "/app/openfga/openfgastore.yaml")
-OPENFGA_SERVER_URL = os.getenv("OPENFGA_SERVER_URL", "http://openfga:8080")
 
 
 # ---------------------------------------------------------------------------
@@ -88,6 +88,7 @@ class GraviteeInitializer:
         self.domain_id: Optional[str] = None
         self.apps: List[Dict[str, Any]] = []
         self.session = requests.Session()
+        self.gamma_service_account: Optional[Dict[str, str]] = None
 
     # -- Logging & error helpers -------------------------------------------
 
@@ -99,6 +100,14 @@ class GraviteeInitializer:
         resp = getattr(exc, "response", None)
         if resp is not None and hasattr(resp, "text"):
             self.log(f"  Response: {resp.text}")
+
+    @staticmethod
+    def _mask_token(token: str) -> str:
+        if not token:
+            return ""
+        if len(token) <= 12:
+            return "***"
+        return f"{token[:6]}...{token[-6:]}"
 
     # -- URL helpers -------------------------------------------------------
 
@@ -449,26 +458,28 @@ class GraviteeInitializer:
     # -- User management ---------------------------------------------------
 
     def create_user(self) -> bool:
-        self.log(f"Creating user '{USER_USERNAME}'...")
-        try:
-            r = self.session.post(f"{self._domain_url}/users", json={
-                "firstName": USER_FIRST_NAME,
-                "lastName": USER_LAST_NAME,
-                "email": USER_EMAIL,
-                "username": USER_USERNAME,
-                "password": USER_PASSWORD,
-                "forceResetPassword": False,
-                "preRegistration": False,
-            }, timeout=10)
-            if r.status_code == 400 and "already exists" in r.text.lower():
-                self.log(f"✓ User '{USER_USERNAME}' already exists, skipping creation")
-                return True
-            r.raise_for_status()
-            self.log(f"✓ User '{USER_USERNAME}' created successfully")
-            return True
-        except requests.exceptions.RequestException as exc:
-            self._log_response_error("Failed to create user", exc)
-            return False
+        for user in USERS:
+            username = user["username"]
+            self.log(f"Creating user '{username}'...")
+            try:
+                r = self.session.post(f"{self._domain_url}/users", json={
+                    "firstName": user["firstName"],
+                    "lastName": user["lastName"],
+                    "email": user["email"],
+                    "username": username,
+                    "password": USER_PASSWORD,
+                    "forceResetPassword": False,
+                    "preRegistration": False,
+                }, timeout=10)
+                if r.status_code == 400 and "already exists" in r.text.lower():
+                    self.log(f"✓ User '{username}' already exists, skipping creation")
+                    continue
+                r.raise_for_status()
+                self.log(f"✓ User '{username}' created successfully")
+            except requests.exceptions.RequestException as exc:
+                self._log_response_error(f"Failed to create user '{username}'", exc)
+                return False
+        return True
 
     # -- MCP Servers -------------------------------------------------------
 
@@ -536,41 +547,186 @@ class GraviteeInitializer:
             self.log(f"✓ MCP Server '{cfg['name']}' configured with {len(cfg.get('tools', []))} tool(s)")
         return True
 
-    # -- OpenFGA authorization engine --------------------------------------
+    # -- Gamma AM service account ----------------------------------------
 
-    def create_openfga_authorization_engine(self, store_id: str, authorization_model_id: str = None) -> bool:
-        self.log("Creating OpenFGA authorization engine...")
-        url = f"{self._domain_url}/authorization-engines"
-
+    def _get_roles(self) -> List[Dict[str, Any]]:
         try:
-            r = self.session.get(url, timeout=10)
+            r = self.session.get(
+                f"{AM_BASE_URL}/management/organizations/{ORGANIZATION}/roles",
+                timeout=10,
+            )
             r.raise_for_status()
-            for engine in r.json():
-                if engine.get("type") == "openfga":
-                    self.log(f"✓ OpenFGA authorization engine already exists with ID: {engine['id']}")
-                    return True
-        except requests.exceptions.RequestException:
-            pass  # will try to create
+            data = r.json()
+            return data if isinstance(data, list) else data.get("data", [])
+        except requests.exceptions.RequestException as exc:
+            self._log_response_error("Failed to load AM roles", exc)
+            return []
 
-        configuration = {"connectionUri": OPENFGA_SERVER_URL, "storeId": store_id}
-        if authorization_model_id:
-            configuration["authorizationModelId"] = authorization_model_id
+    def _find_role_id(self, role_name: str) -> Optional[str]:
+        for role in self._get_roles():
+            if role.get("name") == role_name:
+                return role.get("id")
+        self.log(f"ERROR: Role '{role_name}' not found")
+        return None
+
+    def _find_user_by_username(self, username: str) -> Optional[Dict[str, Any]]:
+        try:
+            r = self.session.get(
+                f"{AM_BASE_URL}/management/organizations/{ORGANIZATION}/users",
+                params={"q": username},
+                timeout=10,
+            )
+            r.raise_for_status()
+            data = r.json().get("data", [])
+            for user in data:
+                if (user.get("username") or "").lower() == username.lower():
+                    return user
+            return None
+        except requests.exceptions.RequestException as exc:
+            self._log_response_error("Failed to search users", exc)
+            return None
+
+    def _ensure_gamma_service_account_user(self) -> Optional[str]:
+        self.log(f"Ensuring Gamma service account '{GAMMA_SERVICE_ACCOUNT_USERNAME}'...")
+        existing = self._find_user_by_username(GAMMA_SERVICE_ACCOUNT_USERNAME)
+        if existing:
+            uid = existing.get("id")
+            self.log(f"✓ Gamma service account already exists (ID: {uid})")
+            return uid
 
         try:
-            r = self.session.post(url, json={
-                "type": "openfga",
-                "name": "OpenFGA Authorization Engine",
-                "configuration": json.dumps(configuration),
-            }, timeout=10)
-            if r.status_code == 400 and "already exists" in r.text.lower():
-                self.log("✓ OpenFGA authorization engine already exists")
+            r = self.session.post(
+                f"{AM_BASE_URL}/management/organizations/{ORGANIZATION}/users",
+                json={"username": GAMMA_SERVICE_ACCOUNT_USERNAME, "serviceAccount": True},
+                timeout=10,
+            )
+            r.raise_for_status()
+            uid = r.json().get("id")
+            if not uid:
+                self.log("ERROR: Gamma service account created without ID")
+                return None
+            self.log(f"✓ Gamma service account created (ID: {uid})")
+            return uid
+        except requests.exceptions.RequestException as exc:
+            self._log_response_error("Failed to create Gamma service account", exc)
+            return None
+
+    def _member_has_role(self, members_payload: Dict[str, Any], member_id: str, role_id: str) -> bool:
+        for membership in members_payload.get("memberships", []):
+            if membership.get("memberId") == member_id and membership.get("roleId") == role_id:
                 return True
+        return False
+
+    def _ensure_org_member_role(self, member_id: str, role_id: str) -> bool:
+        try:
+            members_url = f"{AM_BASE_URL}/management/organizations/{ORGANIZATION}/members"
+            r = self.session.get(members_url, timeout=10)
             r.raise_for_status()
-            self.log(f"✓ OpenFGA authorization engine created with ID: {r.json().get('id')}")
+            payload = r.json()
+            if self._member_has_role(payload, member_id, role_id):
+                self.log("✓ Gamma service account already has ORGANIZATION_OWNER")
+                return True
+
+            r2 = self.session.post(
+                members_url,
+                json={"memberId": member_id, "memberType": "USER", "role": role_id},
+                timeout=10,
+            )
+            r2.raise_for_status()
+            self.log("✓ Added Gamma service account as ORGANIZATION_OWNER")
             return True
         except requests.exceptions.RequestException as exc:
-            self._log_response_error("Failed to create OpenFGA authorization engine", exc)
+            self._log_response_error("Failed to add organization membership", exc)
             return False
+
+    def _ensure_domain_member_role(self, member_id: str, role_id: str) -> bool:
+        try:
+            members_url = f"{self._domain_url}/members"
+            r = self.session.get(members_url, timeout=10)
+            r.raise_for_status()
+            payload = r.json()
+            if self._member_has_role(payload, member_id, role_id):
+                self.log("✓ Gamma service account already has DOMAIN_OWNER")
+                return True
+
+            r2 = self.session.post(
+                members_url,
+                json={"memberId": member_id, "memberType": "USER", "role": role_id},
+                timeout=10,
+            )
+            r2.raise_for_status()
+            self.log("✓ Added Gamma service account as DOMAIN_OWNER")
+            return True
+        except requests.exceptions.RequestException as exc:
+            self._log_response_error("Failed to add domain membership", exc)
+            return False
+
+    def _create_service_account_token(self, user_id: str) -> Optional[str]:
+        self.log(f"Creating AM token '{GAMMA_SERVICE_ACCOUNT_TOKEN_NAME}' for Gamma service account...")
+        try:
+            r = self.session.post(
+                f"{AM_BASE_URL}/management/organizations/{ORGANIZATION}/users/{user_id}/tokens",
+                json={"name": GAMMA_SERVICE_ACCOUNT_TOKEN_NAME},
+                timeout=10,
+            )
+            r.raise_for_status()
+            token = r.json().get("token")
+            if not token:
+                self.log("ERROR: Service account token creation returned no token")
+                return None
+            self.log(f"✓ Service account token generated ({self._mask_token(token)})")
+            return token
+        except requests.exceptions.RequestException as exc:
+            self._log_response_error("Failed to create service account token", exc)
+            return None
+
+    def _write_gamma_am_config(self, service_account_token: str) -> bool:
+        self.log(f"Writing Gamma AM link config to {GAMMA_AM_CONFIG_FILE}...")
+        payload = {
+            "baseUrl": GAMMA_AM_BASE_URL,
+            "serviceAccountAccessToken": service_account_token,
+            "amOrganizationId": ORGANIZATION,
+            "environmentId": None,
+            "defaultDomainId": self.domain_id,
+            "defaultDomainHrid": DOMAIN_NAME,
+            "gatewayUrl": None,
+        }
+        try:
+            target = Path(GAMMA_AM_CONFIG_FILE)
+            target.parent.mkdir(parents=True, exist_ok=True)
+            target.write_text(json.dumps(payload), encoding="utf-8")
+            self.log("✓ Gamma AM link config written")
+            return True
+        except Exception as exc:
+            self.log(f"ERROR: Failed to write Gamma AM link config: {exc}")
+            return False
+
+    def setup_gamma_service_account(self) -> bool:
+        self.log("Configuring AM service account for Gamma...")
+        org_owner_role = self._find_role_id("ORGANIZATION_OWNER")
+        domain_owner_role = self._find_role_id("DOMAIN_OWNER")
+        if not org_owner_role or not domain_owner_role:
+            return False
+
+        user_id = self._ensure_gamma_service_account_user()
+        if not user_id:
+            return False
+
+        if not self._ensure_org_member_role(user_id, org_owner_role):
+            return False
+        if not self._ensure_domain_member_role(user_id, domain_owner_role):
+            return False
+
+        token = self._create_service_account_token(user_id)
+        if not token:
+            return False
+
+        self.gamma_service_account = {
+            "id": user_id,
+            "username": GAMMA_SERVICE_ACCOUNT_USERNAME,
+            "tokenMask": self._mask_token(token),
+        }
+        return self._write_gamma_am_config(token)
 
     # -- Orchestration -----------------------------------------------------
 
@@ -597,6 +753,9 @@ class GraviteeInitializer:
         if not self._create_all_mcp_servers(mcp_configs):
             return False
 
+        if not self.setup_gamma_service_account():
+            return False
+
         self.log("=" * 80)
         self.log("✓ Access Management initialization completed successfully!")
         self.log("")
@@ -606,388 +765,20 @@ class GraviteeInitializer:
         for app in self.apps:
             self.log(f"    • {app['name']} ({app['type']})")
             self.log(f"      Client ID: {app['clientId']}")
-        self.log(f"  - User: {USER_USERNAME}")
+        for u in USERS:
+            self.log(f"  - User: {u['username']}")
         self.log(f"  - MCP Servers created: {len(mcp_configs)}")
         for mcp in mcp_configs:
             self.log(f"    • {mcp['name']}")
             self.log(f"      Client ID: {mcp['clientId']}")
             self.log(f"      Tools: {[t['key'] for t in mcp.get('tools', [])]}")
+        if self.gamma_service_account:
+            self.log("  - Gamma AM Service Account:")
+            self.log(f"    • Username: {self.gamma_service_account['username']}")
+            self.log(f"      ID: {self.gamma_service_account['id']}")
+            self.log(f"      Token: {self.gamma_service_account['tokenMask']}")
+            self.log(f"      Shared config: {GAMMA_AM_CONFIG_FILE}")
         return True
-
-
-# ───────────────────────────────────────────────────────────────────────────
-# OpenFGA Initializer
-# ───────────────────────────────────────────────────────────────────────────
-
-class OpenFGAInitializer:
-    """Handles OpenFGA authorization store initialization."""
-
-    def __init__(self):
-        self.store_id: Optional[str] = None
-        self.authorization_model_id: Optional[str] = None
-        self.session = requests.Session()
-        self.session.headers.update({"Content-Type": "application/json"})
-
-    def log(self, message: str):
-        print(f"[OPENFGA-INIT] {message}", flush=True)
-
-    def _log_response_error(self, label: str, exc: requests.exceptions.RequestException):
-        self.log(f"ERROR: {label}: {exc}")
-        resp = getattr(exc, "response", None)
-        if resp is not None and hasattr(resp, "text"):
-            self.log(f"  Response: {resp.text}")
-
-    # -- Readiness ---------------------------------------------------------
-
-    def wait_for_fga_api(self) -> bool:
-        self.log("Waiting for OpenFGA API to be ready...")
-        for attempt in range(1, MAX_RETRIES + 1):
-            try:
-                if self.session.get(f"{FGA_BASE_URL}/stores", timeout=5).status_code == 200:
-                    self.log("OpenFGA API is ready!")
-                    return True
-            except requests.exceptions.RequestException as exc:
-                self.log(f"  Attempt {attempt}/{MAX_RETRIES}: not ready yet ({exc})")
-            if attempt < MAX_RETRIES:
-                time.sleep(RETRY_DELAY)
-        self.log("ERROR: OpenFGA API did not become ready in time")
-        return False
-
-    # -- Store management --------------------------------------------------
-
-    def get_or_create_store(self) -> bool:
-        self.log(f"Creating/finding store '{FGA_STORE_NAME}'...")
-        try:
-            r = self.session.get(f"{FGA_BASE_URL}/stores", timeout=10)
-            r.raise_for_status()
-            for store in r.json().get("stores", []):
-                if store.get("name") == FGA_STORE_NAME:
-                    self.store_id = store["id"]
-                    self.log(f"✓ Found existing store with ID: {self.store_id}")
-                    return True
-        except requests.exceptions.RequestException:
-            pass
-
-        try:
-            r = self.session.post(f"{FGA_BASE_URL}/stores", json={"name": FGA_STORE_NAME}, timeout=10)
-            r.raise_for_status()
-            self.store_id = r.json().get("id")
-            if not self.store_id:
-                self.log("ERROR: No store ID in response")
-                return False
-            self.log(f"✓ Store created with ID: {self.store_id}")
-            return True
-        except requests.exceptions.RequestException as exc:
-            self._log_response_error("Failed to create store", exc)
-            return False
-
-    # -- DSL parsing -------------------------------------------------------
-
-    def parse_dsl_model(self, dsl_content: str) -> Dict[str, Any]:
-        """Parse OpenFGA DSL model format into JSON format."""
-        try:
-            lines = dsl_content.strip().split("\n")
-            schema_version = "1.1"
-            type_definitions: List[Dict[str, Any]] = []
-            current_type: Optional[str] = None
-            current_relations: List[Dict[str, Any]] = []
-
-            for line in lines:
-                stripped = line.strip()
-                if not stripped or stripped == "model" or stripped == "relations":
-                    continue
-
-                if stripped.startswith("schema "):
-                    schema_version = stripped.replace("schema ", "").strip()
-                    continue
-
-                if stripped.startswith("type "):
-                    if current_type:
-                        type_definitions.append(self._build_type_def(current_type, current_relations))
-                    current_type = stripped.replace("type ", "").strip()
-                    current_relations = []
-                    continue
-
-                if stripped.startswith("define ") and ":" in stripped:
-                    rel_def = stripped.replace("define ", "").strip()
-                    rel_name, rel_value = rel_def.split(":", 1)
-                    parsed = self._parse_relation_definition(rel_value.strip())
-                    current_relations.append({
-                        "name": rel_name.strip(),
-                        "def": parsed["userset"],
-                        "metadata": parsed.get("metadata"),
-                    })
-
-            if current_type:
-                type_definitions.append(self._build_type_def(current_type, current_relations))
-
-            return {"schema_version": schema_version, "type_definitions": type_definitions}
-        except Exception as exc:
-            self.log(f"ERROR: Failed to parse DSL model: {exc}")
-            traceback.print_exc()
-            return {}
-
-    @staticmethod
-    def _build_type_def(type_name: str, relations: List[Dict[str, Any]]) -> Dict[str, Any]:
-        type_def: Dict[str, Any] = {"type": type_name}
-        if not relations:
-            return type_def
-        type_def["relations"] = {r["name"]: r["def"] for r in relations}
-        metadata_rels = {r["name"]: r["metadata"] for r in relations if r.get("metadata")}
-        if metadata_rels:
-            type_def["metadata"] = {"relations": metadata_rels}
-        return type_def
-
-    def _parse_relation_definition(self, definition: str) -> Dict[str, Any]:
-        definition = definition.strip()
-        result: Dict[str, Any] = {"userset": {}, "metadata": None}
-
-        # Direct assignment: [user] or [user, hotel#admin]
-        direct_match = re.match(r"^\[([^\]]+)\]$", definition)
-        if direct_match:
-            directly_related = self._parse_type_list(direct_match.group(1))
-            result["userset"] = {"this": {}}
-            result["metadata"] = {"directly_related_user_types": directly_related}
-            return result
-
-        # Union: A or B or C
-        if " or " in definition:
-            parts = definition.split(" or ")
-            children = []
-            all_directly_related = []
-            for part in parts:
-                parsed = self._parse_single_relation(part.strip())
-                children.append(parsed["userset"])
-                if parsed.get("directly_related"):
-                    all_directly_related.extend(parsed["directly_related"])
-            result["userset"] = {"union": {"child": children}}
-            if all_directly_related:
-                result["metadata"] = {"directly_related_user_types": all_directly_related}
-            return result
-
-        # Single relation
-        parsed = self._parse_single_relation(definition)
-        result["userset"] = parsed["userset"]
-        if parsed.get("directly_related"):
-            result["metadata"] = {"directly_related_user_types": parsed["directly_related"]}
-        return result
-
-    def _parse_single_relation(self, part: str) -> Dict[str, Any]:
-        part = part.strip()
-
-        direct_match = re.match(r"^\[([^\]]+)\]$", part)
-        if direct_match:
-            return {"userset": {"this": {}}, "directly_related": self._parse_type_list(direct_match.group(1))}
-
-        from_match = re.match(r"^(\w+)\s+from\s+(\w+)$", part)
-        if from_match:
-            return {
-                "userset": {
-                    "tupleToUserset": {
-                        "tupleset": {"relation": from_match.group(2)},
-                        "computedUserset": {"relation": from_match.group(1)},
-                    }
-                }
-            }
-
-        return {"userset": {"computedUserset": {"relation": part}}}
-
-    @staticmethod
-    def _parse_type_list(types_str: str) -> List[Dict[str, str]]:
-        result = []
-        for t in types_str.split(","):
-            t = t.strip()
-            if "#" in t:
-                type_name, relation = t.split("#", 1)
-                result.append({"type": type_name.strip(), "relation": relation.strip()})
-            else:
-                result.append({"type": t})
-        return result
-
-    # -- Authorization model -----------------------------------------------
-
-    def create_authorization_model(self, model_dsl: str) -> bool:
-        self.log("Checking for existing authorization model...")
-        try:
-            model_json = self.parse_dsl_model(model_dsl)
-            if not model_json.get("type_definitions"):
-                self.log("ERROR: Failed to parse model DSL — no type definitions")
-                return False
-
-            existing_id = self._find_existing_authorization_model(model_json)
-            if existing_id:
-                self.authorization_model_id = existing_id
-                self.log(f"✓ Using existing authorization model with ID: {existing_id}")
-                return True
-
-            self.log("Creating new authorization model...")
-            r = self.session.post(
-                f"{FGA_BASE_URL}/stores/{self.store_id}/authorization-models",
-                json=model_json,
-                timeout=10,
-            )
-            r.raise_for_status()
-            self.authorization_model_id = r.json().get("authorization_model_id")
-            if not self.authorization_model_id:
-                self.log("ERROR: No authorization_model_id in response")
-                return False
-            self.log(f"✓ Authorization model created with ID: {self.authorization_model_id}")
-            return True
-        except requests.exceptions.RequestException as exc:
-            self._log_response_error("Failed to create authorization model", exc)
-            return False
-
-    def _find_existing_authorization_model(self, new_model: Dict[str, Any]) -> Optional[str]:
-        try:
-            r = self.session.get(
-                f"{FGA_BASE_URL}/stores/{self.store_id}/authorization-models",
-                timeout=10,
-            )
-            r.raise_for_status()
-            existing_models = r.json().get("authorization_models", [])
-            if not existing_models:
-                return None
-
-            new_types_json = json.dumps(
-                self._normalize_type_definitions(new_model.get("type_definitions", [])),
-                sort_keys=True,
-            )
-            for existing in existing_models:
-                existing_json = json.dumps(
-                    self._normalize_type_definitions(existing.get("type_definitions", [])),
-                    sort_keys=True,
-                )
-                if new_types_json == existing_json:
-                    return existing.get("id")
-            return None
-        except requests.exceptions.RequestException:
-            return None
-
-    def _normalize_type_definitions(self, type_defs: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
-        normalized = []
-        for td in sorted(type_defs, key=lambda x: x.get("type", "")):
-            norm: Dict[str, Any] = {"type": td.get("type")}
-            if td.get("relations"):
-                norm["relations"] = {
-                    name: self._normalize_userset(udef)
-                    for name, udef in td["relations"].items()
-                }
-            if td.get("metadata") and td["metadata"].get("relations"):
-                meta_rels = {}
-                for rn, rm in td["metadata"]["relations"].items():
-                    if rm and rm.get("directly_related_user_types"):
-                        drut = [
-                            {k: v for k, v in item.items() if k in ("type", "relation") and v}
-                            for item in rm["directly_related_user_types"]
-                        ]
-                        if drut:
-                            meta_rels[rn] = {
-                                "directly_related_user_types": sorted(drut, key=lambda x: (x.get("type", ""), x.get("relation", "")))
-                            }
-                if meta_rels:
-                    norm["metadata"] = {"relations": meta_rels}
-            normalized.append(norm)
-        return normalized
-
-    def _normalize_userset(self, userset: Dict[str, Any]) -> Dict[str, Any]:
-        if not userset:
-            return {}
-        result: Dict[str, Any] = {}
-        if "this" in userset:
-            result["this"] = {}
-        if "computedUserset" in userset:
-            result["computedUserset"] = {"relation": userset["computedUserset"].get("relation", "")}
-        if "tupleToUserset" in userset:
-            ttu = userset["tupleToUserset"]
-            result["tupleToUserset"] = {
-                "tupleset": {"relation": ttu.get("tupleset", {}).get("relation", "")},
-                "computedUserset": {"relation": ttu.get("computedUserset", {}).get("relation", "")},
-            }
-        for key in ("union", "intersection"):
-            if key in userset:
-                result[key] = {"child": [self._normalize_userset(c) for c in userset[key].get("child", [])]}
-        if "difference" in userset:
-            result["difference"] = {
-                "base": self._normalize_userset(userset["difference"].get("base", {})),
-                "subtract": self._normalize_userset(userset["difference"].get("subtract", {})),
-            }
-        return result
-
-    # -- Tuples ------------------------------------------------------------
-
-    def write_tuples(self, tuples: List[Dict[str, str]]) -> bool:
-        self.log(f"Writing {len(tuples)} relationship tuples...")
-        if not tuples:
-            self.log("No tuples to write")
-            return True
-        try:
-            r = self.session.post(
-                f"{FGA_BASE_URL}/stores/{self.store_id}/write",
-                json={
-                    "writes": {
-                        "tuple_keys": [{"user": t["user"], "relation": t["relation"], "object": t["object"]} for t in tuples],
-                        "on_duplicate": "ignore",
-                    },
-                    "authorization_model_id": self.authorization_model_id,
-                },
-                timeout=10,
-            )
-            r.raise_for_status()
-            self.log(f"✓ {len(tuples)} relationship tuples written successfully")
-            return True
-        except requests.exceptions.RequestException as exc:
-            self._log_response_error("Failed to write tuples", exc)
-            return False
-
-    # -- Orchestration -----------------------------------------------------
-
-    def run(self) -> bool:
-        self.log("Starting OpenFGA authorization store initialization...")
-        self.log("=" * 80)
-
-        if not self.wait_for_fga_api():
-            return False
-
-        config = self._load_config()
-        if not config:
-            return False
-
-        if not self.get_or_create_store():
-            return False
-
-        model_dsl = config.get("model", "")
-        if not model_dsl:
-            self.log("ERROR: No model found in configuration")
-            return False
-        if not self.create_authorization_model(model_dsl):
-            return False
-
-        tuples = config.get("tuples", [])
-        if not self.write_tuples(tuples):
-            return False
-
-        self.log("=" * 80)
-        self.log("✓ OpenFGA initialization completed successfully!")
-        self.log("")
-        self.log("Summary:")
-        self.log(f"  - Store: {FGA_STORE_NAME} (ID: {self.store_id})")
-        self.log(f"  - Authorization Model ID: {self.authorization_model_id}")
-        self.log(f"  - Tuples written: {len(tuples)}")
-        return True
-
-    def _load_config(self) -> Optional[Dict[str, Any]]:
-        self.log(f"Loading configuration from {FGA_CONFIG_FILE}...")
-        try:
-            with open(FGA_CONFIG_FILE, "r") as fh:
-                config = yaml.safe_load(fh)
-            self.log("✓ Configuration loaded successfully")
-            return config
-        except FileNotFoundError:
-            self.log(f"ERROR: Configuration file not found: {FGA_CONFIG_FILE}")
-            return None
-        except yaml.YAMLError as exc:
-            self.log(f"ERROR: Failed to parse YAML: {exc}")
-            return None
 
 
 # ───────────────────────────────────────────────────────────────────────────
@@ -996,7 +787,6 @@ class OpenFGAInitializer:
 
 def main():
     am = GraviteeInitializer()
-    fga = OpenFGAInitializer()
 
     try:
         if not am.run():
@@ -1005,27 +795,6 @@ def main():
         am.log("Initialization interrupted by user"); sys.exit(1)
     except Exception as exc:
         am.log(f"FATAL ERROR: {exc}"); traceback.print_exc(); sys.exit(1)
-
-    try:
-        if not fga.run():
-            sys.exit(1)
-    except KeyboardInterrupt:
-        fga.log("Initialization interrupted by user"); sys.exit(1)
-    except Exception as exc:
-        fga.log(f"FATAL ERROR: {exc}"); traceback.print_exc(); sys.exit(1)
-
-    # Link OpenFGA engine to AM domain
-    try:
-        if fga.store_id:
-            am.log("=" * 80)
-            am.log("Creating OpenFGA Authorization Engine in Access Management...")
-            if not am.create_openfga_authorization_engine(fga.store_id, fga.authorization_model_id):
-                sys.exit(1)
-            am.log("✓ OpenFGA Authorization Engine configured in AM")
-        else:
-            am.log("WARNING: No OpenFGA store ID available, skipping authorization engine creation")
-    except Exception as exc:
-        am.log(f"FATAL ERROR creating authorization engine: {exc}"); traceback.print_exc(); sys.exit(1)
 
     am.log("✓ Access Management initialization completed")
     print("[INIT] ✓ All initialization completed successfully!", flush=True)

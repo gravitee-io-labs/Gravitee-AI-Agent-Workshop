@@ -1,0 +1,73 @@
+# Collector for the local demo stack. Receives OTLP from apim-gateway (spans + log records via
+# gravitee-reporter-otel) and writes to apim-es using mapping.mode: otel so trace_id / span_id /
+# status.code land as the right ES types.
+#
+# Routing — hardcoded via the exporter's static `traces_index` / `logs_index`, with the dynamic
+# indexer explicitly disabled (mapping.mode: otel turns it on by default, which would otherwise
+# bypass our static config and land docs in {signal}-generic-default).
+
+receivers:
+  otlp:
+    protocols:
+      grpc:
+        endpoint: 0.0.0.0:4317
+      http:
+        endpoint: 0.0.0.0:4318
+
+processors:
+  # Tight batching for a demo: 200ms keeps the "send a request, refresh the UI" loop snappy without
+  # overwhelming ES.
+  batch:
+    timeout: 200ms
+
+exporters:
+  elasticsearch:
+    endpoints: ['http://apim-es:9200']
+    mapping:
+      mode: otel
+    # Static indices — every span goes to traces-gamma.otel-local, every log to logs-gamma.otel-local.
+    traces_index: traces-gamma.otel-local
+    logs_index: logs-gamma.otel-local
+    # Default in mapping.mode: otel is dynamic indexing via resource attributes; disable so the
+    # static names above actually win.
+    traces_dynamic_index:
+      enabled: false
+    logs_dynamic_index:
+      enabled: false
+    flush:
+      interval: 1s
+    # Demo defaults: surface errors immediately instead of silently retrying / queuing. Anyone
+    # debugging the stack wants to see the failure in the collector logs, not five minutes of
+    # silent retries.
+    retry:
+      enabled: false
+    sending_queue:
+      enabled: false
+    timeout: 30s
+
+  # Forward traces to agent-live-graph for real-time flow visualization.
+  # agent-live-graph (docker-compose.workshop.yml) exposes an OTLP/HTTP receiver on port 4318.
+  # Fails fast (2 s timeout, no retry) so the pipeline is not blocked when the workshop
+  # services are not running.
+  otlphttp/agent-live-graph:
+    endpoint: http://agent-live-graph:4318
+    tls:
+      insecure: true
+    retry_on_failure:
+      enabled: false
+    sending_queue:
+      enabled: false
+    timeout: 2s
+
+service:
+  pipelines:
+    traces:
+      receivers: [otlp]
+      processors: [batch]
+      exporters: [elasticsearch, otlphttp/agent-live-graph]
+    logs:
+      receivers: [otlp]
+      processors: [batch]
+      exporters: [elasticsearch]
+  # No metrics pipeline. If the gateway happens to emit OTel metrics on the same OTLP endpoint, the
+  # receiver drops them with a warning.

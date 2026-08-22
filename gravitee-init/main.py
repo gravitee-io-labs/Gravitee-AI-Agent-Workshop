@@ -143,9 +143,43 @@ def main():
         log(f"✗ Failed to run AM initialization: {e}")
         sys.exit(1)
 
-    # Step 2: Initialize API Management
+    # Step 2: Register AIM catalog source (Tavily MCP server)
     log("")
-    log("STEP 2: Initializing API Management (APIM)...")
+    log("STEP 2: Registering AIM catalog source (Tavily MCP)...")
+    log("-" * 80)
+
+    # gamma is served through apim-rest-api internally (same as $APIM_URL/gamma/...)
+    gamma_url = os.getenv("GAMMA_BASE_URL", APIM_BASE_URL)
+    aim_catalog_url = (
+        f"{gamma_url}/gamma/organizations/{ORGANIZATION}/environments/{ENVIRONMENT}"
+        "/modules/aim/catalog/sources"
+    )
+    aim_payload = {
+        "sourceKind": "mcp.server",
+        "definition": {
+            "type": "mcp-gateway",
+            "name": "https://mcp.tavily.com/mcp/",
+        },
+    }
+    try:
+        r = requests.post(
+            aim_catalog_url,
+            json=aim_payload,
+            auth=(APIM_USERNAME, APIM_PASSWORD),
+            timeout=15,
+        )
+        if r.status_code in (200, 201):
+            log(f"✓ AIM catalog source registered (HTTP {r.status_code})")
+        elif r.status_code == 409:
+            log("✓ AIM catalog source already exists (HTTP 409)")
+        else:
+            log(f"WARNING: AIM catalog source registration returned HTTP {r.status_code}: {r.text}")
+    except Exception as e:
+        log(f"WARNING: Failed to register AIM catalog source: {e}")
+
+    # Step 3: Initialize API Management
+    log("")
+    log("STEP 3: Initializing API Management (APIM)...")
     log("-" * 80)
 
     try:
@@ -161,6 +195,24 @@ def main():
     except Exception as e:
         log(f"✗ Failed to run APIM initialization: {e}")
         sys.exit(1)
+
+    # Step 4: Initialize Gamma AIM catalog (MCP tools)
+    log("")
+    log("STEP 4: Initializing Gamma AIM catalog (MCP tools)...")
+    log("-" * 80)
+
+    try:
+        subprocess.run(
+            [sys.executable, "/app/gamma_init.py"],
+            check=True,
+            capture_output=False,
+        )
+        log("✓ Gamma AIM initialization completed")
+    except subprocess.CalledProcessError as e:
+        log(f"WARNING: Gamma AIM initialization failed with exit code {e.returncode}")
+        # Non-fatal: AIM tools are best-effort
+    except Exception as e:
+        log(f"WARNING: Failed to run Gamma initialization: {e}")
 
     # All done
     log("")

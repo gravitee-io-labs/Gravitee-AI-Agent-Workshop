@@ -55,13 +55,140 @@ class MCPClient:
     """Single MCP server connection with elicitation support and auto-reconnect."""
 
     def __init__(self, mcp_url: str, retry_interval: int = MCP_RETRY_INTERVAL,
-                 elicitation_callback: Optional[ElicitationCallbackT] = None):
+                 elicitation_callback: Optional[ElicitationCallbackT] = None,
+                 static_headers: Optional[Dict[str, str]] = None):
         self.session: Optional[ClientSession] = None
         self.exit_stack = AsyncExitStack()
         self.mcp_http_url = mcp_url
         self.retry_interval = retry_interval
         self.is_connected = False
         self._elicitation_callback = elicitation_callback
+        self.static_headers: Dict[str, str] = static_headers or {}
+        self._http_session_id: Optional[str] = None
+
+    @staticmethod
+    def _is_missing_session_error(payload: dict) -> bool:
+        """Detect gateway error that indicates Streamable HTTP session is required."""
+        msg = (payload.get("error") or {}).get("message", "")
+        return isinstance(msg, str) and "mcp-session-id" in msg.lower()
+
+    async def _http_initialize_session(self, extra_headers: Optional[Dict[str, str]]) -> None:
+        """Initialize a Streamable HTTP MCP session and cache Mcp-Session-Id."""
+        if not HAS_HTTPX:
+            raise RuntimeError("httpx is required for HTTP MCP session initialization")
+
+        request_headers = {
+            "Content-Type": "application/json",
+            "Accept": "application/json, text/event-stream",
+        }
+        if extra_headers:
+            request_headers.update(extra_headers)
+
+        init_request = {
+            "jsonrpc": "2.0",
+            "id": 1,
+            "method": "initialize",
+            "params": {
+                "protocolVersion": "2025-11-25",
+                "capabilities": {},
+                "clientInfo": {"name": "hotel-agent", "version": "1.0.0"},
+            },
+        }
+
+        async with httpx.AsyncClient() as client:
+            response = await client.post(
+                self.mcp_http_url.rstrip('/'),
+                json=init_request,
+                headers=request_headers,
+                timeout=30.0,
+            )
+            if response.status_code in (401, 403):
+                raise ToolError(f"HTTP {response.status_code}", response.status_code)
+            if response.status_code != 200:
+                raise RuntimeError(f"HTTP {response.status_code} during initialize")
+
+            session_id = response.headers.get("Mcp-Session-Id") or response.headers.get("mcp-session-id")
+            if not session_id:
+                raise RuntimeError("MCP initialize succeeded but no Mcp-Session-Id header was returned")
+            self._http_session_id = session_id
+
+    async def _http_jsonrpc_request(
+        self,
+        method: str,
+        params: Dict[str, Any],
+        *,
+        extra_headers: Optional[Dict[str, str]] = None,
+        timeout: float = 60.0,
+    ) -> tuple[dict, Dict[str, str]]:
+        """Send a JSON-RPC request over Streamable HTTP with automatic session bootstrap."""
+        if not HAS_HTTPX:
+            raise RuntimeError("httpx is not installed")
+
+        request_headers = {
+            "Content-Type": "application/json",
+            "Accept": "application/json, text/event-stream",
+        }
+        if extra_headers:
+            request_headers.update(extra_headers)
+        if self._http_session_id:
+            request_headers["Mcp-Session-Id"] = self._http_session_id
+
+        mcp_request = {
+            "jsonrpc": "2.0",
+            "id": 1,
+            "method": method,
+            "params": params,
+        }
+
+        async with httpx.AsyncClient() as client:
+            async with client.stream(
+                "POST",
+                self.mcp_http_url.rstrip('/'),
+                json=mcp_request,
+                headers=request_headers,
+                timeout=timeout,
+            ) as response:
+                if response.status_code in (401, 403):
+                    raise ToolError(f"HTTP {response.status_code}", response.status_code)
+                content_type = response.headers.get("content-type", "")
+                body = await response.aread()
+                body_text = body.decode("utf-8")
+
+                if "text/event-stream" in content_type:
+                    data = _parse_sse_response(body_text)
+                    if not data:
+                        raise RuntimeError("No JSON-RPC result in SSE stream")
+                else:
+                    try:
+                        data = json.loads(body_text)
+                    except json.JSONDecodeError:
+                        data = {}
+
+                if response.status_code != 200:
+                    if response.status_code == 400 and self._is_missing_session_error(data):
+                        await self._http_initialize_session(extra_headers)
+                        return await self._http_jsonrpc_request(
+                            method,
+                            params,
+                            extra_headers=extra_headers,
+                            timeout=timeout,
+                        )
+                    raise RuntimeError(f"HTTP {response.status_code}")
+
+                session_id = response.headers.get("Mcp-Session-Id") or response.headers.get("mcp-session-id")
+                if session_id:
+                    self._http_session_id = session_id
+
+                if "error" in data and self._is_missing_session_error(data):
+                    await self._http_initialize_session(extra_headers)
+                    return await self._http_jsonrpc_request(
+                        method,
+                        params,
+                        extra_headers=extra_headers,
+                        timeout=timeout,
+                    )
+
+                return data, dict(response.headers)
 
     def _create_sdk_elicitation_callback(self):
         outer_callback = self._elicitation_callback
@@ -94,7 +221,7 @@ class MCPClient:
         while True:
             try:
                 http_transport = await self.exit_stack.enter_async_context(
-                    mcp_http_client(self.mcp_http_url)
+                    mcp_http_client(self.mcp_http_url, headers=self.static_headers or None)
                 )
                 try:
                     read_stream, write_stream, _ = http_transport
@@ -108,6 +235,14 @@ class MCPClient:
                 await self.session.initialize()
                 self.is_connected = True
                 logger.info(f"Connected to {self.mcp_http_url}")
+                # Bootstrap HTTP session ID so direct HTTP calls (list_tools/call_tool)
+                # always send Mcp-Session-Id and avoid a spurious 400 on first request.
+                if HAS_HTTPX and self.static_headers:
+                    try:
+                        await self._http_initialize_session(self.static_headers)
+                        logger.info(f"HTTP session bootstrapped (id: {self._http_session_id})")
+                    except Exception as e:
+                        logger.debug(f"HTTP session bootstrap failed (will retry on first direct call): {e}")
                 break
             except Exception as e:
                 retry_count += 1
@@ -134,6 +269,7 @@ class MCPClient:
         self.exit_stack = AsyncExitStack()
         self.session = None
         self.is_connected = False
+        self._http_session_id = None
         await self.connect(max_retries=3)
 
     async def list_tools(self, extra_headers: Optional[Dict[str, str]] = None) -> List[Dict[str, Any]]:
@@ -141,49 +277,23 @@ class MCPClient:
         # Direct HTTP path — handles both JSON and SSE responses
         if HAS_HTTPX and extra_headers:
             try:
-                async with httpx.AsyncClient() as client:
-                    mcp_request = {
-                        "jsonrpc": "2.0", "id": 1,
-                        "method": "tools/list",
-                        "params": {},
-                    }
-                    request_headers = {
-                        "Content-Type": "application/json",
-                        "Accept": "application/json, text/event-stream",
-                    }
-                    request_headers.update(extra_headers)
-
-                    async with client.stream(
-                        "POST", self.mcp_http_url.rstrip('/'),
-                        json=mcp_request, headers=request_headers, timeout=30.0,
-                    ) as response:
-                        if response.status_code in (401, 403):
-                            raise ToolError(f"HTTP {response.status_code}", response.status_code)
-                        if response.status_code != 200:
-                            raise RuntimeError(f"HTTP {response.status_code}")
-
-                        content_type = response.headers.get("content-type", "")
-                        body = await response.aread()
-                        body_text = body.decode("utf-8")
-
-                        if "text/event-stream" in content_type:
-                            data = _parse_sse_response(body_text)
-                            if not data:
-                                raise RuntimeError("No JSON-RPC result in SSE stream")
-                        else:
-                            data = json.loads(body_text)
-
-                        if "error" in data:
-                            raise RuntimeError(data["error"].get("message", "Unknown error"))
-                        tools = data.get("result", {}).get("tools", [])
-                        return [{
-                            "type": "function",
-                            "function": {
-                                "name": t["name"],
-                                "description": t.get("description", ""),
-                                "parameters": t.get("inputSchema", {}),
-                            },
-                        } for t in tools]
+                data, _ = await self._http_jsonrpc_request(
+                    "tools/list",
+                    {},
+                    extra_headers=extra_headers,
+                    timeout=30.0,
+                )
+                if "error" in data:
+                    raise RuntimeError(data["error"].get("message", "Unknown error"))
+                tools = data.get("result", {}).get("tools", [])
+                return [{
+                    "type": "function",
+                    "function": {
+                        "name": t["name"],
+                        "description": t.get("description", ""),
+                        "parameters": t.get("inputSchema", {}),
+                    },
+                } for t in tools]
             except Exception as e:
                 logger.warning(f"Direct HTTP list_tools failed, falling back to session: {e}")
 
@@ -216,42 +326,15 @@ class MCPClient:
         # Direct HTTP path — stateless, handles both JSON and SSE responses
         if HAS_HTTPX and extra_headers:
             try:
-                async with httpx.AsyncClient() as client:
-                    mcp_request = {
-                        "jsonrpc": "2.0", "id": 1,
-                        "method": "tools/call",
-                        "params": {"name": tool_name, "arguments": arguments},
-                    }
-                    request_headers = {
-                        "Content-Type": "application/json",
-                        "Accept": "application/json, text/event-stream",
-                    }
-                    request_headers.update(extra_headers)
-
-                    # Stream the response to handle SSE (Streamable HTTP MCP)
-                    async with client.stream(
-                        "POST", self.mcp_http_url.rstrip('/'),
-                        json=mcp_request, headers=request_headers, timeout=60.0,
-                    ) as response:
-                        if response.status_code in (401, 403):
-                            raise ToolError(f"HTTP {response.status_code}", response.status_code)
-                        if response.status_code != 200:
-                            raise RuntimeError(f"HTTP {response.status_code}")
-
-                        content_type = response.headers.get("content-type", "")
-                        body = await response.aread()
-                        body_text = body.decode("utf-8")
-
-                        if "text/event-stream" in content_type:
-                            data = _parse_sse_response(body_text)
-                            if not data:
-                                raise RuntimeError("No JSON-RPC result in SSE stream")
-                        else:
-                            data = json.loads(body_text)
-
-                        if "error" in data:
-                            raise RuntimeError(data["error"].get("message", "Unknown error"))
-                        return data.get("result", {}), dict(response.headers)
+                data, headers = await self._http_jsonrpc_request(
+                    "tools/call",
+                    {"name": tool_name, "arguments": arguments},
+                    extra_headers=extra_headers,
+                    timeout=60.0,
+                )
+                if "error" in data:
+                    raise RuntimeError(data["error"].get("message", "Unknown error"))
+                return data.get("result", {}), headers
             except ToolError:
                 raise
             except Exception as e:
@@ -284,6 +367,7 @@ class MCPClient:
         try:
             await self.exit_stack.aclose()
             self.is_connected = False
+            self._http_session_id = None
         except Exception as e:
             logger.error(f"Cleanup error: {e}")
 
@@ -293,7 +377,9 @@ class MCPMultiClient:
 
     def __init__(self, mcp_urls: Optional[List[str] | str] = None,
                  retry_interval: int = MCP_RETRY_INTERVAL,
-                 elicitation_callback: Optional[ElicitationCallbackT] = None):
+                 elicitation_callback: Optional[ElicitationCallbackT] = None,
+                 static_headers: Optional[Dict[str, str]] = None):
+        self._static_headers: Dict[str, str] = static_headers or {}
         if mcp_urls is None or mcp_urls == "":
             urls_str = MCP_HTTP_URLS_DEFAULT
         elif isinstance(mcp_urls, str):
@@ -309,7 +395,7 @@ class MCPMultiClient:
 
     async def connect_all(self, max_retries: Optional[int] = None, connection_timeout: int = 30):
         for url in self.mcp_urls:
-            client = MCPClient(url, self.retry_interval, self._elicitation_callback)
+            client = MCPClient(url, self.retry_interval, self._elicitation_callback, self._static_headers or None)
             try:
                 await asyncio.wait_for(client.connect(max_retries=max_retries), timeout=connection_timeout)
                 self.clients[url] = client

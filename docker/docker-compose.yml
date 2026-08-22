@@ -1,0 +1,192 @@
+include:
+  - ./docker-compose.apim.yml
+  - ./docker-compose.workshop.yml
+
+# Self-contained AM services (pre-built images, Gravitee ACR by default —
+# override ${REGISTRY} to pull from the public hub). Previously these were
+# pulled in via AM's local-stack compose, but that mounted files from the AM
+# repo (license, wiremock, mtls certs). Inlined here so every mount lives under
+# docker/, and the unused AM extras (smtp, wiremock, openfga, kafka, mtls) are
+# dropped. Image versions default to the inlined alpha tags (no .env needed).
+#
+# Mongo URIs/wiring and the GRAVITEE_* env are lifted from AM's dev local-stack.
+# Email is disabled (the smtp service is gone). Two mongos run side by side:
+# this one (AM, :27018) and apim-mongo (:27017) from docker-compose.apim.yml.
+services:
+  mongodb:
+    image: mongo:${MONGODB_VERSION:-8.0}
+    restart: always
+    ports:
+      - '27018:27017'
+    volumes:
+      - am-mongo-data:/data/db
+
+  management:
+    image: ${AM_REGISTRY:-graviteeio}/am-management-api:${AM_VERSION:-4.12.0}
+    extra_hosts:
+      - 'host.docker.internal:host-gateway'
+    depends_on:
+      mongodb:
+        condition: service_started
+    volumes:
+      - ./license/license.key:/opt/graviteeio-am-management-api/license/license.key
+    healthcheck:
+      test: ['CMD', 'curl', 'http://localhost:18093/_node/health?probes=jetty-http-server', '-u', 'admin:adminadmin']
+      interval: 5s
+      timeout: 2s
+      retries: 10
+    ports:
+      - '8093:8093'
+      - '18093:18093'
+    environment:
+      - GRAVITEE_EMAIL_ENABLED=false
+      - GRAVITEE_MFA_RATE_ENABLED=true
+      - GRAVITEE_MFA_RATE_LIMIT=2
+      - GRAVITEE_MFA_RATE_TIMEPERIOD=1
+      - GRAVITEE_MFA_RATE_TIMEUNIT=Minutes
+      - GIO_MAX_MEM=512m
+      - GRAVITEE_SERVICES_CORE_HTTP_HOST=0.0.0.0
+      - GRAVITEE_HTTP_API_AUTOMATION_ENABLED=true
+      - GRAVITEE_REPOSITORIES_MANAGEMENT_MONGODB_URI=mongodb://mongodb:27017/graviteeam?serverSelectionTimeoutMS=5000&connectTimeoutMS=5000&socketTimeoutMS=5000
+      - GRAVITEE_REPOSITORIES_OAUTH2_MONGODB_URI=mongodb://mongodb:27017/graviteeam?serverSelectionTimeoutMS=5000&connectTimeoutMS=5000&socketTimeoutMS=5000
+      - GRAVITEE_REPOSITORIES_GATEWAY_MONGODB_URI=mongodb://mongodb:27017/graviteeam?serverSelectionTimeoutMS=5000&connectTimeoutMS=5000&socketTimeoutMS=5000
+      - GRAVITEE_DATAPLANES_0_ID=default
+      - GRAVITEE_DATAPLANES_0_TYPE=mongodb
+      - GRAVITEE_DATAPLANES_0_MONGODB_URI=mongodb://mongodb:27017/graviteeam?serverSelectionTimeoutMS=5000&connectTimeoutMS=5000&socketTimeoutMS=5000
+
+  gateway:
+    image: ${AM_REGISTRY:-graviteeio}/am-gateway:${AM_VERSION:-4.12.0}
+    extra_hosts:
+      - 'host.docker.internal:host-gateway'
+    depends_on:
+      mongodb:
+        condition: service_started
+      management:
+        condition: service_healthy
+    volumes:
+      - ./license/license.key:/opt/graviteeio-am-gateway/license/license.key
+    healthcheck:
+      test: ['CMD', 'curl', 'http://localhost:18092/_node/health?probes=jetty-http-server', '-u', 'admin:adminadmin']
+      interval: 5s
+      timeout: 2s
+      retries: 10
+    ports:
+      - '8092:8092'
+      - '18092:18092'
+    environment:
+      - GRAVITEE_EMAIL_ENABLED=false
+      - GRAVITEE_MFA_RATE_ENABLED=true
+      - GRAVITEE_MFA_RATE_LIMIT=2
+      - GRAVITEE_MFA_RATE_TIMEPERIOD=1
+      - GRAVITEE_MFA_RATE_TIMEUNIT=Minutes
+      - GRAVITEE_SERVICES_SYNC_CRON=*/2 * * * * *
+      - GRAVITEE_SERVICES_SYNC_TIMEFRAMEBEFOREDELAY=5000
+      - GRAVITEE_SERVICES_SYNC_TIMEFRAMEAFTERDELAY=5000
+      - GRAVITEE_HTTP_SSL_CERTIFICATEHEADER=X-Client-Cert
+      - GIO_MAX_MEM=512m
+      - GRAVITEE_SERVICES_CORE_HTTP_HOST=0.0.0.0
+      - GRAVITEE_SERVICES_SYNC_PROBES_STATE_ENABLED=true
+      - GRAVITEE_HANDLERS_OAUTH2_INTROSPECT_OFFLINEVERIFICATIONTIMERSECONDS=0
+      - GRAVITEE_REPOSITORIES_MANAGEMENT_MONGODB_URI=mongodb://mongodb:27017/graviteeam?serverSelectionTimeoutMS=5000&connectTimeoutMS=5000&socketTimeoutMS=5000
+      - GRAVITEE_REPOSITORIES_OAUTH_2_MONGODB_URI=mongodb://mongodb:27017/graviteeam?serverSelectionTimeoutMS=5000&connectTimeoutMS=5000&socketTimeoutMS=5000
+      - GRAVITEE_REPOSITORIES_GATEWAY_MONGODB_URI=mongodb://mongodb:27017/graviteeam?serverSelectionTimeoutMS=5000&connectTimeoutMS=5000&socketTimeoutMS=5000
+
+  # Reached only via nginx at http://am.localhost (no host port).
+  # same-origin: nginx serves the UI at am.localhost/ and proxies /management -> AM mgmt.
+  webui:
+    image: ${AM_REGISTRY:-graviteeio}/am-management-ui:${AM_VERSION:-4.12.0}
+    depends_on:
+      management:
+        condition: service_healthy
+    environment:
+      - MGMT_API_URL=http://am.localhost
+      - MGMT_BASE_HREF=/
+
+  # ── SPIRE — real SPIFFE workload identity issuer ──────────────────────────────
+  # Copied from gravitee-access-management/docker/local-stack/dev/spire so the demo
+  # can exercise SPIFFE end-to-end. Trust domain am.local; JWKS for AM at
+  # http://spire-oidc:8443/keys (on this network) / http://localhost:18443/keys (host).
+  # setup.sh registers am.local as a trust domain on the gamma domain pointing at that
+  # JWKS, so a JWT-SVID from spire-agent validates against AM out of the box.
+  # Mint one with: bash spire/scripts/issue-svid.sh
+
+  # One-shot init: chown the spire-server data + shared volumes so the server can
+  # run as an unprivileged user (1000:1000) and bootstrap/agent can read the UDS.
+  spire-perms-init:
+    image: alpine:3.19
+    command: ['sh', '-c', 'mkdir -p /data /shared && chown -R 1000:1000 /data /shared && chmod 0755 /data /shared']
+    volumes:
+      - spire-server-data:/data
+      - spire-shared:/shared
+
+  spire-server:
+    image: ghcr.io/spiffe/spire-server:1.9.6
+    user: '1000:1000'
+    command: ['-config', '/run/spire/config/server.conf']
+    depends_on:
+      spire-perms-init:
+        condition: service_completed_successfully
+    volumes:
+      - ./spire/server.conf:/run/spire/config/server.conf:ro
+      - spire-server-data:/run/spire/data
+      - spire-shared:/run/spire/shared
+    ports:
+      - '18081:8081'
+    healthcheck:
+      test: ['CMD', '/opt/spire/bin/spire-server', 'healthcheck', '-socketPath', '/run/spire/shared/server.sock']
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  spire-bootstrap:
+    build:
+      context: ./spire/bootstrap
+    depends_on:
+      spire-server:
+        condition: service_healthy
+    volumes:
+      - spire-shared:/run/spire/shared
+
+  spire-agent:
+    build:
+      context: ./spire/agent
+    depends_on:
+      spire-bootstrap:
+        condition: service_completed_successfully
+    volumes:
+      - ./spire/agent.conf:/run/spire/config/agent.conf:ro
+      - spire-shared:/run/spire/shared
+      - spire-agent-public:/run/spire-agent/public
+    healthcheck:
+      test: ['CMD', '/usr/local/bin/spire-agent', 'healthcheck', '-socketPath', '/run/spire-agent/public/api.sock']
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  spire-oidc:
+    image: ghcr.io/spiffe/oidc-discovery-provider:1.9.6
+    user: '1000:1000'
+    depends_on:
+      spire-agent:
+        condition: service_healthy
+    # Share the agent's PID namespace so the unix workload attestor can resolve
+    # the OIDC provider's caller PID across containers.
+    pid: 'service:spire-agent'
+    command: ['-config', '/run/spire/config/oidc-provider.conf']
+    volumes:
+      - ./spire/oidc-provider.conf:/run/spire/config/oidc-provider.conf:ro
+      - spire-agent-public:/run/spire-agent/public:ro
+    ports:
+      - '18443:8443'
+    # No healthcheck: the oidc-discovery-provider image is distroless (no wget/
+    # curl/shell to probe with), and nothing depends_on it as healthy. run.sh
+    # polls http://localhost:18443/keys for readiness before setup.sh runs.
+
+# Named volumes: am-mongo-data persists AM mongo across `docker compose down`
+# (wiped only by `down -v`); the spire-* volumes carry the server datastore and
+# the shared UDS / agent socket between the SPIRE containers.
+volumes:
+  am-mongo-data:
+  spire-server-data:
+  spire-shared:
+  spire-agent-public:

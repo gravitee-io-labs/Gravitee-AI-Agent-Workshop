@@ -1,0 +1,11 @@
+# AM license — supply your own
+license/license.key
+
+# local image-version overrides — copy from .env.example
+.env
+
+# the gamma/authz/MCP plugins are baked into the images; ./plugins is an
+# optional manual-override path (mounted as plugins-ext). keep the folder so
+# the bind mount has a target, ignore any zips dropped in for local overrides.
+plugins/*
+!plugins/.gitkeep

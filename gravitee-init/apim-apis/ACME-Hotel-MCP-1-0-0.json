@@ -1,0 +1,857 @@
+{
+  "api": {
+    "definitionVersion": "V4",
+    "type": "MCP_PROXY",
+    "listeners": [
+      {
+        "type": "HTTP",
+        "paths": [
+          {
+            "path": "/mcp-proxy/",
+            "overrideAccess": false
+          }
+        ],
+        "pathMappings": [],
+        "requestValidation": {
+          "rejectNullByte": true
+        },
+        "entrypoints": [
+          {
+            "type": "mcp-studio",
+            "qos": "AUTO",
+            "configuration": {
+              "supportedTransports": [
+                "streamable-http"
+              ],
+              "supportedProtocolVersions": [
+                "2025-11-25"
+              ]
+            }
+          }
+        ],
+        "servers": []
+      }
+    ],
+    "endpointGroups": [
+      {
+        "name": "tavily-mcp",
+        "type": "tools-mcp",
+        "loadBalancer": {
+          "type": "ROUND_ROBIN"
+        },
+        "endpoints": [
+          {
+            "name": "tavily-mcp-mcp",
+            "type": "tools-mcp",
+            "weight": 1,
+            "inheritConfiguration": false,
+            "configuration": {
+              "groupName": "tavily-mcp",
+              "specification": {
+                "resources": [],
+                "tools": [
+                  {
+                    "inputSchema": {
+                      "additionalProperties": false,
+                      "type": "object",
+                      "properties": {
+                        "end_date": {
+                          "default": "",
+                          "description": "Will return all results before the specified end date. Required to be written in the format YYYY-MM-DD",
+                          "type": "string"
+                        },
+                        "country": {
+                          "default": "",
+                          "description": "Boost search results from a specific country. Must be a full country name (e.g., 'United States', 'Japan', 'Germany'). ISO country codes (e.g., 'us', 'jp') are not supported. Available only if topic is general. See https://docs.tavily.com/documentation/api-reference/search for the full list of supported countries.",
+                          "type": "string"
+                        },
+                        "include_favicon": {
+                          "default": false,
+                          "description": "Whether to include the favicon URL for each result",
+                          "type": "boolean"
+                        },
+                        "exact_match": {
+                          "anyOf": [
+                            {
+                              "type": "boolean"
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ],
+                          "description": "Only return results containing the exact phrase(s) in quotes in your query"
+                        },
+                        "query": {
+                          "description": "Search query",
+                          "type": "string"
+                        },
+                        "include_domains": {
+                          "default": [],
+                          "description": "A list of domains to specifically include in the search results, if the user asks to search on specific sites set this to the domain of the site",
+                          "type": "array",
+                          "items": {
+                            "type": "string"
+                          }
+                        },
+                        "include_images": {
+                          "default": false,
+                          "description": "Include a list of query-related images in the response",
+                          "type": "boolean"
+                        },
+                        "search_depth": {
+                          "default": "basic",
+                          "description": "The depth of the search. 'basic' for generic results, 'advanced' for more thorough search, 'fast' for optimized low latency with high relevance, 'ultra-fast' for prioritizing latency above all else",
+                          "type": "string",
+                          "enum": [
+                            "basic",
+                            "advanced",
+                            "fast",
+                            "ultra-fast"
+                          ]
+                        },
+                        "time_range": {
+                          "anyOf": [
+                            {
+                              "type": "string",
+                              "enum": [
+                                "day",
+                                "week",
+                                "month",
+                                "year"
+                              ]
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ],
+                          "description": "The time range back from the current date to include in the search results"
+                        },
+                        "max_results": {
+                          "default": 5,
+                          "description": "The maximum number of search results to return",
+                          "type": "integer"
+                        },
+                        "topic": {
+                          "default": "general",
+                          "const": "general",
+                          "description": "The category of the search. This will determine which of our agents will be used for the search",
+                          "type": "string"
+                        },
+                        "exclude_domains": {
+                          "default": [],
+                          "description": "List of domains to specifically exclude, if the user asks to exclude a domain set this to the domain of the site",
+                          "type": "array",
+                          "items": {
+                            "type": "string"
+                          }
+                        },
+                        "include_image_descriptions": {
+                          "default": false,
+                          "description": "Include a list of query-related images and their descriptions in the response",
+                          "type": "boolean"
+                        },
+                        "include_raw_content": {
+                          "default": false,
+                          "description": "Include the cleaned and parsed HTML content of each search result",
+                          "type": "boolean"
+                        },
+                        "start_date": {
+                          "default": "",
+                          "description": "Will return all results after the specified start date. Required to be written in the format YYYY-MM-DD.",
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "query"
+                      ]
+                    },
+                    "name": "tavily_search",
+                    "description": "Search the web for current information on any topic. Use for news, facts, or data beyond your knowledge cutoff. Returns snippets and source URLs.",
+                    "entityId": "tavily-mcp.tavily_search",
+                    "id": "d397c133-c7a6-493e-b11c-b2284480029a"
+                  }
+                ],
+                "prompts": []
+              },
+              "upstreamAuth": {
+                "type": "bearer",
+                "apiKeyHeader": "X-API-Key",
+                "token": "${TAVILY_API_KEY}"
+              },
+              "target": "https://mcp.tavily.com/mcp/"
+            },
+            "services": {},
+            "secondary": false,
+            "tenants": []
+          }
+        ],
+        "services": {}
+      },
+      {
+        "name": "ACME Hotels API",
+        "type": "tools-http",
+        "loadBalancer": {
+          "type": "ROUND_ROBIN"
+        },
+        "endpoints": [
+          {
+            "name": "ACME Hotels API-mcp",
+            "type": "tools-http",
+            "weight": 1,
+            "inheritConfiguration": false,
+            "configuration": {
+              "groupName": "ACME Hotels API",
+              "specification": {
+                "resources": [],
+                "tools": [
+                  {
+                    "path": "/bookings",
+                    "headers": [],
+                    "method": "POST",
+                    "pathParams": [],
+                    "outputSchema": {
+                      "type": "object",
+                      "properties": {
+                        "bodySchema": {
+                          "description": "A hotel room booking.",
+                          "title": "Booking",
+                          "required": [
+                            "check_in",
+                            "check_out",
+                            "created_at",
+                            "guest_email",
+                            "guest_name",
+                            "guests",
+                            "hotel_id",
+                            "hotel_name",
+                            "id",
+                            "room_type",
+                            "status",
+                            "total_price"
+                          ],
+                          "properties": {
+                            "notes": {
+                              "default": "",
+                              "description": "Special requests or notes",
+                              "title": "Notes"
+                            },
+                            "guest_name": {
+                              "description": "Guest full name",
+                              "title": "Guest Name"
+                            },
+                            "total_price": {
+                              "description": "Total price in USD",
+                              "title": "Total Price"
+                            },
+                            "hotel_id": {
+                              "description": "Hotel identifier",
+                              "title": "Hotel Id"
+                            },
+                            "check_in": {
+                              "format": "date",
+                              "description": "Check-in date",
+                              "title": "Check In"
+                            },
+                            "created_at": {
+                              "format": "date-time",
+                              "description": "Booking creation timestamp",
+                              "title": "Created At"
+                            },
+                            "hotel_name": {
+                              "description": "Hotel name (denormalised for convenience)",
+                              "title": "Hotel Name"
+                            },
+                            "check_out": {
+                              "format": "date",
+                              "description": "Check-out date",
+                              "title": "Check Out"
+                            },
+                            "guest_email": {
+                              "format": "email",
+                              "description": "Guest email address",
+                              "title": "Guest Email"
+                            },
+                            "guests": {
+                              "description": "Number of guests",
+                              "title": "Guests",
+                              "minimum": 1
+                            },
+                            "id": {
+                              "description": "Booking reference",
+                              "title": "Id"
+                            },
+                            "room_type": {
+                              "description": "Room type booked",
+                              "title": "Room Type"
+                            },
+                            "status": {
+                              "description": "Booking status",
+                              "title": "BookingStatus",
+                              "enum": [
+                                "confirmed",
+                                "completed",
+                                "cancelled"
+                              ]
+                            }
+                          }
+                        }
+                      },
+                      "required": []
+                    },
+                    "inputSchema": {
+                      "type": "object",
+                      "properties": {
+                        "bodySchema": {
+                          "description": "Request body to create a new booking.",
+                          "title": "BookingCreate",
+                          "required": [
+                            "check_in",
+                            "check_out",
+                            "guest_email",
+                            "guest_name",
+                            "hotel_id",
+                            "room_type"
+                          ],
+                          "properties": {
+                            "check_out": {
+                              "format": "date",
+                              "description": "Check-out date (YYYY-MM-DD)",
+                              "title": "Check Out"
+                            },
+                            "notes": {
+                              "default": "",
+                              "description": "Special requests or notes",
+                              "title": "Notes"
+                            },
+                            "guest_name": {
+                              "description": "Guest full name",
+                              "title": "Guest Name"
+                            },
+                            "hotel_id": {
+                              "description": "Hotel identifier",
+                              "title": "Hotel Id"
+                            },
+                            "check_in": {
+                              "format": "date",
+                              "description": "Check-in date (YYYY-MM-DD)",
+                              "title": "Check In"
+                            },
+                            "guest_email": {
+                              "format": "email",
+                              "description": "Guest email address",
+                              "title": "Guest Email"
+                            },
+                            "guests": {
+                              "default": 1,
+                              "description": "Number of guests",
+                              "title": "Guests",
+                              "minimum": 1
+                            },
+                            "room_type": {
+                              "description": "Room type to book",
+                              "title": "Room Type"
+                            }
+                          }
+                        }
+                      },
+                      "required": []
+                    },
+                    "queryParams": [],
+                    "name": "createBooking",
+                    "description": "Create a booking\n\nCreate a new hotel room booking. The total price is automatically calculated from the room type nightly rate and stay duration. Validates hotel existence, room type, dates, and guest capacity.",
+                    "entityId": "acme-hotels-api-createbooking",
+                    "id": "fd014906-d4cf-47eb-8f83-bc69df94a788",
+                    "contentType": "application/json"
+                  },
+                  {
+                    "path": "/bookings",
+                    "headers": [],
+                    "method": "GET",
+                    "pathParams": [],
+                    "outputSchema": {
+                      "type": "object",
+                      "properties": {
+                        "bodySchema": {
+                          "title": "Response Listbookings",
+                          "items": {
+                            "description": "A hotel room booking.",
+                            "title": "Booking",
+                            "required": [
+                              "check_in",
+                              "check_out",
+                              "created_at",
+                              "guest_email",
+                              "guest_name",
+                              "guests",
+                              "hotel_id",
+                              "hotel_name",
+                              "id",
+                              "room_type",
+                              "status",
+                              "total_price"
+                            ],
+                            "properties": {
+                              "notes": {
+                                "default": "",
+                                "description": "Special requests or notes",
+                                "title": "Notes"
+                              },
+                              "guest_name": {
+                                "description": "Guest full name",
+                                "title": "Guest Name"
+                              },
+                              "total_price": {
+                                "description": "Total price in USD",
+                                "title": "Total Price"
+                              },
+                              "hotel_id": {
+                                "description": "Hotel identifier",
+                                "title": "Hotel Id"
+                              },
+                              "check_in": {
+                                "format": "date",
+                                "description": "Check-in date",
+                                "title": "Check In"
+                              },
+                              "created_at": {
+                                "format": "date-time",
+                                "description": "Booking creation timestamp",
+                                "title": "Created At"
+                              },
+                              "hotel_name": {
+                                "description": "Hotel name (denormalised for convenience)",
+                                "title": "Hotel Name"
+                              },
+                              "check_out": {
+                                "format": "date",
+                                "description": "Check-out date",
+                                "title": "Check Out"
+                              },
+                              "guest_email": {
+                                "format": "email",
+                                "description": "Guest email address",
+                                "title": "Guest Email"
+                              },
+                              "guests": {
+                                "description": "Number of guests",
+                                "title": "Guests",
+                                "minimum": 1
+                              },
+                              "id": {
+                                "description": "Booking reference",
+                                "title": "Id"
+                              },
+                              "room_type": {
+                                "description": "Room type booked",
+                                "title": "Room Type"
+                              },
+                              "status": {
+                                "description": "Booking status",
+                                "title": "BookingStatus",
+                                "enum": [
+                                  "confirmed",
+                                  "completed",
+                                  "cancelled"
+                                ]
+                              }
+                            }
+                          }
+                        }
+                      },
+                      "required": []
+                    },
+                    "inputSchema": {
+                      "type": "object",
+                      "properties": {},
+                      "required": []
+                    },
+                    "queryParams": [],
+                    "name": "listBookings",
+                    "description": "List bookings\n\nReturns bookings for the authenticated user, identified by the X-User-Email header.",
+                    "entityId": "acme-hotels-api-listbookings",
+                    "id": "6e7174ea-aa66-4a65-aed7-9a36f83b4bc3"
+                  },
+                  {
+                    "path": "/hotels",
+                    "headers": [],
+                    "method": "GET",
+                    "pathParams": [],
+                    "outputSchema": {
+                      "type": "object",
+                      "properties": {
+                        "bodySchema": {
+                          "title": "Response Searchhotels",
+                          "items": {
+                            "description": "Lightweight hotel listing without reviews.",
+                            "title": "HotelSummary",
+                            "required": [
+                              "address",
+                              "amenities",
+                              "check_in_time",
+                              "check_out_time",
+                              "city",
+                              "contact",
+                              "country",
+                              "description",
+                              "id",
+                              "name",
+                              "rating",
+                              "review_count",
+                              "room_types",
+                              "stars"
+                            ],
+                            "properties": {
+                              "country": {
+                                "title": "Country"
+                              },
+                              "amenities": {
+                                "title": "Amenities",
+                                "items": {}
+                              },
+                              "address": {
+                                "title": "Address"
+                              },
+                              "city": {
+                                "title": "City"
+                              },
+                              "check_in_time": {
+                                "title": "Check In Time"
+                              },
+                              "check_out_time": {
+                                "title": "Check Out Time"
+                              },
+                              "rating": {
+                                "title": "Rating"
+                              },
+                              "description": {
+                                "title": "Description"
+                              },
+                              "review_count": {
+                                "title": "Review Count"
+                              },
+                              "stars": {
+                                "title": "Stars"
+                              },
+                              "room_types": {
+                                "title": "Room Types",
+                                "items": {
+                                  "title": "RoomType",
+                                  "required": [
+                                    "capacity",
+                                    "count",
+                                    "description",
+                                    "name",
+                                    "price_per_night",
+                                    "type"
+                                  ],
+                                  "properties": {
+                                    "price_per_night": {
+                                      "description": "Nightly rate in USD",
+                                      "title": "Price Per Night"
+                                    },
+                                    "name": {
+                                      "description": "Display name",
+                                      "title": "Name"
+                                    },
+                                    "count": {
+                                      "description": "Total rooms of this type",
+                                      "title": "Count"
+                                    },
+                                    "description": {
+                                      "description": "Room description",
+                                      "title": "Description"
+                                    },
+                                    "type": {
+                                      "description": "Room type key (e.g. standard, deluxe, suite)",
+                                      "title": "Type"
+                                    },
+                                    "capacity": {
+                                      "description": "Maximum number of guests",
+                                      "title": "Capacity"
+                                    }
+                                  }
+                                }
+                              },
+                              "contact": {
+                                "title": "HotelContact",
+                                "required": [
+                                  "email",
+                                  "phone"
+                                ],
+                                "properties": {
+                                  "phone": {
+                                    "description": "Phone number",
+                                    "title": "Phone"
+                                  },
+                                  "email": {
+                                    "description": "Reservation email",
+                                    "title": "Email"
+                                  }
+                                }
+                              },
+                              "name": {
+                                "title": "Name"
+                              },
+                              "id": {
+                                "title": "Id"
+                              }
+                            }
+                          }
+                        }
+                      },
+                      "required": []
+                    },
+                    "inputSchema": {
+                      "type": "object",
+                      "properties": {
+                        "q": {
+                          "description": "Free-text search across name, city, country, and description",
+                          "anyOf": [
+                            {},
+                            {}
+                          ],
+                          "title": "Q"
+                        },
+                        "country": {
+                          "description": "Filter by country (case-insensitive)",
+                          "anyOf": [
+                            {},
+                            {}
+                          ],
+                          "title": "Country"
+                        },
+                        "max_price": {
+                          "description": "Maximum nightly price (USD) across any room type",
+                          "anyOf": [
+                            {
+                              "minimum": 0
+                            },
+                            {}
+                          ],
+                          "title": "Max Price"
+                        },
+                        "min_price": {
+                          "description": "Minimum nightly price (USD) across any room type",
+                          "anyOf": [
+                            {
+                              "minimum": 0
+                            },
+                            {}
+                          ],
+                          "title": "Min Price"
+                        },
+                        "city": {
+                          "description": "Filter by city name (case-insensitive)",
+                          "anyOf": [
+                            {},
+                            {}
+                          ],
+                          "title": "City"
+                        },
+                        "amenity": {
+                          "description": "Required amenities (all must be present)",
+                          "anyOf": [
+                            {
+                              "items": {}
+                            },
+                            {}
+                          ],
+                          "title": "Amenity"
+                        },
+                        "min_rating": {
+                          "description": "Minimum guest rating (0–5)",
+                          "anyOf": [
+                            {
+                              "maximum": 5,
+                              "minimum": 0
+                            },
+                            {}
+                          ],
+                          "title": "Min Rating"
+                        },
+                        "stars": {
+                          "description": "Exact star rating (1–5)",
+                          "anyOf": [
+                            {
+                              "maximum": 5,
+                              "minimum": 1
+                            },
+                            {}
+                          ],
+                          "title": "Stars"
+                        }
+                      },
+                      "required": []
+                    },
+                    "queryParams": [
+                      "q",
+                      "city",
+                      "country",
+                      "min_price",
+                      "max_price",
+                      "min_rating",
+                      "stars",
+                      "amenity"
+                    ],
+                    "name": "searchHotels",
+                    "description": "Search hotels\n\nSearch and filter hotels across all cities. Returns hotel summaries (without full reviews). All filters are optional and combine with AND logic. Use `q` for free-text search across name, city, country, and description.",
+                    "entityId": "acme-hotels-api-searchhotels",
+                    "id": "a43d5650-ca54-49ff-8c7a-ae6036367e20"
+                  }
+                ],
+                "prompts": []
+              },
+              "target": "http://host.docker.internal:8082/hotels"
+            },
+            "services": {},
+            "secondary": false,
+            "tenants": []
+          }
+        ],
+        "services": {}
+      }
+    ],
+    "analytics": {
+      "enabled": true,
+      "logging": {
+        "content": {
+          "headers": true,
+          "messageHeaders": false,
+          "payload": true,
+          "messagePayload": false,
+          "messageMetadata": false
+        },
+        "phase": {
+          "request": true,
+          "response": true
+        },
+        "mode": {
+          "endpoint": true,
+          "entrypoint": true
+        }
+      },
+      "tracing": {
+        "enabled": true,
+        "verbose": true
+      }
+    },
+    "flowExecution": {
+      "mode": "DEFAULT",
+      "matchRequired": false
+    },
+    "flows": [],
+    "allowMultiJwtOauth2Subscriptions": false,
+    "id": "819c2ad7-91c1-42c8-9c2a-d791c112c80a",
+    "name": "ACME Hotel MCP",
+    "apiVersion": "1.0.0",
+    "deployedAt": "2026-06-18T13:36:38.585Z",
+    "createdAt": "2026-06-18T13:36:38.495Z",
+    "updatedAt": "2026-06-18T13:36:38.585Z",
+    "disableMembershipNotifications": false,
+    "groups": [],
+    "state": "STARTED",
+    "visibility": "PUBLIC",
+    "labels": [],
+    "lifecycleState": "CREATED",
+    "tags": [],
+    "primaryOwner": {
+      "id": "7d85b478-1ed0-41c9-85b4-781ed031c90a",
+      "displayName": "admin",
+      "type": "USER"
+    },
+    "categories": [],
+    "originContext": {
+      "origin": "MANAGEMENT"
+    },
+    "responseTemplates": {}
+  },
+  "members": [
+    {
+      "id": "7d85b478-1ed0-41c9-85b4-781ed031c90a",
+      "displayName": "admin",
+      "roles": [
+        {
+          "name": "PRIMARY_OWNER",
+          "scope": "API"
+        }
+      ]
+    }
+  ],
+  "metadata": [
+    {
+      "key": "email-support",
+      "name": "email-support",
+      "format": "MAIL",
+      "value": "${(api.primaryOwner.email)!''}",
+      "defaultValue": "support@change.me"
+    }
+  ],
+  "pages": [],
+  "plans": [
+    {
+      "definitionVersion": "V4",
+      "flows": [],
+      "id": "cb3338cf-b594-422f-b338-cfb594922faf",
+      "name": "AM JWT",
+      "description": "",
+      "security": {
+        "type": "JWT",
+        "configuration": {
+          "signature": "RSA_RS256",
+          "publicKeyResolver": "JWKS_URL",
+          "resolverParameter": "http://host.docker.internal:8092/gravitee/oidc/.well-known/jwks.json",
+          "connectTimeout": 2000,
+          "requestTimeout": 2000,
+          "followRedirects": false,
+          "useSystemProxy": false,
+          "extractClaims": false,
+          "propagateAuthHeader": true,
+          "userClaim": "sub",
+          "confirmationMethodValidation": {
+            "ignoreMissing": false,
+            "certificateBoundThumbprint": {
+              "enabled": false,
+              "extractCertificateFromHeader": false,
+              "headerName": "ssl-client-cert"
+            }
+          },
+          "tokenTypValidation": {
+            "enabled": false,
+            "ignoreMissing": false,
+            "expectedValues": [
+              "JWT"
+            ],
+            "ignoreCase": false
+          },
+          "revocationCheck": {
+            "enabled": false,
+            "revocationClaim": "jti",
+            "refreshInterval": 300,
+            "connectTimeout": 2000,
+            "requestTimeout": 2000,
+            "followRedirects": false,
+            "useSystemProxy": false,
+            "auth": {
+              "type": "none"
+            }
+          }
+        }
+      },
+      "mode": "STANDARD",
+      "characteristics": [],
+      "commentMessage": "",
+      "commentRequired": false,
+      "createdAt": "2026-07-23T17:05:32.351Z",
+      "excludedGroups": [],
+      "generalConditions": "",
+      "order": 1,
+      "publishedAt": "2026-07-23T17:05:35.037Z",
+      "status": "PUBLISHED",
+      "tags": [],
+      "type": "API",
+      "updatedAt": "2026-07-23T17:05:35.037Z",
+      "validation": "MANUAL"
+    }
+  ],
+  "apiMedia": []
+}

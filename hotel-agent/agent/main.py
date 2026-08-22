@@ -37,6 +37,7 @@ load_dotenv()
 # --- Configuration ---
 
 AGENT_SERVER_PORT = int(os.getenv("AGENT_SERVER_PORT", "8080"))
+AGENT_PUBLIC_URL = os.getenv("AGENT_PUBLIC_URL", f"http://localhost:{AGENT_SERVER_PORT}")
 AGENT_NAME = os.getenv("AGENT_NAME", "ACME Hotel Agent")
 AGENT_DESCRIPTION = os.getenv(
     "AGENT_DESCRIPTION",
@@ -44,6 +45,7 @@ AGENT_DESCRIPTION = os.getenv(
     "and helps guests with all aspects of their stay.",
 )
 MCP_HTTP_URLS = os.getenv("MCP_HTTP_URLS", os.getenv("MCP_HTTP_URL", ""))
+MCP_API_KEY = os.getenv("MCP_API_KEY", "")
 AM_TOKEN_URL = os.getenv("AM_TOKEN_URL", "")
 AM_CLIENT_ID = os.getenv("AM_CLIENT_ID", "")
 AM_CLIENT_SECRET = os.getenv("AM_CLIENT_SECRET", "")
@@ -52,6 +54,8 @@ SYSTEM_PROMPT = os.getenv(
     "You are a Hotel booking assistant. "
     "Help guests search for hotels, check availability, make reservations, and manage their bookings. "
     "Always use the available tools to retrieve data, never invent or fabricate information. "
+    "When asked for information beyond hotel bookings (local attractions, restaurants, things to do, current events, etc.), "
+    "use the web search tool if available to answer the question. "
     "Be friendly, concise, and whenever possible, personalize your responses using the guest's first name.",
 )
 
@@ -146,15 +150,18 @@ def _rate_limit_message(e: LLMRateLimitError) -> str:
 class MCPAgent:
 
     def __init__(self):
-        self.mcp = MCPMultiClient(mcp_urls=MCP_HTTP_URLS, elicitation_callback=elicitation_mgr.request)
+        self.mcp: MCPMultiClient | None = None
         self.llm = LLMClient()
         self.auth = AuthService(am_token_url=AM_TOKEN_URL, am_client_id=AM_CLIENT_ID, am_client_secret=AM_CLIENT_SECRET)
         self._ready = False
 
     async def initialize(self):
-        await self.mcp.connect_all(max_retries=3, connection_timeout=15)
         if AM_TOKEN_URL:
             await self.auth.initialize()
+        token = await self.auth.ensure_agent_token() if AM_TOKEN_URL else None
+        static_headers = {"Authorization": f"Bearer {token}"} if token else None
+        self.mcp = MCPMultiClient(mcp_urls=MCP_HTTP_URLS, elicitation_callback=elicitation_mgr.request, static_headers=static_headers)
+        await self.mcp.connect_all(max_retries=3, connection_timeout=15)
         self._ready = True
         logger.info("Agent initialized")
 
@@ -192,23 +199,39 @@ class MCPAgent:
         tools = await self.mcp.list_all_tools(extra_headers=mcp_headers or None)
         logger.info(f"Step 1 - MCP Tools Discovery: {len(tools)} tools availables.")
 
-        # Step 2 — LLM decides which tool to call (no history — just current message + tools)
-        try:
-            content, tool_calls = await self.llm.process_query(
-                message, tools, system_prompt=SYSTEM_PROMPT,
-                extra_headers=gw_headers or None,
+        # Build a tool-aware system prompt so small models know the exact tool names
+        effective_system_prompt = SYSTEM_PROMPT
+        if tools:
+            tool_names = ", ".join(t["function"]["name"] for t in tools)
+            effective_system_prompt += (
+                f"\n\nAvailable tools: {tool_names}. "
+                "You MUST call one of these tools for every user request. "
+                "Never answer from your own knowledge or say you cannot help — always use a tool."
             )
-        except LLMRateLimitError as e:
-            logger.warning(f"Step 2 - Rate limited (reset={e.reset})")
-            return _rate_limit_message(e), []
-        except LLMRequestBlockedError:
-            return "Your request was blocked because it was deemed invalid or unsafe.", []
 
-        if not tool_calls:
-            logger.info("Step 2 - LLM reasoning: LLM did not select any tool.")
-            return (content or "I couldn't determine how to help. Could you provide more details?"), []
+        # Step 2 — LLM decides which tool to call (no history — just current message + tools)
+        # Shortcut: if the message contains "web", force tavily_search if available
+        web_tool = next((t for t in tools if t["function"]["name"] == "tavily_search"), None)
+        if web_tool and "web" in message.lower():
+            logger.info("Step 2 - Shortcut: 'web' keyword detected, forcing tavily_search")
+            tool_calls = [{"id": "forced_web_search", "function": {"name": "tavily_search", "arguments": {"query": message}}}]
         else:
-            logger.info(f"Step 2 - LLM reasoning: LLM selected {len(tool_calls)} tool(s): {', '.join([tc['function']['name'] for tc in tool_calls])}")
+            try:
+                content, tool_calls = await self.llm.process_query(
+                    message, tools, system_prompt=effective_system_prompt,
+                    extra_headers=gw_headers or None,
+                )
+            except LLMRateLimitError as e:
+                logger.warning(f"Step 2 - Rate limited (reset={e.reset})")
+                return _rate_limit_message(e), []
+            except LLMRequestBlockedError:
+                return "Your request was blocked because it was deemed invalid or unsafe.", []
+
+            if not tool_calls:
+                logger.info("Step 2 - LLM reasoning: LLM did not select any tool.")
+                return (content or "I couldn't determine how to help. Could you provide more details?"), []
+            else:
+                logger.info(f"Step 2 - LLM reasoning: LLM selected {len(tool_calls)} tool(s): {', '.join([tc['function']['name'] for tc in tool_calls])}")
             
         # Step 3 — Execution of the selected tool (currently only supports the 1st one).
         tc = tool_calls[0]
@@ -245,7 +268,8 @@ class MCPAgent:
             return json.dumps(result) if isinstance(result, (dict, list)) else str(result), tool_messages
 
     async def cleanup(self):
-        await self.mcp.cleanup()
+        if self.mcp:
+            await self.mcp.cleanup()
         await self.auth.cleanup()
 
     @staticmethod
@@ -415,7 +439,7 @@ def create_agent_card() -> AgentCard:
         version="1.0.0",
         description=AGENT_DESCRIPTION,
         supported_interfaces=[AgentInterface(
-            url=f"http://localhost:{AGENT_SERVER_PORT}",
+            url=AGENT_PUBLIC_URL,
             protocol_binding="JSONRPC",
         )],
         capabilities=AgentCapabilities(streaming=True),
@@ -467,8 +491,11 @@ def main():
 
     @asynccontextmanager
     async def lifespan(app):
-        await agent.initialize()
-        logger.info("Agent ready")
+        try:
+            await agent.initialize()
+            logger.info("Agent ready")
+        except Exception as e:
+            logger.warning(f"Agent initialization failed, will retry on first request: {e}")
         yield
         await agent.cleanup()
         logger.info("Agent stopped")

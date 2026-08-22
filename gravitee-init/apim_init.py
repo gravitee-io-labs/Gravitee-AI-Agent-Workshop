@@ -32,6 +32,174 @@ APIM_SUBSCRIPTIONS_CONFIG_DIR = os.getenv("APIM_SUBSCRIPTIONS_CONFIG_DIR", "/app
 MAX_RETRIES = 30
 RETRY_DELAY = 5
 
+# Full environment settings template aligned with APIM UI update payload.
+APIM_SETTINGS_TEMPLATE: Dict[str, Any] = {
+    "email": {
+        "enabled": False,
+        "host": "smtp.my.domain",
+        "port": 587,
+        "password": "********",
+        "protocol": "smtp",
+        "subject": "[Gravitee.io] %s",
+        "from": "noreply@my.domain",
+        "properties": {
+            "auth": False,
+            "startTlsEnable": False,
+        },
+    },
+    "metadata": {
+        "readonly": [
+            "email.enabled",
+            "email.host",
+            "email.port",
+            "email.subject",
+            "email.from",
+        ]
+    },
+    "analytics": {"clientTimeout": 30000},
+    "api": {
+        "labelsDictionary": [],
+        "primaryOwnerMode": "HYBRID",
+    },
+    "apiProduct": {"primaryOwnerMode": "HYBRID"},
+    "apiScore": {"enabled": False},
+    "apiQualityMetrics": {
+        "enabled": False,
+        "functionalDocumentationWeight": 0,
+        "technicalDocumentationWeight": 0,
+        "descriptionWeight": 0,
+        "descriptionMinLength": 100,
+        "logoWeight": 0,
+        "categoriesWeight": 0,
+        "labelsWeight": 0,
+        "healthcheckWeight": 0,
+    },
+    "apiReview": {"enabled": False},
+    "application": {
+        "registration": {"enabled": False},
+        "types": {
+            "simple": {"enabled": True},
+            "browser": {"enabled": True},
+            "web": {"enabled": True},
+            "native": {"enabled": True},
+            "backend_to_backend": {"enabled": True},
+        },
+    },
+    "authentication": {
+        "google": {},
+        "github": {},
+        "oauth2": {},
+        "forceLogin": {"enabled": False},
+        "localLogin": {"enabled": True},
+    },
+    "company": {"name": "Gravitee.io"},
+    "cors": {
+        "allowOrigin": ["*"],
+        "allowHeaders": [
+            "Cache-Control",
+            "Pragma",
+            "Origin",
+            "Authorization",
+            "Content-Type",
+            "X-Requested-With",
+            "If-Match",
+            "X-Xsrf-Token",
+            "X-Recaptcha-Token",
+        ],
+        "allowMethods": ["OPTIONS", "GET", "POST", "PUT", "DELETE", "PATCH"],
+        "exposedHeaders": ["ETag", "X-Xsrf-Token"],
+        "maxAge": 1728000,
+    },
+    "documentation": {
+        "url": "https://documentation.gravitee.io/apim",
+        "pageNotFoundMessage": "",
+    },
+    "openAPIDocViewer": {
+        "openAPIDocType": {
+            "swagger": {"enabled": True},
+            "redoc": {"enabled": True},
+            "defaultType": "Swagger",
+        }
+    },
+    "plan": {
+        "security": {
+            "apikey": {"enabled": True},
+            "customApiKey": {"enabled": True},
+            "customApiKeyReuse": {"enabled": False},
+            "sharedApiKey": {"enabled": False},
+            "oauth2": {"enabled": True},
+            "keyless": {"enabled": True},
+            "jwt": {"enabled": True},
+            "push": {"enabled": True},
+            "mtls": {"enabled": True},
+        }
+    },
+    "logging": {
+        "maxDurationMillis": 0,
+        "audit": {
+            "enabled": False,
+            "trail": {"enabled": False},
+        },
+        "user": {"displayed": False},
+        "messageSampling": {
+            "probabilistic": {"limit": 0.5, "default": 0.01},
+            "count": {"limit": 10, "default": 100},
+            "temporal": {"limit": "PT1S", "default": "PT1S"},
+            "windowedCount": {"limit": "1/PT1S", "default": "1/PT10S"},
+        },
+    },
+    "portal": {
+        "entrypoint": "http://host.docker.internal:8082",
+        "apikeyHeader": "X-Gravitee-Api-Key",
+        "support": {"enabled": True},
+        "url": "http://portal.localhost",
+        "tcpPort": 4082,
+        "kafkaDomain": "{apiHost}",
+        "kafkaPort": 9092,
+        "kafkaSaslMechanisms": ["PLAIN", "SCRAM-SHA-256", "SCRAM-SHA-512"],
+        "apis": {
+            "tilesMode": {"enabled": True},
+            "documentationOnlyMode": {"enabled": False},
+            "categoryMode": {"enabled": True},
+            "promotedApiMode": {"enabled": True},
+            "apiHeaderShowTags": {"enabled": True},
+            "apiHeaderShowCategories": {"enabled": True},
+        },
+        "analytics": {"enabled": False},
+        "rating": {"enabled": True, "comment": {"mandatory": False}},
+        "media": {"enabled": False, "maxSizeInOctet": 1000000},
+        "userCreation": {
+            "enabled": True,
+            "automaticValidation": {"enabled": True},
+        },
+        "uploadMedia": {"enabled": False, "maxSizeInOctet": 1000000},
+    },
+    "portalNext": {
+        "access": {"enabled": True},
+        "mtls": {"enabled": False},
+        "analytics": {"enabled": False},
+        "applications": {
+            "membership": {
+                "enabled": False,
+                "transferOwnership": {"enabled": False},
+                "invitations": {"enabled": False},
+            }
+        },
+        "banner": {
+            "title": "Welcome to Gravitee Developer Portal!",
+            "subtitle": "Discover powerful APIs to supercharge your projects.",
+            "enabled": True,
+            "primaryButton": {"enabled": False},
+            "secondaryButton": {"enabled": False},
+        },
+        "catalog": {"fuzzySearch": {"enabled": False}},
+    },
+    "reCaptcha": {"enabled": False},
+    "scheduler": {"tasks": 10, "notifications": 10},
+    "dashboards": {"apiStatus": {"enabled": True}},
+    "kafkaPortRouting": {"enabled": False},
+}
+
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -43,6 +211,16 @@ def _list_yaml_files(directory: str) -> List[Path]:
     if not p.exists():
         return []
     return sorted(list(p.glob("*.yaml")) + list(p.glob("*.yml")))
+
+
+def _deep_merge_dict(target: Dict[str, Any], source: Dict[str, Any]) -> Dict[str, Any]:
+    """Recursively merge source into target (source takes precedence)."""
+    for key, value in source.items():
+        if isinstance(value, dict) and isinstance(target.get(key), dict):
+            _deep_merge_dict(target[key], value)
+        else:
+            target[key] = value
+    return target
 
 
 # ───────────────────────────────────────────────────────────────────────────
@@ -98,23 +276,22 @@ class ApimInitializer:
     # -- Environment settings (single GET + POST) --------------------------
 
     def _configure_settings(self) -> bool:
-        """Enable next-gen portal and custom API key in a single round-trip."""
-        self.log("Configuring environment settings (next-gen portal, custom API key)...")
+        """Apply APIM environment settings template in a single GET + POST round-trip."""
+        self.log("Configuring environment settings from template...")
         try:
             url = f"{self._v1_url}/settings"
             r = self.session.get(url, timeout=10)
             r.raise_for_status()
             settings = r.json()
 
-            # Next-gen portal
-            settings.setdefault("portalNext", {}).setdefault("access", {})["enabled"] = True
-            # Custom API key
-            settings.setdefault("plan", {}).setdefault("security", {}).setdefault("customApiKey", {})["enabled"] = True
+            _deep_merge_dict(settings, APIM_SETTINGS_TEMPLATE)
 
             r2 = self.session.post(url, json=settings, timeout=10)
             r2.raise_for_status()
-            self.log("✓ Next generation portal enabled")
-            self.log("✓ Custom API key enabled")
+            self.log("✓ APIM settings template applied")
+            self.log("  - portalNext.access.enabled = true")
+            self.log("  - plan.security.customApiKey.enabled = true")
+            self.log("  - portal.entrypoint/url configured")
             return True
         except requests.exceptions.RequestException as exc:
             self._log_response_error("Failed to configure settings", exc)
@@ -255,7 +432,9 @@ class ApimInitializer:
         self.log(f"Importing API definition from: {definition_file.name}")
         try:
             with open(definition_file, "r") as fh:
-                api_definition = json.load(fh)
+                raw = fh.read()
+            raw = re.sub(r'\$\{(\w+)\}', lambda m: os.environ.get(m.group(1), m.group(0)), raw)
+            api_definition = json.loads(raw)
 
             api_name = api_definition.get("api", {}).get("name", definition_file.stem)
 
