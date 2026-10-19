@@ -7,7 +7,7 @@
     "start": "node server.js"
   },
   "dependencies": {
-    "protobufjs": "7.5.4",
+    "protobufjs": "7.5.5",
     "ws": "8.19.0"
   }
 }
