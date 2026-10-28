@@ -1,5 +1,8 @@
 FROM nginx:1.30-alpine
 
+# The fixes Alpine published since the image was built (brotli-libs 1.2.1 for CVE-2026-111497)
+RUN apk upgrade --no-cache
+
 # Copy nginx config
 COPY nginx.conf /etc/nginx/conf.d/default.conf
 
